@@ -13,7 +13,7 @@ export function Navbar() {
             <Zap className="w-4 h-4 text-black" />
           </div>
           <span className="font-bold text-lg tracking-tight">
-            Ticker<span className="text-emerald-400">Trust</span>
+            Trust<span className="text-emerald-400">Ticker</span>
           </span>
         </Link>
 

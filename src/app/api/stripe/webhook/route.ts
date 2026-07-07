@@ -28,11 +28,12 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.userId;
       if (userId && session.subscription) {
+        const sub = await getStripe().subscriptions.retrieve(session.subscription as string);
         await prisma.user.update({
           where: { id: userId },
           data: {
-            subscriptionId: session.subscription as string,
-            subscriptionStatus: "active",
+            subscriptionId: sub.id,
+            subscriptionStatus: sub.status,
           },
         });
       }
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
         await prisma.user.update({
           where: { id: userId },
           data: {
-            subscriptionStatus: sub.status,
+            subscriptionStatus: sub.status === "trialing" ? "trialing" : sub.status,
             ...(periodEnd ? { subscriptionEndsAt: new Date(periodEnd * 1000) } : {}),
           },
         });

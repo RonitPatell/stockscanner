@@ -1,24 +1,49 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Zap, Check, ArrowLeft } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
+import { CheckoutButton } from "@/components/CheckoutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+
 const SUBSCRIPTION_PRICE = 40;
 
 const included = [
   "Live catalyst scanner with 30s refresh",
-  "Discord webhook alerts",
   "Smart keyword sentiment scoring (-100 to +100)",
   "Float, market cap, and volume on every ticker",
   "Premarket mover detection",
   "Historical similar-catalyst move data",
-  "Discord webhook alerts (free)",
+  "Discord webhook alerts",
   "Advanced filters (catalyst type, urgency, sentiment)",
   "Sound alerts for new catalysts",
   "Watchlist support",
   "Cancel anytime",
 ];
 
-export default function PricingPage() {
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ canceled?: string }>;
+}) {
+  const session = await auth();
+  const params = await searchParams;
+
+  let isSubscribed = false;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { subscriptionStatus: true },
+    });
+    isSubscribed = hasActiveSubscription(user?.subscriptionStatus);
+  }
+
+  if (isSubscribed) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-zinc-800 px-4 sm:px-6 h-16 flex items-center">
@@ -28,7 +53,7 @@ export default function PricingPage() {
             <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-black" />
             </div>
-            <span className="font-bold">TickerTrust</span>
+            <span className="font-bold">TrustTicker</span>
           </div>
         </Link>
       </header>
@@ -40,13 +65,19 @@ export default function PricingPage() {
             <p className="text-zinc-400">One plan. Everything included. No hidden fees.</p>
           </div>
 
+          {params.canceled === "true" && (
+            <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 text-center">
+              Checkout canceled. You can start your trial whenever you&apos;re ready.
+            </div>
+          )}
+
           <div className="rounded-2xl border border-emerald-500/30 bg-zinc-900/50 p-8 glow-emerald relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-emerald-500 text-black text-xs font-bold px-4 py-1 rounded-bl-lg">
               MOST POPULAR
             </div>
 
             <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-1">Pro Trader</h2>
+              <h2 className="text-xl font-semibold mb-1">TrustTicker Pro</h2>
               <p className="text-sm text-zinc-400">Full access to everything</p>
             </div>
 
@@ -56,11 +87,19 @@ export default function PricingPage() {
             </div>
             <p className="text-sm text-emerald-400 mb-8">7-day free trial included</p>
 
-            <Link href="/login?register=true" className="block mb-8">
-              <Button size="lg" className="w-full text-base">
-                Start Free Trial
-              </Button>
-            </Link>
+            <div className="mb-8">
+              {session ? (
+                <CheckoutButton size="lg" className="w-full text-base">
+                  Start Free Trial
+                </CheckoutButton>
+              ) : (
+                <Link href="/login?register=true&next=checkout" className="block">
+                  <Button size="lg" className="w-full text-base">
+                    Create Account & Start Trial
+                  </Button>
+                </Link>
+              )}
+            </div>
 
             <ul className="space-y-3">
               {included.map((item) => (
@@ -71,6 +110,15 @@ export default function PricingPage() {
               ))}
             </ul>
           </div>
+
+          {!session && (
+            <p className="text-center text-sm text-zinc-500 mt-6">
+              Already have an account?{" "}
+              <Link href="/login?next=checkout" className="text-emerald-400 hover:underline">
+                Sign in to subscribe
+              </Link>
+            </p>
+          )}
 
           <div className="mt-8">
             <DisclaimerBanner compact />

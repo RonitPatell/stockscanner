@@ -1,4 +1,4 @@
-# TickerTrust
+# TrustTicker
 
 AI Stock Catalyst Scanner — **$40/month** subscription SaaS.
 

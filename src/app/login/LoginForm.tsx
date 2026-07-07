@@ -12,6 +12,7 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegister = searchParams.get("register") === "true";
+  const next = searchParams.get("next");
 
   const [mode, setMode] = useState<"login" | "register">(isRegister ? "register" : "login");
   const [email, setEmail] = useState("");
@@ -52,7 +53,14 @@ export default function LoginForm() {
         return;
       }
 
+      if (next === "checkout") {
+        router.refresh();
+        router.push("/subscribe");
+        return;
+      }
+
       router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Something went wrong");
       setLoading(false);
@@ -68,7 +76,7 @@ export default function LoginForm() {
             <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-black" />
             </div>
-            <span className="font-bold">TickerTrust</span>
+            <span className="font-bold">TrustTicker</span>
           </div>
         </Link>
       </header>
@@ -81,7 +89,7 @@ export default function LoginForm() {
           <p className="text-zinc-400 text-center text-sm mb-8">
             {mode === "register"
               ? "Start your 7-day free trial"
-              : "Sign in to your TickerTrust account"}
+              : "Sign in to your TrustTicker account"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -86,7 +86,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            TickerTrust scans breaking news in real-time, scores sentiment with AI,
+            TrustTicker scans breaking news in real-time, scores sentiment with AI,
             and shows you momentum before the crowd catches on. Built for day traders
             and swing traders who need an edge.
           </p>
@@ -140,7 +140,7 @@ export default function HomePage() {
               Built different from every other scanner
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto">
-              Screeners show you what moved. TickerTrust tells you why — and whether it matters.
+              Screeners show you what moved. TrustTicker tells you why — and whether it matters.
             </p>
           </div>
 
@@ -166,7 +166,7 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold mb-6">Why traders switch to TickerTrust</h2>
+              <h2 className="text-3xl font-bold mb-6">Why traders switch to TrustTicker</h2>
               <ul className="space-y-3">
                 {comparisons.map((item) => (
                   <li key={item} className="flex items-start gap-3 text-zinc-300">
@@ -182,7 +182,7 @@ export default function HomePage() {
                 <span className="font-semibold">Legal & Compliant</span>
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                TickerTrust is an informational data platform. We provide market data,
+                TrustTicker is an informational data platform. We provide market data,
                 news aggregation, and AI-generated sentiment indicators — not investment
                 advice. Every page includes clear disclaimers. Historical move data
                 includes sample sizes and past-performance warnings.
@@ -215,7 +215,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <DisclaimerBanner compact />
           <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4 text-sm text-zinc-600">
-            <span>© {new Date().getFullYear()} TickerTrust. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} TrustTicker. All rights reserved.</span>
             <div className="flex gap-6">
               <Link href="/legal/terms" className="hover:text-zinc-400">Terms</Link>
               <Link href="/legal/privacy" className="hover:text-zinc-400">Privacy</Link>

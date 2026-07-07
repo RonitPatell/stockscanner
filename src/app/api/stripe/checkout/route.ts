@@ -39,6 +39,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
     console.error("Checkout error:", error);
-    return NextResponse.json({ error: "Checkout failed" }, { status: 500 });
+    const message =
+      error instanceof Error && error.message.includes("No such price")
+        ? "Invalid STRIPE_PRICE_ID in environment variables"
+        : "Checkout failed — verify Stripe keys and price ID in .env";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

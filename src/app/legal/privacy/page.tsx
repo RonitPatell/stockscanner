@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center">
-        <Link href="/" className="text-emerald-400 hover:underline text-sm">← Back to TickerTrust</Link>
+        <Link href="/" className="text-emerald-400 hover:underline text-sm">← Back to TrustTicker</Link>
       </header>
       <main className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mb-2">How We Use Your Information</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Provide and improve the TickerTrust service</li>
+              <li>Provide and improve the TrustTicker service</li>
               <li>Process subscription payments</li>
               <li>Send catalyst alerts via your configured channels</li>
               <li>Communicate service updates and support</li>
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2 className="text-lg font-semibold text-white mb-2">Contact</h2>
-            <p>For privacy inquiries, contact: privacy@tickertrust.com</p>
+            <p>For privacy inquiries, contact: privacy@trustticker.com</p>
           </section>
         </div>
         <p className="text-xs text-zinc-600 mt-12">Last updated: {new Date().toLocaleDateString()}</p>

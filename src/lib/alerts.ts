@@ -18,7 +18,7 @@ export async function sendDiscordWebhook(
               { name: "Sentiment", value: `${payload.sentimentScore?.toFixed(0) || "—"}/100`, inline: true },
               { name: "Summary", value: payload.summary || "—" },
             ],
-            footer: { text: "TickerTrust — Informational only, not investment advice" },
+            footer: { text: "TrustTicker — Informational only, not investment advice" },
             timestamp: new Date().toISOString(),
           },
         ],

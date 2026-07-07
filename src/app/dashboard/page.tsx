@@ -1,23 +1,36 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { Zap, Settings, LogOut, CreditCard } from "lucide-react";
+import { Zap, Settings, LogOut } from "lucide-react";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { LiveScanner } from "@/components/LiveScanner";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { CheckoutButton } from "@/components/CheckoutButton";
+import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { Button } from "@/components/ui/button";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subscribed?: string }>;
+}) {
   const session = await auth();
-  const isSubscribed = session?.user?.id
-    ? (await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { subscriptionStatus: true },
-      }))?.subscriptionStatus === "active"
-    : false;
+  const params = await searchParams;
 
-  // Allow demo access without subscription for development
-  const hasAccess = isSubscribed || process.env.NODE_ENV === "development" || !session;
+  let isSubscribed = false;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { subscriptionStatus: true },
+    });
+    isSubscribed = hasActiveSubscription(user?.subscriptionStatus);
+  }
+
+  // Logged-out visitors can preview; logged-in users need an active subscription
+  const hasAccess =
+    isSubscribed ||
+    process.env.NODE_ENV === "development" ||
+    !session;
 
   return (
     <div className="min-h-screen">
@@ -28,7 +41,7 @@ export default async function DashboardPage() {
               <Zap className="w-3.5 h-3.5 text-black" />
             </div>
             <span className="font-bold">
-              Ticker<span className="text-emerald-400">Trust</span>
+              Trust<span className="text-emerald-400">Ticker</span>
             </span>
           </Link>
 
@@ -36,7 +49,7 @@ export default async function DashboardPage() {
             {session ? (
               <>
                 {!isSubscribed && (
-                  <SubscribeButton />
+                  <CheckoutButton size="sm">Subscribe $40/mo</CheckoutButton>
                 )}
                 <Link href="/settings">
                   <Button variant="ghost" size="icon">
@@ -64,12 +77,27 @@ export default async function DashboardPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {params.subscribed === "true" && isSubscribed && (
+          <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            Subscription active — welcome to TrustTicker Pro!
+          </div>
+        )}
+
+        {params.subscribed === "true" && !isSubscribed && session && (
+          <SubscriptionActivating />
+        )}
+
         {!hasAccess ? (
-          <div className="text-center py-20">
-            <CreditCard className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-            <h2 className="text-xl font-bold mb-2">Subscription Required</h2>
-            <p className="text-zinc-400 mb-6">Subscribe to access the live catalyst scanner.</p>
-            <SubscribeButton large />
+          <div className="text-center py-20 max-w-md mx-auto">
+            <h2 className="text-2xl font-bold mb-2">Start your 7-day free trial</h2>
+            <p className="text-zinc-400 mb-6">
+              You&apos;re signed in. Add a payment method to unlock the live catalyst scanner.
+              You won&apos;t be charged until the trial ends.
+            </p>
+            <CheckoutButton size="lg" className="w-full text-base">
+              Start Free Trial — $40/mo after
+            </CheckoutButton>
+            <p className="text-xs text-zinc-600 mt-4">Cancel anytime from Settings</p>
           </div>
         ) : (
           <>
@@ -81,25 +109,5 @@ export default async function DashboardPage() {
         )}
       </main>
     </div>
-  );
-}
-
-function SubscribeButton({ large }: { large?: boolean }) {
-  return (
-    <form
-      action={async () => {
-        "use server";
-        const session = await auth();
-        if (!session?.user?.id) {
-          redirect("/login?register=true");
-        }
-        // Client-side checkout is handled via API - redirect to pricing for now
-        redirect("/pricing");
-      }}
-    >
-      <Button size={large ? "lg" : "sm"} type="submit">
-        <CreditCard className="w-4 h-4" /> Subscribe $40/mo
-      </Button>
-    </form>
   );
 }

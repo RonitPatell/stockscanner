@@ -8,10 +8,10 @@ export default function DisclaimerPage() {
       <div className="prose prose-invert prose-sm max-w-none mt-8 space-y-4 text-zinc-300">
         <h2 className="text-lg font-semibold text-white">Not Investment Advice</h2>
         <p>
-          TickerTrust (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;) provides an informational market data
+          TrustTicker (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;) provides an informational market data
           and news aggregation platform. Nothing on this platform constitutes investment advice,
           financial advice, trading advice, or any other sort of advice. You should not treat
-          any content on TickerTrust as such.
+          any content on TrustTicker as such.
         </p>
 
         <h2 className="text-lg font-semibold text-white">Automated Analysis</h2>
@@ -31,7 +31,7 @@ export default function DisclaimerPage() {
 
         <h2 className="text-lg font-semibold text-white">No Fiduciary Relationship</h2>
         <p>
-          Use of TickerTrust does not create a fiduciary, advisory, or broker-client relationship.
+          Use of TrustTicker does not create a fiduciary, advisory, or broker-client relationship.
           We are not registered investment advisors, broker-dealers, or financial planners.
           Consult a licensed financial professional before making investment decisions.
         </p>
@@ -40,7 +40,7 @@ export default function DisclaimerPage() {
         <p>
           Trading stocks involves substantial risk of loss and is not suitable for every investor.
           You may lose some or all of your invested capital. Only trade with money you can afford
-          to lose. TickerTrust is not responsible for any trading losses incurred based on
+          to lose. TrustTicker is not responsible for any trading losses incurred based on
           information displayed on our platform.
         </p>
 
@@ -65,7 +65,7 @@ function LegalLayout({ title, children }: { title: string; children: React.React
   return (
     <div className="min-h-screen">
       <header className="border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center">
-        <Link href="/" className="text-emerald-400 hover:underline text-sm">← Back to TickerTrust</Link>
+        <Link href="/" className="text-emerald-400 hover:underline text-sm">← Back to TrustTicker</Link>
       </header>
       <main className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">{title}</h1>

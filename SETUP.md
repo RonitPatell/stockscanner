@@ -1,4 +1,4 @@
-# TickerTrust — $0 to Run, $40/mo Revenue
+# TrustTicker — $0 to Run, $40/mo Revenue
 
 **Your cost:** ~$12/year (domain only)  
 **Subscriber cost:** $40/month (paid to you via Stripe)
@@ -59,7 +59,7 @@ Without this key, Yahoo Finance RSS is used automatically.
 ### 5. Stripe ($40/mo subscriptions — free to set up)
 
 1. Create account at [stripe.com](https://stripe.com)
-2. **Products** → Add product: `TickerTrust Pro`
+2. **Products** → Add product: `TrustTicker Pro`
 3. Price: **$40.00 / month / recurring**
 4. Optional: add **7-day free trial**
 5. Copy `price_...` → `STRIPE_PRICE_ID`
@@ -84,7 +84,7 @@ npm run dev
 
 ```bash
 git add .
-git commit -m "TickerTrust launch"
+git commit -m "TrustTicker launch"
 git push
 ```
 
