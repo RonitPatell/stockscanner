@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String?
+  passwordHash     String?
+  image            String?
+  stripeCustomerId String?   @unique
+  subscriptionId   String?
+  subscriptionStatus String @default("inactive") // inactive, active, past_due, canceled
+  subscriptionEndsAt DateTime?
+  discordWebhook   String?
+  phoneNumber      String?
+  smsAlertsEnabled Boolean   @default(false)
+  discordAlertsEnabled Boolean @default(false)
+  watchlist        String[]  @default([])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  alertLogs        AlertLog[]
+}
+
+model Catalyst {
+  id              String   @id @default(cuid())
+  symbol          String
+  headline        String
+  source          String
+  sourceUrl       String?
+  publishedAt     DateTime
+  aiSummary       String?
+  sentimentScore  Float?   // -100 to +100
+  sentimentLabel  String?  // bearish, neutral, bullish, very_bullish
+  floatShares     Float?
+  marketCap       Float?
+  price           Float?
+  changePercent   Float?
+  volume          Float?
+  avgVolume       Float?
+  isPremarket     Boolean  @default(false)
+  historicalAvgMove Float?
+  historicalSampleSize Int?
+  catalystType    String?  // earnings, fda, merger, upgrade, downgrade, insider, sec_filing, macro
+  urgencyScore    Float?   // 0-100 momentum/urgency
+  rawNewsId       String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([symbol])
+  @@index([publishedAt])
+  @@index([urgencyScore])
+  @@index([sentimentScore])
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalystId String
+  channel   String   // discord, sms, email
+  status    String   // sent, failed
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

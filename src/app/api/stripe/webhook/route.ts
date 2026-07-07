@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getStripe } from "@/lib/stripe";
+import { prisma } from "@/lib/prisma";
+import Stripe from "stripe";
+
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const sig = req.headers.get("stripe-signature");
+
+  if (!sig) {
+    return NextResponse.json({ error: "No signature" }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = getStripe().webhooks.constructEvent(
+      body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    console.error("Webhook signature failed:", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const userId = session.metadata?.userId;
+      if (userId && session.subscription) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            subscriptionId: session.subscription as string,
+            subscriptionStatus: "active",
+          },
+        });
+      }
+      break;
+    }
+    case "customer.subscription.updated": {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = sub.metadata?.userId;
+      if (userId) {
+        const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            subscriptionStatus: sub.status,
+            ...(periodEnd ? { subscriptionEndsAt: new Date(periodEnd * 1000) } : {}),
+          },
+        });
+      }
+      break;
+    }
+    case "customer.subscription.deleted": {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = sub.metadata?.userId;
+      if (userId) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            subscriptionStatus: "canceled",
+            subscriptionId: null,
+          },
+        });
+      }
+      break;
+    }
+  }
+
+  return NextResponse.json({ received: true });
+}
