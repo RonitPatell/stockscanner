@@ -4,9 +4,10 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Zap, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { LogoMark } from "@/components/Logo";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +33,7 @@ export default function LoginForm() {
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name, phoneNumber: phone }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -73,9 +75,7 @@ export default function LoginForm() {
         <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100">
           <ArrowLeft className="w-4 h-4" />
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-black" />
-            </div>
+            <LogoMark className="w-7 h-7" />
             <span className="font-bold">TrustTicker</span>
           </div>
         </Link>
@@ -94,13 +94,23 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "register" && (
-              <input
-                type="text"
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-              />
+              <>
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone number"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </>
             )}
             <input
               type="email"

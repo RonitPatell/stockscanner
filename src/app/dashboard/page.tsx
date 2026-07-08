@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Zap, Settings, LogOut } from "lucide-react";
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
-import { LiveScanner } from "@/components/LiveScanner";
-import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { TradingDashboard } from "@/components/TradingDashboard";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { SubscriptionActivating } from "@/components/SubscriptionActivating";
+import { UserMenu } from "@/components/UserMenu";
+import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 
 export default async function DashboardPage({
@@ -21,9 +21,9 @@ export default async function DashboardPage({
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { subscriptionStatus: true },
+      select: { subscriptionStatus: true, subscriptionEndsAt: true },
     });
-    isSubscribed = hasActiveSubscription(user?.subscriptionStatus);
+    isSubscribed = hasActiveSubscription(user ?? undefined);
   }
 
   // Logged-out visitors can preview; logged-in users need an active subscription
@@ -33,13 +33,11 @@ export default async function DashboardPage({
     !session;
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-black" />
-            </div>
+    <div className="h-screen flex flex-col overflow-hidden bg-zinc-950">
+      <header className="shrink-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
+          <Link href="/" prefetch className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <LogoMark className="w-7 h-7" />
             <span className="font-bold">
               Trust<span className="text-emerald-400">Ticker</span>
             </span>
@@ -51,21 +49,7 @@ export default async function DashboardPage({
                 {!isSubscribed && (
                   <CheckoutButton size="sm">Subscribe $40/mo</CheckoutButton>
                 )}
-                <Link href="/settings">
-                  <Button variant="ghost" size="icon">
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </Link>
-                <form
-                  action={async () => {
-                    "use server";
-                    await signOut({ redirectTo: "/" });
-                  }}
-                >
-                  <Button variant="ghost" size="icon" type="submit">
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </form>
+                <UserMenu />
               </>
             ) : (
               <Link href="/login">
@@ -76,9 +60,9 @@ export default async function DashboardPage({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 min-h-0 max-w-[1600px] w-full mx-auto px-3 sm:px-4 py-2 overflow-hidden">
         {params.subscribed === "true" && isSubscribed && (
-          <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          <div className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 shrink-0">
             Subscription active — welcome to TrustTicker Pro!
           </div>
         )}
@@ -100,12 +84,7 @@ export default async function DashboardPage({
             <p className="text-xs text-zinc-600 mt-4">Cancel anytime from Settings</p>
           </div>
         ) : (
-          <>
-            <LiveScanner />
-            <div className="mt-8">
-              <DisclaimerBanner />
-            </div>
-          </>
+          <TradingDashboard />
         )}
       </main>
     </div>

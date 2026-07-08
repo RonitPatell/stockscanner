@@ -17,8 +17,9 @@ model User {
   subscriptionId   String?
   subscriptionStatus String @default("inactive") // inactive, active, past_due, canceled
   subscriptionEndsAt DateTime?
+  hasUsedTrial     Boolean   @default(false)
   discordWebhook   String?
-  phoneNumber      String?
+  phoneNumber      String?   @unique
   smsAlertsEnabled Boolean   @default(false)
   discordAlertsEnabled Boolean @default(false)
   watchlist        String[]  @default([])

@@ -17,7 +17,8 @@ export const SUBSCRIPTION_PRICE = 40; // USD per month
 export async function createCheckoutSession(
   customerId: string,
   userId: string,
-  email: string
+  email: string,
+  allowTrial: boolean
 ) {
   return getStripe().checkout.sessions.create({
     customer: customerId,
@@ -34,7 +35,7 @@ export async function createCheckoutSession(
     metadata: { userId },
     subscription_data: {
       metadata: { userId },
-      trial_period_days: 7,
+      ...(allowTrial ? { trial_period_days: 7 } : {}),
     },
     allow_promotion_codes: true,
   });

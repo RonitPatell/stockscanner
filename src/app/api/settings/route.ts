@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function normalizeWatchlist(raw: unknown): string[] | undefined {
+  if (raw == null) return undefined;
+  if (!Array.isArray(raw)) return undefined;
+  return [...new Set(raw.map((s) => String(s).trim().toUpperCase()).filter((s) => /^[A-Z]{1,5}$/.test(s)))];
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -17,6 +23,7 @@ export async function GET() {
       discordAlertsEnabled: true,
       watchlist: true,
       subscriptionStatus: true,
+      subscriptionEndsAt: true,
     },
   });
 
@@ -30,14 +37,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
+  const watchlist = normalizeWatchlist(body.watchlist);
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      discordWebhook: body.discordWebhook,
-      phoneNumber: body.phoneNumber,
-      smsAlertsEnabled: body.smsAlertsEnabled,
-      discordAlertsEnabled: body.discordAlertsEnabled,
-      watchlist: body.watchlist,
+      ...(body.discordWebhook !== undefined && { discordWebhook: body.discordWebhook }),
+      ...(body.phoneNumber !== undefined && { phoneNumber: body.phoneNumber }),
+      ...(body.smsAlertsEnabled !== undefined && { smsAlertsEnabled: body.smsAlertsEnabled }),
+      ...(body.discordAlertsEnabled !== undefined && { discordAlertsEnabled: body.discordAlertsEnabled }),
+      ...(watchlist !== undefined && { watchlist }),
     },
   });
 

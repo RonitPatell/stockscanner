@@ -12,10 +12,10 @@ export default async function SubscribePage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { subscriptionStatus: true },
+    select: { subscriptionStatus: true, subscriptionEndsAt: true },
   });
 
-  if (hasActiveSubscription(user?.subscriptionStatus)) {
+  if (hasActiveSubscription(user ?? undefined)) {
     redirect("/dashboard");
   }
 

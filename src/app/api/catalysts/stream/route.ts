@@ -1,8 +1,10 @@
+import { NextRequest } from "next/server";
 import { getCatalysts } from "@/lib/catalyst-engine";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -15,7 +17,7 @@ export async function GET() {
 
       const poll = async () => {
         try {
-          const catalysts = await getCatalysts();
+          const catalysts = await getCatalysts(80, { moversOnly });
           send({ type: "update", catalysts, timestamp: new Date().toISOString() });
         } catch {
           send({ type: "error", message: "Poll failed" });
@@ -23,7 +25,7 @@ export async function GET() {
       };
 
       await poll();
-      const interval = setInterval(poll, 30000);
+      const interval = setInterval(poll, 20000);
 
       // Keep-alive heartbeat
       const heartbeat = setInterval(() => {

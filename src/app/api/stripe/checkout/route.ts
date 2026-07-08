@@ -17,6 +17,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    if (!user.phoneNumber) {
+      return NextResponse.json(
+        { error: "Add a phone number to your account before subscribing" },
+        { status: 400 }
+      );
+    }
+
     const customerId = await getOrCreateStripeCustomer(
       user.id,
       user.email,
@@ -30,10 +37,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const phoneTrialUsed = user.phoneNumber
+      ? await prisma.user.findFirst({
+          where: {
+            phoneNumber: user.phoneNumber,
+            hasUsedTrial: true,
+            NOT: { id: user.id },
+          },
+        })
+      : null;
+
     const checkoutSession = await createCheckoutSession(
       customerId,
       user.id,
-      user.email
+      user.email,
+      !user.hasUsedTrial && !phoneTrialUsed
     );
 
     return NextResponse.json({ url: checkoutSession.url });

@@ -1,3 +1,14 @@
+export interface CatalystHeadline {
+  id: string;
+  headline: string;
+  source: string;
+  sourceUrl?: string | null;
+  publishedAt: string;
+  sentimentScore?: number | null;
+  catalystType?: string | null;
+  aiSummary?: string | null;
+}
+
 export interface CatalystItem {
   id: string;
   symbol: string;
@@ -14,11 +25,15 @@ export interface CatalystItem {
   changePercent?: number | null;
   volume?: number | null;
   avgVolume?: number | null;
+  rVol?: number | null;
   isPremarket?: boolean;
   historicalAvgMove?: number | null;
   historicalSampleSize?: number | null;
   catalystType?: string | null;
   urgencyScore?: number | null;
+  /** All headlines when multiple news items exist for this symbol */
+  headlines?: CatalystHeadline[];
+  newsCount?: number;
 }
 
 export interface ScannerFilters {
@@ -28,6 +43,13 @@ export interface ScannerFilters {
   premarketOnly?: boolean;
   minUrgency?: number;
   search?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minFloatM?: number;
+  maxFloatM?: number;
+  minChange?: number;
+  maxChange?: number;
+  minRvol?: number;
 }
 
 export interface StockQuote {
@@ -36,8 +58,52 @@ export interface StockQuote {
   change: number;
   changePercent: number;
   volume: number;
+  avgVolume?: number;
+  rVol?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  open?: number;
+  prevClose?: number;
   marketCap?: number;
   floatShares?: number;
+}
+
+export type MarketAlertType =
+  | "hod"
+  | "near_hod"
+  | "hod_retest"
+  | "volume_surge"
+  | "milestone_15m"
+  | "momentum";
+
+export interface MarketAlert {
+  id: string;
+  symbol: string;
+  type: MarketAlertType;
+  message: string;
+  changePercent: number;
+  price: number;
+  rVol?: number;
+  timestamp: string;
+}
+
+export interface VolumeLeader {
+  symbol: string;
+  price: number;
+  changePercent: number;
+  volume: number;
+  avgVolume: number;
+  rVol: number;
+  dayHigh: number;
+  nearHod: boolean;
+  marketCap?: number;
+}
+
+export interface MarketScannerSnapshot {
+  alerts: MarketAlert[];
+  volumeLeaders: VolumeLeader[];
+  scannedAt: string;
+  marketSession: "premarket" | "regular" | "afterhours" | "closed";
 }
 
 export interface NewsArticle {

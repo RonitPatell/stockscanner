@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   description:
     "Real-time stock catalyst scanner with AI summaries, sentiment scores, and momentum alerts. Informational only — not investment advice.",
   keywords: ["stock scanner", "catalyst", "day trading", "premarket movers", "AI stock analysis"],
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

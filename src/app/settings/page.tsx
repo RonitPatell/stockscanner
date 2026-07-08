@@ -3,44 +3,87 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Zap, ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { formatSubscriptionEnd } from "@/lib/subscription";
+import { LogoMark } from "@/components/Logo";
+
+interface SettingsData {
+  discordWebhook?: string;
+  discordAlertsEnabled?: boolean;
+  smsAlertsEnabled?: boolean;
+  watchlist?: string[];
+  subscriptionStatus?: string | null;
+  subscriptionEndsAt?: string | null;
+}
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const [discordWebhook, setDiscordWebhook] = useState("");
   const [discordAlertsEnabled, setDiscordAlertsEnabled] = useState(false);
+  const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
+  const [watchlistInput, setWatchlistInput] = useState("");
+  const [billing, setBilling] = useState<Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">>({});
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   useEffect(() => {
     if (session) {
       fetch("/api/settings")
         .then((r) => r.json())
-        .then((data) => {
+        .then((data: SettingsData) => {
           setDiscordWebhook(data.discordWebhook || "");
           setDiscordAlertsEnabled(data.discordAlertsEnabled || false);
+          setSmsAlertsEnabled(data.smsAlertsEnabled || false);
+          setWatchlistInput((data.watchlist ?? []).join(", "));
+          setBilling({
+            subscriptionStatus: data.subscriptionStatus,
+            subscriptionEndsAt: data.subscriptionEndsAt,
+          });
           setLoading(false);
         });
     }
   }, [session]);
 
   const handleSave = async () => {
+    const watchlist = watchlistInput
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => /^[A-Z]{1,5}$/.test(s));
+
     await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ discordWebhook, discordAlertsEnabled }),
+      body: JSON.stringify({
+        discordWebhook,
+        discordAlertsEnabled,
+        smsAlertsEnabled,
+        watchlist,
+      }),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleManageBilling = async () => {
-    const res = await fetch("/api/stripe/portal", { method: "POST" });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
+    setBillingLoading(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } finally {
+      setBillingLoading(false);
+    }
   };
+
+  const accessUntil = formatSubscriptionEnd(billing.subscriptionEndsAt);
+  const isSubscribed =
+    billing.subscriptionStatus === "active" || billing.subscriptionStatus === "trialing";
 
   if (!session) {
     return (
@@ -57,16 +100,32 @@ export default function SettingsPage() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-emerald-400" />
+          <LogoMark className="w-7 h-7" />
           <span className="font-bold">Settings</span>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-8">
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Discord Alerts</h2>
+          <h2 className="text-lg font-semibold">Watchlist &amp; Alerts</h2>
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-4">
+            <div>
+              <label className="text-sm font-medium text-zinc-300 block mb-1.5">
+                Watchlist tickers
+              </label>
+              <input
+                type="text"
+                placeholder="NVDA, AMD, SOFI, PLTR"
+                value={watchlistInput}
+                onChange={(e) => setWatchlistInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
+              <p className="text-xs text-zinc-600 mt-1.5">
+                Comma-separated. You&apos;ll get alerts when these tickers hit the news feed.
+              </p>
+            </div>
+
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
@@ -74,8 +133,9 @@ export default function SettingsPage() {
                 onChange={(e) => setDiscordAlertsEnabled(e.target.checked)}
                 className="rounded"
               />
-              Enable Discord webhook alerts
+              Discord alerts (watchlist + urgent catalysts)
             </label>
+
             <input
               type="url"
               placeholder="https://discord.com/api/webhooks/..."
@@ -83,24 +143,68 @@ export default function SettingsPage() {
               onChange={(e) => setDiscordWebhook(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
+
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={smsAlertsEnabled}
+                onChange={(e) => setSmsAlertsEnabled(e.target.checked)}
+                className="rounded"
+              />
+              SMS alerts for watchlist news
+            </label>
             <p className="text-xs text-zinc-600">
-              Discord → Server Settings → Integrations → Webhooks → New Webhook → Copy URL
+              SMS uses your account phone number. Requires Twilio env vars on the server.
             </p>
 
             <Button onClick={handleSave} disabled={loading} className="w-full">
               <Save className="w-4 h-4" />
-              {saved ? "Saved!" : "Save Alert Settings"}
+              {saved ? "Saved!" : "Save Watchlist & Alerts"}
             </Button>
           </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Billing</h2>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-            <p className="text-sm text-zinc-400 mb-4">Manage your $40/month subscription</p>
-            <Button variant="secondary" onClick={handleManageBilling} className="w-full">
-              Manage Billing
-            </Button>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-4">
+            {isSubscribed ? (
+              <>
+                <div className="text-sm space-y-1">
+                  <p className="text-zinc-300">
+                    Status:{" "}
+                    <span className="text-emerald-400 capitalize">{billing.subscriptionStatus}</span>
+                  </p>
+                  {accessUntil && (
+                    <p className="text-zinc-500">
+                      {billing.subscriptionStatus === "trialing"
+                        ? `Trial ends ${accessUntil}`
+                        : `Current period ends ${accessUntil}`}
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  To cancel, open the billing portal below and choose{" "}
+                  <span className="text-zinc-400">Cancel subscription</span>. You keep full scanner
+                  access until the end of your current billing period — you won&apos;t be charged again.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={handleManageBilling}
+                  disabled={billingLoading}
+                  className="w-full"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {billingLoading ? "Opening portal…" : "Manage subscription & cancel"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-zinc-400">No active subscription.</p>
+                <Link href="/pricing">
+                  <Button className="w-full">View plans</Button>
+                </Link>
+              </>
+            )}
           </div>
         </section>
 

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Zap, Check, ArrowLeft } from "lucide-react";
+import { Check, ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { LogoMark } from "@/components/Logo";
 
 const SUBSCRIPTION_PRICE = 40;
 
@@ -32,12 +33,25 @@ export default async function PricingPage({
   const params = await searchParams;
 
   let isSubscribed = false;
+  let trialAvailable = true;
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { subscriptionStatus: true },
+      select: { subscriptionStatus: true, subscriptionEndsAt: true, hasUsedTrial: true, phoneNumber: true },
     });
-    isSubscribed = hasActiveSubscription(user?.subscriptionStatus);
+    isSubscribed = hasActiveSubscription(user ?? undefined);
+    if (user?.hasUsedTrial) {
+      trialAvailable = false;
+    } else if (user?.phoneNumber) {
+      const phoneTrialUsed = await prisma.user.findFirst({
+        where: {
+          phoneNumber: user.phoneNumber,
+          hasUsedTrial: true,
+          NOT: { id: session.user.id },
+        },
+      });
+      trialAvailable = !phoneTrialUsed;
+    }
   }
 
   if (isSubscribed) {
@@ -50,9 +64,7 @@ export default async function PricingPage({
         <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-black" />
-            </div>
+            <LogoMark className="w-7 h-7" />
             <span className="font-bold">TrustTicker</span>
           </div>
         </Link>
@@ -85,12 +97,14 @@ export default async function PricingPage({
               <span className="text-5xl font-bold">${SUBSCRIPTION_PRICE}</span>
               <span className="text-zinc-400">/month</span>
             </div>
-            <p className="text-sm text-emerald-400 mb-8">7-day free trial included</p>
+            <p className="text-sm text-emerald-400 mb-8">
+              {trialAvailable ? "7-day free trial included" : "No trial — billed immediately at checkout"}
+            </p>
 
             <div className="mb-8">
               {session ? (
                 <CheckoutButton size="lg" className="w-full text-base">
-                  Start Free Trial
+                  {trialAvailable ? "Start Free Trial" : "Subscribe — $40/mo"}
                 </CheckoutButton>
               ) : (
                 <Link href="/login?register=true&next=checkout" className="block">

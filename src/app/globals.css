@@ -55,3 +55,40 @@ body {
 .glow-emerald {
   box-shadow: 0 0 80px rgba(16, 185, 129, 0.15);
 }
+
+.gradient-text {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 40%, #6ee7b7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 35s linear infinite;
+}
+
+@keyframes landing-fade-up-keyframes {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-fade-up {
+  animation: landing-fade-up-keyframes 0.7s ease-out both;
+}
+
+.landing-delay-1 { animation-delay: 0.1s; }
+.landing-delay-2 { animation-delay: 0.2s; }
+.landing-delay-3 { animation-delay: 0.3s; }
+.landing-delay-4 { animation-delay: 0.4s; }
+.landing-delay-5 { animation-delay: 0.55s; }
