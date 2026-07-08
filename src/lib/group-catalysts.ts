@@ -65,12 +65,18 @@ export function groupCatalystsBySymbol(items: CatalystItem[]): CatalystItem[] {
       (cur.volume ?? 0) > (best.volume ?? 0) ? cur : best
     );
     const maxRvol = Math.max(...sorted.map((i) => i.rVol ?? 0));
+    const relatedSymbols = [
+      ...new Set(sorted.flatMap((i) => i.relatedSymbols ?? [])),
+    ]
+      .filter((s) => s !== symbol)
+      .slice(0, 10);
 
     grouped.push({
       ...latest,
       id: sorted.length === 1 ? latest.id : `group-${symbol}`,
       symbol,
-      headline: latest.headline,
+      // Keep the headline stable: show the most urgent story, not always the newest minor update.
+      headline: (dominant.urgencyScore ?? 0) >= (latest.urgencyScore ?? 0) ? dominant.headline : latest.headline,
       headlines,
       newsCount: sorted.length,
       sentimentScore,
@@ -82,6 +88,7 @@ export function groupCatalystsBySymbol(items: CatalystItem[]): CatalystItem[] {
       volume: volume.volume ?? latest.volume,
       avgVolume: volume.avgVolume ?? latest.avgVolume,
       rVol: maxRvol > 0 ? maxRvol : latest.rVol,
+      relatedSymbols: relatedSymbols.length ? relatedSymbols : latest.relatedSymbols,
     });
   }
 

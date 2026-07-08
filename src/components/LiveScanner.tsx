@@ -10,6 +10,7 @@ import {
   Moon,
   Volume2,
   Star,
+  Download,
 } from "lucide-react";
 import { CatalystCard } from "./CatalystCard";
 import { DisclaimerBanner } from "./DisclaimerBanner";
@@ -21,7 +22,19 @@ import { cn } from "@/lib/utils";
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
-const POLL_MS = 20_000;
+const POLL_MS = 3_000;
+const QUOTE_POLL_MS = 12_000;
+const QUOTE_BATCH_SIZE = 8;
+const FETCH_TIMEOUT_MS = 30_000;
+const QUOTE_TIMEOUT_MS = 15_000;
+const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
+
+function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}
 
 export function LiveScanner({
   embedded = false,
@@ -41,6 +54,84 @@ export function LiveScanner({
   const [moversOnly, setMoversOnly] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const prevSymbolsRef = useRef<Set<string>>(new Set());
+  const catalystsRef = useRef<CatalystItem[]>([]);
+  const liveQuotesRef = useRef<
+    Record<string, { price: number; changePercent: number }>
+  >({});
+  const quoteCursorRef = useRef(0);
+  const quoteFetchInFlightRef = useRef(false);
+  const catalystFetchInFlightRef = useRef(false);
+  const catalystAbortRef = useRef<AbortController | null>(null);
+  const quoteAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    catalystsRef.current = catalysts;
+  }, [catalysts]);
+
+  const applyLiveQuotes = useCallback(
+    (
+      items: CatalystItem[],
+      quotes: Record<string, { price: number; changePercent: number }>
+    ): CatalystItem[] => {
+      if (!quotes || Object.keys(quotes).length === 0) return items;
+      return items.map((c) => {
+        const q = quotes[c.symbol];
+        if (!q) return c;
+        if (c.price === q.price && c.changePercent === q.changePercent) return c;
+        return { ...c, price: q.price, changePercent: q.changePercent };
+      });
+    },
+    []
+  );
+
+  const mergeLiveQuotes = useCallback(
+    (quotes: Record<string, { price: number; changePercent: number }>) => {
+      if (!quotes || Object.keys(quotes).length === 0) return;
+      liveQuotesRef.current = { ...liveQuotesRef.current, ...quotes };
+      setCatalysts((prev) => applyLiveQuotes(prev, liveQuotesRef.current));
+    },
+    [applyLiveQuotes]
+  );
+
+  const refreshLiveQuotes = useCallback(async () => {
+    if (quoteFetchInFlightRef.current) return;
+    const all = [
+      ...new Set(catalystsRef.current.map((c) => c.symbol).filter(Boolean)),
+    ];
+    if (all.length === 0) return;
+
+    const start = quoteCursorRef.current % all.length;
+    const batch: string[] = [];
+    for (let i = 0; i < Math.min(QUOTE_BATCH_SIZE, all.length); i++) {
+      batch.push(all[(start + i) % all.length]);
+    }
+    quoteCursorRef.current = (start + batch.length) % all.length;
+
+    quoteFetchInFlightRef.current = true;
+    quoteAbortRef.current?.abort(new DOMException("Superseded", "AbortError"));
+    const controller = new AbortController();
+    quoteAbortRef.current = controller;
+    const timeout = setTimeout(() => {
+      controller.abort(new DOMException("Quote request timed out", "AbortError"));
+    }, QUOTE_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(
+        `/api/quotes?symbols=${batch.join(",")}&max=${QUOTE_BATCH_SIZE}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.quotes) mergeLiveQuotes(data.quotes);
+    } catch (err) {
+      if (!isAbortError(err)) {
+        /* ignore network errors */
+      }
+    } finally {
+      clearTimeout(timeout);
+      quoteFetchInFlightRef.current = false;
+    }
+  }, [mergeLiveQuotes]);
 
   const loadWatchlist = useCallback(async () => {
     try {
@@ -48,6 +139,9 @@ export function LiveScanner({
       if (!res.ok) return;
       const data = await res.json();
       setWatchlist((data.watchlist ?? []).map((s: string) => s.toUpperCase()));
+      if (data.scannerFilters && typeof data.scannerFilters === "object") {
+        setFilters(data.scannerFilters as ScannerFilters);
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -55,9 +149,33 @@ export function LiveScanner({
     loadWatchlist();
   }, [loadWatchlist]);
 
+  // Persist filters as the user tweaks them (debounced)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scannerFilters: filters }),
+      }).catch(() => {});
+    }, 800);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [filters]);
+
   const fetchCatalysts = useCallback(async () => {
+    if (catalystFetchInFlightRef.current) return;
+
+    catalystFetchInFlightRef.current = true;
+    catalystAbortRef.current?.abort(new DOMException("Superseded", "AbortError"));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
+    catalystAbortRef.current = controller;
+    const timeout = setTimeout(() => {
+      controller.abort(new DOMException("Catalyst request timed out", "AbortError"));
+    }, FETCH_TIMEOUT_MS);
+
     try {
       const res = await fetch(`/api/catalysts?moversOnly=${moversOnly}`, {
         signal: controller.signal,
@@ -78,38 +196,89 @@ export function LiveScanner({
       }
 
       prevSymbolsRef.current = currentSymbols;
-      setCatalysts(data);
+      setCatalysts(applyLiveQuotes(data, liveQuotesRef.current));
       setLastUpdate(new Date());
       setConnected(true);
-    } catch {
-      setConnected(false);
+    } catch (err) {
+      if (!isAbortError(err)) setConnected(false);
     } finally {
       clearTimeout(timeout);
+      catalystFetchInFlightRef.current = false;
       setLoading(false);
     }
-  }, [soundEnabled, moversOnly]);
+  }, [soundEnabled, moversOnly, applyLiveQuotes]);
 
   useEffect(() => {
     fetchCatalysts();
     const interval = setInterval(fetchCatalysts, POLL_MS);
-    return () => clearInterval(interval);
-  }, [fetchCatalysts]);
+
+    // Force a background news pull immediately, then every 45s
+    const kickIngest = () => {
+      void fetch("/api/catalysts/refresh", { method: "POST" }).catch(() => {});
+    };
+    kickIngest();
+    const ingestInterval = setInterval(kickIngest, 3_000);
+
+    // Live price ticks — independent of news polling
+    const kickQuotes = () => {
+      void refreshLiveQuotes();
+    };
+    // First quote refresh shortly after initial feed load
+    const quoteKickoff = setTimeout(kickQuotes, 2_500);
+    const quoteInterval = setInterval(kickQuotes, QUOTE_POLL_MS);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(ingestInterval);
+      clearTimeout(quoteKickoff);
+      clearInterval(quoteInterval);
+      catalystAbortRef.current?.abort(new DOMException("Unmounted", "AbortError"));
+      quoteAbortRef.current?.abort(new DOMException("Unmounted", "AbortError"));
+    };
+  }, [fetchCatalysts, refreshLiveQuotes]);
 
   useEffect(() => {
-    const eventSource = new EventSource(`/api/catalysts/stream?moversOnly=${moversOnly}`);
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "update" && Array.isArray(data.catalysts)) {
-          setCatalysts(data.catalysts);
-          setLastUpdate(new Date());
-          setConnected(true);
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
+
+    const connect = () => {
+      if (stopped) return;
+      eventSource?.close();
+      eventSource = new EventSource(`/api/catalysts/stream?moversOnly=${moversOnly}`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "update" && Array.isArray(data.catalysts)) {
+            const fresh = (data.catalysts as CatalystItem[]).filter(
+              (c) => Date.now() - new Date(c.publishedAt).getTime() <= MAX_FEED_AGE_MS
+            );
+            setCatalysts(applyLiveQuotes(fresh, liveQuotesRef.current));
+            setLastUpdate(new Date());
+            setConnected(true);
+            setLoading(false);
+          }
+        } catch { /* ignore */ }
+      };
+
+      eventSource.onerror = () => {
+        setConnected(false);
+        eventSource?.close();
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 3_000);
         }
-      } catch { /* ignore */ }
+      };
     };
-    eventSource.onerror = () => setConnected(false);
-    return () => eventSource.close();
-  }, [moversOnly]);
+
+    connect();
+
+    return () => {
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      eventSource?.close();
+    };
+  }, [moversOnly, applyLiveQuotes]);
 
   const toggleWatchlist = async (symbol: string) => {
     const sym = symbol.toUpperCase();
@@ -128,6 +297,7 @@ export function LiveScanner({
 
   const filtered = catalysts
     .filter((c) => {
+      if (Date.now() - new Date(c.publishedAt).getTime() > MAX_FEED_AGE_MS) return false;
       if (tab === "premarket" && !c.isPremarket) return false;
       if (tab === "watchlist" && !watchSet.has(c.symbol.toUpperCase())) return false;
       return applyFilters(c, filters);
@@ -137,6 +307,46 @@ export function LiveScanner({
   const isPremarket = catalysts.some((c) => c.isPremarket);
   const tabLabel =
     tab === "premarket" ? "Premarket" : tab === "watchlist" ? "Watchlist" : "News Feed";
+
+  const exportCsv = useCallback(() => {
+    const rows = filtered.slice(0, 200).map((c) => ({
+      publishedAt: c.publishedAt,
+      symbol: c.symbol,
+      price: c.price ?? "",
+      changePercent: c.changePercent ?? "",
+      rVol: c.rVol ?? "",
+      catalystType: c.catalystType ?? "",
+      source: c.source ?? "",
+      headline: c.headline ?? "",
+    }));
+    const header = Object.keys(rows[0] ?? {
+      publishedAt: "",
+      symbol: "",
+      price: "",
+      changePercent: "",
+      rVol: "",
+      catalystType: "",
+      source: "",
+      headline: "",
+    });
+    const esc = (v: unknown) => {
+      const s = String(v ?? "");
+      return /[\",\n]/.test(s) ? `\"${s.replace(/\"/g, '\"\"')}\"` : s;
+    };
+    const csv =
+      header.join(",") +
+      "\n" +
+      rows.map((r) => header.map((k) => esc((r as any)[k])).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trustticker-feed-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [filtered]);
 
   return (
     <div className={cn("flex flex-col min-h-0", embedded ? "h-full" : "space-y-3")}>
@@ -204,6 +414,15 @@ export function LiveScanner({
           </Button>
           <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="w-3.5 h-3.5" /> Filter
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={exportCsv}
+            title="Download the current feed as CSV"
+          >
+            <Download className="w-3.5 h-3.5" /> Export
           </Button>
           <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={fetchCatalysts}>
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />

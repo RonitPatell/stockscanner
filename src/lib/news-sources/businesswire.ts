@@ -1,66 +1,53 @@
 import type { NewsArticle } from "@/types";
-import { resolveArticleSymbol } from "../news-verifier";
+import { resolveArticleSymbol, isNonStockArticle } from "../news-verifier";
+import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
 
 const BUSINESS_WIRE_FEEDS = [
   "https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeGVtQ==",
   "https://feed.businesswire.com/rss/industry/1000001/feedTitle/Business%20Wire%20-%20Financial%20Services",
   "https://feed.businesswire.com/rss/industry/1000002/feedTitle/Business%20Wire%20-%20Technology",
   "https://feed.businesswire.com/rss/industry/1000003/feedTitle/Business%20Wire%20-%20Health",
+  "https://feed.businesswire.com/rss/industry/1000005/feedTitle/Business%20Wire%20-%20Energy",
+  "https://feed.businesswire.com/rss/industry/1000012/feedTitle/Business%20Wire%20-%20Consumer",
+  "https://feed.businesswire.com/rss/subject/1000117/feedTitle/Business%20Wire%20-%20Earnings",
+  "https://feed.businesswire.com/rss/subject/1000093/feedTitle/Business%20Wire%20-%20Mergers",
 ];
 
 export async function fetchBusinessWirePRs(): Promise<NewsArticle[]> {
   const articles: NewsArticle[] = [];
+  const seen = new Set<string>();
 
-  for (const feedUrl of BUSINESS_WIRE_FEEDS) {
-    try {
-      const res = await fetch(feedUrl, {
-        cache: "no-store",
-        headers: { "User-Agent": "TrustTicker/1.0 (trustticker.com)" },
-      });
-      if (!res.ok) continue;
+  const results = await Promise.all(
+    BUSINESS_WIRE_FEEDS.map(async (feedUrl) => {
+      const xml = await fetchRssXml(feedUrl);
+      if (!xml) return [] as NewsArticle[];
+      const out: NewsArticle[] = [];
+      for (const item of parseRssItems(xml)) {
+        if (!item.title) continue;
+        const key = item.link || item.title;
+        if (seen.has(key)) continue;
+        seen.add(key);
 
-      const xml = await res.text();
-      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+        const summary = item.description.slice(0, 400);
+        if (isNonStockArticle(item.title, summary)) continue;
 
-      for (const item of items) {
-        const title =
-          item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] ||
-          item.match(/<title>(.*?)<\/title>/)?.[1] ||
-          "";
-        const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
-        const pubDate =
-          item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ||
-          item.match(/<dc:date>(.*?)<\/dc:date>/)?.[1];
-        const description =
-          item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] ||
-          item.match(/<description>(.*?)<\/description>/)?.[1] ||
-          "";
-
-        const resolved = resolveArticleSymbol(title, stripHtml(description));
+        const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved) continue;
 
-        articles.push({
-          id: `bw-${hashStr(link || title)}`,
+        out.push({
+          id: `bw-${hashStr(key)}`,
           symbol: resolved.symbol,
-          headline: title,
+          headline: item.title,
           source: "Business Wire",
-          url: link,
-          publishedAt: pubDate ? new Date(pubDate) : new Date(),
-          summary: stripHtml(description).slice(0, 400),
+          url: item.link || undefined,
+          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          summary,
         });
       }
-    } catch { /* next feed */ }
-  }
+      return out;
+    })
+  );
 
+  for (const batch of results) articles.push(...batch);
   return articles;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function hashStr(s: string): string {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h).toString(36);
 }

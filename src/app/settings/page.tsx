@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { formatSubscriptionEnd } from "@/lib/subscription";
 import { LogoMark } from "@/components/Logo";
+import { AlertRulesPanel } from "@/components/AlertRulesPanel";
+import type { AlertRule } from "@/lib/alert-rules";
+import { DEFAULT_ALERT_RULES } from "@/lib/alert-rules";
 
 interface SettingsData {
   discordWebhook?: string;
@@ -16,6 +19,7 @@ interface SettingsData {
   watchlist?: string[];
   subscriptionStatus?: string | null;
   subscriptionEndsAt?: string | null;
+  alertRules?: AlertRule[];
 }
 
 export default function SettingsPage() {
@@ -28,6 +32,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
 
   useEffect(() => {
     if (session) {
@@ -42,6 +47,9 @@ export default function SettingsPage() {
             subscriptionStatus: data.subscriptionStatus,
             subscriptionEndsAt: data.subscriptionEndsAt,
           });
+          if (Array.isArray(data.alertRules) && data.alertRules.length > 0) {
+            setAlertRules(data.alertRules as AlertRule[]);
+          }
           setLoading(false);
         });
     }
@@ -61,6 +69,7 @@ export default function SettingsPage() {
         discordAlertsEnabled,
         smsAlertsEnabled,
         watchlist,
+        alertRules,
       }),
     });
     setSaved(true);
@@ -161,6 +170,14 @@ export default function SettingsPage() {
               <Save className="w-4 h-4" />
               {saved ? "Saved!" : "Save Watchlist & Alerts"}
             </Button>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-zinc-300">Alert rules</h3>
+            <p className="text-xs text-zinc-600">
+              Trader-grade filters: % move, RVOL, float cap, cooldowns, and news-only triggers.
+            </p>
+            <AlertRulesPanel rules={alertRules} onChange={setAlertRules} />
           </div>
         </section>
 

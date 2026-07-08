@@ -4,17 +4,26 @@ import { getNextTickerBatch, ACTIVE_US_TICKERS } from "./news-sources/active-tic
 import { fetchSec8KFilings } from "./news-sources/sec-edgar";
 import { fetchGlobeNewswirePRs } from "./news-sources/globenewswire";
 import { fetchBusinessWirePRs } from "./news-sources/businesswire";
-import { finnhubFetch } from "./finnhub-queue";
+import { fetchPrNewswirePRs } from "./news-sources/prnewswire";
+import { fetchMarketRssNews, fetchYahooTickerNews } from "./news-sources/market-rss";
+import { finnhubFetch, finnhubFetchLive } from "./finnhub-queue";
+import { resolveFinnhubKey } from "./finnhub-key";
 import { resolveArticleSymbol } from "./news-verifier";
+import { isLikelyStockNews } from "./news-verifier";
+import { getPriorityTickers } from "./priority-tickers";
 
 export { TICKER_BLACKLIST, isValidTickerFormat, extractSymbolFromHeadline };
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
-const MAX_NEWS_ARTICLES = 200;
+const MAX_NEWS_ARTICLES = 400;
 const US_EXCHANGES = ["NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "NMS"];
 
 const quoteCache = new Map<string, { data: StockQuote; ts: number }>();
 const CACHE_TTL_MS = 90_000;
+
+/** Short-lived quote-only cache for live price ticks on the feed */
+const liveQuoteCache = new Map<string, { data: StockQuote; ts: number }>();
+const LIVE_QUOTE_TTL_MS = 12_000;
 
 const volumeCache = new Map<string, { volume: number; avgVolume: number; ts: number }>();
 const VOLUME_CACHE_MS = 5 * 60 * 1000;
@@ -27,7 +36,7 @@ export async function fetchVolumeForSymbol(
     return { volume: cached.volume, avgVolume: cached.avgVolume };
   }
 
-  const key = process.env.FINNHUB_API_KEY;
+  const key = resolveFinnhubKey();
   if (!key) return null;
 
   try {
@@ -61,7 +70,7 @@ export async function fetchVolumeForSymbol(
 }
 
 async function fetchIntradayVolumeSum(symbol: string): Promise<number | null> {
-  const key = process.env.FINNHUB_API_KEY;
+  const key = resolveFinnhubKey();
   if (!key) return null;
 
   try {
@@ -89,51 +98,111 @@ async function fetchIntradayVolumeSum(symbol: string): Promise<number | null> {
   }
 }
 
-export async function fetchMarketNews(): Promise<NewsArticle[]> {
-  const key = process.env.FINNHUB_API_KEY;
+export async function fetchMarketNews(options: { fast?: boolean } = {}): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
   const articles: NewsArticle[] = [];
+  const fast = options.fast === true;
+  const priorityTickers = await getPriorityTickers();
 
-  let moverSymbols: string[] = [];
-  if (key) {
-    moverSymbols = await scanMovingSymbols(key, 2.5, 35);
-  }
+  // Parallel wire + media scrapes (StockTitan-style breadth, no Finnhub quota)
+  const [globePRs, businessWirePRs, prnPRs, marketRss, yahooNews, secFilings] =
+    await Promise.all([
+      fetchGlobeNewswirePRs(),
+      fetchBusinessWirePRs(),
+      fetchPrNewswirePRs(),
+      fetchMarketRssNews(),
+      fetchYahooTickerNews(fast ? 40 : 56, priorityTickers),
+      fetchSec8KFilings(),
+    ]);
 
-  const [globePRs, businessWirePRs] = await Promise.all([
-    fetchGlobeNewswirePRs(),
-    fetchBusinessWirePRs(),
-  ]);
-  articles.push(...globePRs, ...businessWirePRs);
+  articles.push(
+    ...globePRs,
+    ...businessWirePRs,
+    ...prnPRs,
+    ...marketRss,
+    ...yahooNews,
+    ...secFilings
+  );
 
   if (key) {
     try {
-      const [marketNews, mergerNews, companyNews, secForMovers] = await Promise.all([
-        fetchFinnhubMarketNews(key),
-        fetchMergerNews(key),
-        fetchFinnhubCompanyNews(key, moverSymbols),
-        fetchSecFilingsForMovers(moverSymbols),
-      ]);
-      articles.push(...marketNews, ...mergerNews, ...companyNews, ...secForMovers);
+      if (fast) {
+        const [marketNews, mergerNews, priorityNews] = await Promise.all([
+          fetchFinnhubMarketNews(key),
+          fetchMergerNews(key),
+          fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 16)),
+        ]);
+        articles.push(...marketNews, ...mergerNews, ...priorityNews);
+      } else {
+        const moverSymbols = await scanMovingSymbols(key, 2.5, 8);
+        const [marketNews, mergerNews, companyNews] = await Promise.all([
+          fetchFinnhubMarketNews(key),
+          fetchMergerNews(key),
+          fetchFinnhubCompanyNews(key, moverSymbols),
+        ]);
+        articles.push(...marketNews, ...mergerNews, ...companyNews);
+      }
     } catch { /* fall through */ }
-  } else {
-    const secFilings = await fetchSec8KFilings();
-    articles.push(...secFilings);
-  }
-
-  if (articles.length === 0 && !key) {
-    articles.push(...(await fetchYahooFinanceRSS()));
   }
 
   if (articles.length === 0) return getDemoNews();
 
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const seen = new Set<string>();
   return articles
     .filter((a) => {
-      if (!a.symbol || !isValidTickerFormat(a.symbol) || seen.has(a.headline)) return false;
-      seen.add(a.headline);
+      if (!a.symbol || !isValidTickerFormat(a.symbol)) return false;
+      if (!isLikelyStockNews(a.headline, a.summary)) return false;
+      if (a.publishedAt.getTime() < cutoff) return false;
+      const keyHash = `${a.symbol}|${a.headline.slice(0, 80)}`;
+      if (seen.has(keyHash)) return false;
+      seen.add(keyHash);
       return true;
     })
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
     .slice(0, MAX_NEWS_ARTICLES);
+}
+
+/** Fast wire + RSS poll — no SEC/merger/rotating scans (runs every few seconds) */
+export async function fetchFastWireNews(): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
+  const priorityTickers = await getPriorityTickers();
+
+  const [globePRs, businessWirePRs, prnPRs, marketRss, yahooNews, marketNews, priorityNews] =
+    await Promise.all([
+      fetchGlobeNewswirePRs(),
+      fetchBusinessWirePRs(),
+      fetchPrNewswirePRs(),
+      fetchMarketRssNews(),
+      fetchYahooTickerNews(28, priorityTickers),
+      key ? fetchFinnhubMarketNews(key) : Promise.resolve([]),
+      key ? fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 20)) : Promise.resolve([]),
+    ]);
+
+  const articles = [
+    ...globePRs,
+    ...businessWirePRs,
+    ...prnPRs,
+    ...marketRss,
+    ...yahooNews,
+    ...marketNews,
+    ...priorityNews,
+  ];
+
+  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  const seen = new Set<string>();
+  return articles
+    .filter((a) => {
+      if (!a.symbol || !isValidTickerFormat(a.symbol)) return false;
+      if (!isLikelyStockNews(a.headline, a.summary)) return false;
+      if (a.publishedAt.getTime() < cutoff) return false;
+      const keyHash = `${a.symbol}|${a.headline.slice(0, 80)}`;
+      if (seen.has(keyHash)) return false;
+      seen.add(keyHash);
+      return true;
+    })
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+    .slice(0, 200);
 }
 
 /** Scan watchlist for stocks moving ≥ minPercent today */
@@ -161,6 +230,47 @@ async function fetchSecFilingsForMovers(moverSymbols: string[]): Promise<NewsArt
   const secFilings = await fetchSec8KFilings();
 
   return secFilings.filter((a) => moverSet.has(a.symbol));
+}
+
+async function fetchFinnhubCompanyNewsForSymbols(
+  key: string,
+  symbols: string[]
+): Promise<NewsArticle[]> {
+  if (symbols.length === 0) return [];
+  const to = new Date();
+  const from = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  const fromStr = from.toISOString().slice(0, 10);
+  const toStr = to.toISOString().slice(0, 10);
+  const articles: NewsArticle[] = [];
+
+  await Promise.all(
+    symbols.map(async (symbol) => {
+      try {
+        const res = await finnhubFetch(
+          `${FINNHUB_BASE}/company-news?symbol=${symbol}&from=${fromStr}&to=${toStr}&token=${key}`
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as FinnhubNewsItem[];
+        for (const item of data.slice(0, 6)) {
+          const resolved = resolveFinnhubSymbol(item, symbol);
+          if (!resolved) continue;
+          articles.push({
+            id: `fh-${resolved}-${item.id}`,
+            symbol: resolved,
+            headline: item.headline,
+            source: item.source,
+            url: item.url,
+            publishedAt: new Date(item.datetime * 1000),
+            summary: item.summary,
+          });
+        }
+      } catch {
+        /* skip symbol */
+      }
+    })
+  );
+
+  return articles;
 }
 
 async function fetchFinnhubCompanyNews(
@@ -299,7 +409,7 @@ export async function fetchQuote(symbol: string): Promise<StockQuote | null> {
   const cached = quoteCache.get(symbol);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
 
-  const key = process.env.FINNHUB_API_KEY;
+  const key = resolveFinnhubKey();
   if (!key) return null;
 
   try {
@@ -341,7 +451,7 @@ export async function fetchQuoteTrusted(symbol: string): Promise<StockQuote | nu
   const cached = quoteCache.get(symbol);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
 
-  const key = process.env.FINNHUB_API_KEY;
+  const key = resolveFinnhubKey();
   if (!key) return null;
 
   try {
@@ -378,6 +488,96 @@ export async function fetchQuoteTrusted(symbol: string): Promise<StockQuote | nu
   } catch {
     return null;
   }
+}
+
+/**
+ * Lightweight live quote (price / % change only) — no profile call.
+ * Used to keep the news feed prices in sync with the market.
+ */
+export async function fetchQuoteLive(symbol: string): Promise<StockQuote | null> {
+  const cached = liveQuoteCache.get(symbol);
+  if (cached && Date.now() - cached.ts < LIVE_QUOTE_TTL_MS) return cached.data;
+
+  const full = quoteCache.get(symbol);
+  if (full && Date.now() - full.ts < LIVE_QUOTE_TTL_MS) return full.data;
+
+  const key = resolveFinnhubKey();
+  if (!key) return null;
+
+  try {
+    const quoteRes = await finnhubFetchLive(
+      `${FINNHUB_BASE}/quote?symbol=${encodeURIComponent(symbol)}&token=${key}`
+    );
+    if (!quoteRes.ok) return null;
+    const quote = await quoteRes.json();
+    if (!quote.c || quote.c <= 0) return null;
+
+    const data: StockQuote = {
+      symbol,
+      price: quote.c,
+      change: quote.d ?? 0,
+      changePercent: quote.dp ?? 0,
+      volume: 0,
+      dayHigh: quote.h ?? undefined,
+      dayLow: quote.l ?? undefined,
+      open: quote.o ?? undefined,
+      prevClose: quote.pc ?? undefined,
+    };
+    liveQuoteCache.set(symbol, { data, ts: Date.now() });
+    const existing = quoteCache.get(symbol);
+    if (existing) {
+      quoteCache.set(symbol, {
+        data: {
+          ...existing.data,
+          price: data.price,
+          change: data.change,
+          changePercent: data.changePercent,
+          dayHigh: data.dayHigh ?? existing.data.dayHigh,
+          dayLow: data.dayLow ?? existing.data.dayLow,
+        },
+        ts: Date.now(),
+      });
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/** Batch live quotes for visible feed symbols (rate-limit friendly)
+ *  Sequential through shared Finnhub queue — keep batches small (≤12).
+ */
+export async function fetchLiveQuotesBatch(
+  symbols: string[],
+  max = 12
+): Promise<Map<string, StockQuote>> {
+  const unique = [
+    ...new Set(symbols.map((s) => s.toUpperCase()).filter(isValidTickerFormat)),
+  ].slice(0, max);
+  const out = new Map<string, StockQuote>();
+
+  // Prefer cache hits first so the response is snappy
+  const needFetch: string[] = [];
+  for (const symbol of unique) {
+    const cached = liveQuoteCache.get(symbol);
+    if (cached && Date.now() - cached.ts < LIVE_QUOTE_TTL_MS) {
+      out.set(symbol, cached.data);
+      continue;
+    }
+    const full = quoteCache.get(symbol);
+    if (full && Date.now() - full.ts < LIVE_QUOTE_TTL_MS) {
+      out.set(symbol, full.data);
+      continue;
+    }
+    needFetch.push(symbol);
+  }
+
+  // Sequential fetches (queue is serial anyway) — avoids stampeding the chain
+  for (const symbol of needFetch) {
+    const q = await fetchQuoteLive(symbol);
+    if (q) out.set(symbol, q);
+  }
+  return out;
 }
 
 export async function fetchPremarketMovers(): Promise<StockQuote[]> {
@@ -442,6 +642,8 @@ export function isTrustedNewsSource(source: string): boolean {
     source === "SEC EDGAR" ||
     source === "GlobeNewswire" ||
     source === "Business Wire" ||
+    source === "PR Newswire" ||
+    source === "Yahoo Finance" ||
     source.includes("GlobeNewswire") ||
     source.includes("Business Wire") ||
     source.includes("PR Newswire")

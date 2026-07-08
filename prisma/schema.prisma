@@ -23,6 +23,9 @@ model User {
   smsAlertsEnabled Boolean   @default(false)
   discordAlertsEnabled Boolean @default(false)
   watchlist        String[]  @default([])
+  scannerFilters   Json?
+  alertRules       Json?
+  lastBriefSeenAt  DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]
@@ -49,7 +52,14 @@ model Catalyst {
   historicalSampleSize Int?
   catalystType    String?  // earnings, fda, merger, upgrade, downgrade, insider, sec_filing, macro
   urgencyScore    Float?   // 0-100 momentum/urgency
+  relatedSymbols  String[] @default([]) // other verified tickers in same article (roundups)
+  storyClusterId  String?
+  setupTags       String[] @default([])
+  verifiedConfidence Float?
+  keyPoints       String[] @default([])
+  sourceTier      String?
   rawNewsId       String?  @unique
+  alertLogs       AlertLog[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -57,6 +67,7 @@ model Catalyst {
   @@index([publishedAt])
   @@index([urgencyScore])
   @@index([sentimentScore])
+  @@index([storyClusterId])
 }
 
 model AlertLog {
@@ -64,9 +75,12 @@ model AlertLog {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   catalystId String
+  catalyst  Catalyst @relation(fields: [catalystId], references: [id], onDelete: Cascade)
   channel   String   // discord, sms, email
   status    String   // sent, failed
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([catalystId])
+  @@unique([userId, catalystId, channel])
 }

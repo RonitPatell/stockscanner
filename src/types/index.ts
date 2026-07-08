@@ -31,6 +31,14 @@ export interface CatalystItem {
   historicalSampleSize?: number | null;
   catalystType?: string | null;
   urgencyScore?: number | null;
+  /** Other verified tickers mentioned in the same article (session roundups) */
+  relatedSymbols?: string[];
+  /** Cluster id for same-story grouping across sources */
+  storyClusterId?: string | null;
+  setupTags?: string[];
+  verifiedConfidence?: number | null;
+  keyPoints?: string[];
+  sourceTier?: string | null;
   /** All headlines when multiple news items exist for this symbol */
   headlines?: CatalystHeadline[];
   newsCount?: number;
@@ -50,6 +58,39 @@ export interface ScannerFilters {
   minChange?: number;
   maxChange?: number;
   minRvol?: number;
+}
+
+export interface BriefItem {
+  symbol: string;
+  headline: string;
+  changePercent?: number | null;
+  catalystType?: string | null;
+  publishedAt: string;
+  setupTags?: string[];
+}
+
+export interface BriefSection {
+  title: string;
+  items: BriefItem[];
+}
+
+export interface WatchlistBrief {
+  kind: "morning" | "eod" | "delta";
+  generatedAt: string;
+  watchlist: string[];
+  sections: BriefSection[];
+  summary: string;
+  newSinceLastCheck: number;
+}
+
+export interface EarningsEvent {
+  symbol: string;
+  date: string; // YYYY-MM-DD
+  hour?: string;
+  epsEstimate?: number | null;
+  epsActual?: number | null;
+  revenueEstimate?: number | null;
+  revenueActual?: number | null;
 }
 
 export interface StockQuote {

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";
-    const catalysts = await getCatalysts(80, { moversOnly });
+    const catalysts = await getCatalysts(300, { moversOnly });
     return NextResponse.json(catalysts);
   } catch (error) {
     console.error("Catalysts API error:", error);

@@ -2,22 +2,30 @@ import { NextRequest } from "next/server";
 import { getCatalysts } from "@/lib/catalyst-engine";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";
   const encoder = new TextEncoder();
+  let closed = false;
 
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: unknown) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          closed = true;
+        }
       };
 
       send({ type: "connected", timestamp: new Date().toISOString() });
 
       const poll = async () => {
+        if (closed) return;
         try {
-          const catalysts = await getCatalysts(80, { moversOnly });
+          const catalysts = await getCatalysts(300, { moversOnly });
           send({ type: "update", catalysts, timestamp: new Date().toISOString() });
         } catch {
           send({ type: "error", message: "Poll failed" });
@@ -25,20 +33,25 @@ export async function GET(req: NextRequest) {
       };
 
       await poll();
-      const interval = setInterval(poll, 20000);
+      // Push fresh news every 5s without requiring a manual refresh
+      const interval = setInterval(poll, 2_000);
 
-      // Keep-alive heartbeat
       const heartbeat = setInterval(() => {
         send({ type: "heartbeat", timestamp: new Date().toISOString() });
-      }, 15000);
+      }, 12_000);
 
-      // Cleanup on close
       const cleanup = () => {
+        closed = true;
         clearInterval(interval);
         clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch { /* already closed */ }
       };
 
-      setTimeout(cleanup, 300000); // 5 min max connection
+      req.signal.addEventListener("abort", cleanup);
+      // Keep stream open for long sessions; reconnect client-side after this
+      setTimeout(cleanup, 30 * 60_000);
     },
   });
 

@@ -1,57 +1,54 @@
 import type { NewsArticle } from "@/types";
-import { resolveArticleSymbol } from "../news-verifier";
+import { resolveArticleSymbol, isNonStockArticle } from "../news-verifier";
+import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
 
 const GLOBE_FEEDS = [
   "https://www.globenewswire.com/RssFeed/orgclass/1/feedTitle/GlobeNewswire%20-%20News%20on%20Public%20Companies",
   "https://www.globenewswire.com/RssFeed/subjectcode/21-Mergers%20and%20Acquisitions/feedTitle/GlobeNewswire%20-%20M%26A",
   "https://www.globenewswire.com/RssFeed/subjectcode/13-Earnings%20Releases%20and%20Operating%20Results/feedTitle/GlobeNewswire%20-%20Earnings",
+  "https://www.globenewswire.com/RssFeed/subjectcode/5-Bankruptcy/feedTitle/GlobeNewswire%20-%20Bankruptcy",
+  "https://www.globenewswire.com/RssFeed/subjectcode/8-Contracts/feedTitle/GlobeNewswire%20-%20Contracts",
+  "https://www.globenewswire.com/RssFeed/subjectcode/14-Dividend%20Reports%20and%20Estimates/feedTitle/GlobeNewswire%20-%20Dividends",
+  "https://www.globenewswire.com/RssFeed/subjectcode/23-Stock%20Market%20News/feedTitle/GlobeNewswire%20-%20Stock%20Market",
+  "https://www.globenewswire.com/RssFeed/subjectcode/29-FDA%20Approval%20of%20Drugs%20and%20Devices/feedTitle/GlobeNewswire%20-%20FDA",
+  "https://www.globenewswire.com/RssFeed/industry/all/orgclass/1/lang/en",
 ];
 
 export async function fetchGlobeNewswirePRs(): Promise<NewsArticle[]> {
   const articles: NewsArticle[] = [];
+  const seen = new Set<string>();
 
-  for (const feedUrl of GLOBE_FEEDS) {
-    try {
-      const res = await fetch(feedUrl, {
-        cache: "no-store",
-        headers: { "User-Agent": "TrustTicker/1.0 (trustticker.com)" },
-      });
-      if (!res.ok) continue;
+  const results = await Promise.all(
+    GLOBE_FEEDS.map(async (feedUrl) => {
+      const xml = await fetchRssXml(feedUrl);
+      if (!xml) return [] as NewsArticle[];
+      const out: NewsArticle[] = [];
+      for (const item of parseRssItems(xml)) {
+        if (!item.title) continue;
+        const key = item.link || item.title;
+        if (seen.has(key)) continue;
+        seen.add(key);
 
-      const xml = await res.text();
-      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+        const summary = item.description.slice(0, 400);
+        if (isNonStockArticle(item.title, summary)) continue;
 
-      for (const item of items) {
-        const title =
-          item.match(/<title><!\[CDATA\[(.*?)\]\]>/)?.[1] ||
-          item.match(/<title>(.*?)<\/title>/)?.[1] ||
-          "";
-        const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
-        const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1];
-        const description =
-          item.match(/<description><!\[CDATA\[(.*?)\]\]>/)?.[1] || "";
-
-        const resolved = resolveArticleSymbol(title, description.slice(0, 300));
+        const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved) continue;
 
-        articles.push({
-          id: `globe-${hashStr(link || title)}`,
+        out.push({
+          id: `globe-${hashStr(key)}`,
           symbol: resolved.symbol,
-          headline: title,
+          headline: item.title,
           source: "GlobeNewswire",
-          url: link,
-          publishedAt: pubDate ? new Date(pubDate) : new Date(),
-          summary: description.slice(0, 300),
+          url: item.link || undefined,
+          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          summary,
         });
       }
-    } catch { /* next feed */ }
-  }
+      return out;
+    })
+  );
 
+  for (const batch of results) articles.push(...batch);
   return articles;
-}
-
-function hashStr(s: string): string {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h).toString(36);
 }

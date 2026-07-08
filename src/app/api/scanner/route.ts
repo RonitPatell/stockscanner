@@ -28,6 +28,9 @@ export async function GET() {
           volume: true,
           avgVolume: true,
         },
+        where: {
+          publishedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
         orderBy: { publishedAt: "desc" },
         take: 40,
       });

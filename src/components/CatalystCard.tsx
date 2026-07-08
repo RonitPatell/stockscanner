@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, ChevronDown, ChevronRight, LineChart } from "lucide-react";
 import type { CatalystItem } from "@/types";
 import { Badge } from "./ui/badge";
@@ -17,6 +17,13 @@ import {
 import { formatRvol } from "@/lib/volume-utils";
 import { tradingViewUrl, finvizUrl } from "@/lib/chart-links";
 import { CATALYST_TYPES } from "@/types";
+import {
+  confidenceLabel,
+  getSourceTier,
+  sourceTierBadgeClass,
+  sourceTierLabel,
+} from "@/lib/source-trust";
+import { setupTagMeta } from "@/lib/setup-tags";
 
 interface CatalystCardProps {
   catalyst: CatalystItem;
@@ -32,6 +39,59 @@ export function CatalystCard({
   inWatchlist,
 }: CatalystCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [translatedHeadline, setTranslatedHeadline] = useState<string | null>(null);
+  const [detectedLang, setDetectedLang] = useState<string | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [ageLabel, setAgeLabel] = useState(() => timeAgo(catalyst.publishedAt));
+
+  useEffect(() => {
+    setAgeLabel(timeAgo(catalyst.publishedAt));
+    const id = setInterval(() => setAgeLabel(timeAgo(catalyst.publishedAt)), 1000);
+    return () => clearInterval(id);
+  }, [catalyst.publishedAt]);
+
+  const sourceTier = catalyst.sourceTier
+    ? (catalyst.sourceTier as "wire" | "exchange" | "aggregator" | "other")
+    : getSourceTier(catalyst.source);
+  const trustLabel = confidenceLabel(catalyst.verifiedConfidence);
+
+  const shouldTranslate = useMemo(() => {
+    const h = catalyst.headline ?? "";
+    // fast heuristic: any non-ASCII letter
+    return /[^\x00-\x7F]/.test(h);
+  }, [catalyst.headline]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!shouldTranslate) {
+        setTranslatedHeadline(null);
+        setDetectedLang(null);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/translate?to=en&text=${encodeURIComponent(catalyst.headline)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (typeof data.translated === "string" && data.translated.trim()) {
+          setTranslatedHeadline(data.translated);
+          setDetectedLang(typeof data.detectedLang === "string" ? data.detectedLang : null);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldTranslate, catalyst.headline]);
+
+  const headlineText =
+    translatedHeadline && !showOriginal ? translatedHeadline : catalyst.headline;
   const headlines = catalyst.headlines?.length
     ? catalyst.headlines
     : [
@@ -89,7 +149,7 @@ export function CatalystCard({
         {/* Change % */}
         <div
           className={cn(
-            "font-mono text-[11px] font-semibold text-center rounded px-0.5 py-0.5",
+            "font-mono text-[11px] font-semibold text-center rounded px-0.5 py-0.5 transition-colors duration-500",
             isBigMover
               ? (catalyst.changePercent ?? 0) >= 0
                 ? "bg-emerald-500/15 text-emerald-400"
@@ -101,7 +161,7 @@ export function CatalystCard({
         </div>
 
         {/* Price */}
-        <div className="font-mono text-[11px] text-zinc-300 text-right">
+        <div className="font-mono text-[11px] text-zinc-300 text-right tabular-nums transition-colors duration-500">
           {formatPrice(catalyst.price)}
         </div>
 
@@ -130,26 +190,95 @@ export function CatalystCard({
         </div>
 
         {/* Headline — click to expand */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="min-w-0 text-left"
-        >
-          <p className="text-[11px] sm:text-xs text-zinc-200 truncate leading-snug">
-            {newsCount > 1 && (
-              <span className="text-zinc-500 mr-1">{newsCount} ·</span>
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="min-w-0 w-full text-left"
+          >
+            <p className="text-[11px] sm:text-xs text-zinc-200 truncate leading-snug">
+              {newsCount > 1 && (
+                <span className="text-zinc-500 mr-1">{newsCount} ·</span>
+              )}
+              {headlineText}
+              {translatedHeadline && (
+                <span className="ml-1 text-[9px] text-zinc-500">
+                  · Translated{detectedLang ? ` (${detectedLang})` : ""}
+                </span>
+              )}
+            </p>
+            <p className="text-[9px] text-zinc-600 truncate mt-0.5 hidden sm:block">
+              {formatFloat(catalyst.floatShares)} float · {formatMarketCap(catalyst.marketCap)}
+              {catalyst.isPremarket && " · PM"}
+              {catalyst.setupTags?.length ? (
+                <span className="ml-1">
+                  ·{" "}
+                  {catalyst.setupTags.slice(0, 3).map((tag) => {
+                    const meta = setupTagMeta(tag);
+                    return meta ? `${meta.icon}${meta.label}` : tag;
+                  }).join(" ")}
+                </span>
+              ) : null}
+            </p>
+          </button>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            <span
+              className={cn(
+                "text-[8px] px-1 py-0 rounded border uppercase tracking-wide",
+                sourceTierBadgeClass(sourceTier)
+              )}
+            >
+              {sourceTierLabel(sourceTier)}
+            </span>
+            {trustLabel && (
+              <span className="text-[8px] px-1 py-0 rounded border border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+                {trustLabel}
+              </span>
             )}
-            {catalyst.headline}
-          </p>
-          <p className="text-[9px] text-zinc-600 truncate mt-0.5 hidden sm:block">
-            {formatFloat(catalyst.floatShares)} float · {formatMarketCap(catalyst.marketCap)}
-            {catalyst.isPremarket && " · PM"}
-          </p>
-        </button>
+            {catalyst.newsCount && catalyst.newsCount > 1 && (
+              <span className="text-[8px] text-violet-400">
+                {catalyst.newsCount} sources
+              </span>
+            )}
+          </div>
+          {translatedHeadline && (
+            <div className="mt-0.5">
+              <button
+                type="button"
+                onClick={() => setShowOriginal((v) => !v)}
+                className="text-[9px] text-zinc-600 hover:text-zinc-300"
+              >
+                {showOriginal ? "Show translation" : "Show original"}
+              </button>
+            </div>
+          )}
+          {catalyst.relatedSymbols && catalyst.relatedSymbols.length > 0 && (
+            <div className="flex items-center gap-1 mt-0.5 min-w-0 overflow-hidden">
+              <span className="text-[9px] text-zinc-600 shrink-0">Also</span>
+              {catalyst.relatedSymbols.slice(0, 6).map((sym) => (
+                <a
+                  key={sym}
+                  href={tradingViewUrl(sym)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[9px] text-zinc-400 hover:text-emerald-400 px-1 rounded bg-zinc-800/80 border border-zinc-700/60 shrink-0"
+                  title={`Open ${sym} on TradingView`}
+                >
+                  {sym}
+                </a>
+              ))}
+              {catalyst.relatedSymbols.length > 6 && (
+                <span className="text-[9px] text-zinc-600 shrink-0">
+                  +{catalyst.relatedSymbols.length - 6}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Time */}
-        <div className="text-[9px] text-zinc-500 text-right whitespace-nowrap">
-          {timeAgo(catalyst.publishedAt)}
+        <div className="text-[9px] text-zinc-500 text-right whitespace-nowrap tabular-nums">
+          {ageLabel}
         </div>
 
         {/* Expand */}
@@ -197,6 +326,67 @@ export function CatalystCard({
               </button>
             )}
           </div>
+
+          {(catalyst.historicalAvgMove != null || catalyst.historicalSampleSize != null) && (
+            <div className="pb-2">
+              <p className="text-[10px] text-zinc-500">
+                Historical move for this catalyst type:{" "}
+                <span className="text-zinc-300 font-mono">
+                  {catalyst.historicalAvgMove != null
+                    ? `${catalyst.historicalAvgMove.toFixed(1)}% avg`
+                    : "—"}
+                </span>
+                {catalyst.historicalSampleSize != null && catalyst.historicalSampleSize > 0 && (
+                  <span className="text-zinc-600">
+                    {" "}
+                    · n={catalyst.historicalSampleSize}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {catalyst.keyPoints && catalyst.keyPoints.length > 0 && (
+            <div className="pb-2">
+              <p className="text-[10px] text-zinc-500 mb-1">Key points</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {catalyst.keyPoints.slice(0, 4).map((pt) => (
+                  <li key={pt} className="text-[10px] text-zinc-300">
+                    {pt}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {catalyst.relatedSymbols && catalyst.relatedSymbols.length > 0 && (
+            <div className="pb-2">
+              <p className="text-[10px] text-zinc-500 mb-1.5">
+                Verified tickers in this article
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <a
+                  href={tradingViewUrl(catalyst.symbol)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[10px] px-2 py-0.5 rounded border border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                >
+                  {catalyst.symbol}
+                </a>
+                {catalyst.relatedSymbols.map((sym) => (
+                  <a
+                    key={sym}
+                    href={tradingViewUrl(sym)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[10px] px-2 py-0.5 rounded border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
+                  >
+                    {sym}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {newsCount > 1 && (
             <div className="flex items-center gap-2 py-1 mb-1">
