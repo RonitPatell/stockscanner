@@ -1,43 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestAndAnalyzeNews } from "@/lib/catalyst-engine";
-import { prisma } from "@/lib/prisma";
-import { sendDiscordWebhook } from "@/lib/alerts";
+import { runIngestPipeline } from "@/lib/ingest-pipeline";
+import { isScaleMode } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
-// Optional: ping this from cron-job.org (free) every 5 min for background alerts
-export async function GET(req: NextRequest) {
+function authorize(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return process.env.NODE_ENV === "development";
+  return authHeader === `Bearer ${secret}`;
+}
+
+/** Background ingest + feed cache refresh — single writer for all users. */
+async function handleCron(req: NextRequest) {
+  if (!authorize(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const catalysts = await ingestAndAnalyzeNews();
-
-    const alertUsers = await prisma.user.findMany({
-      where: {
-        subscriptionStatus: "active",
-        discordAlertsEnabled: true,
-        discordWebhook: { not: null },
-      },
-    });
-
-    const highUrgency = catalysts.filter((c) => (c.urgencyScore ?? 0) >= 70);
-    let alertsSent = 0;
-
-    for (const user of alertUsers) {
-      for (const catalyst of highUrgency.slice(0, 3)) {
-        if (user.discordWebhook) {
-          const sent = await sendDiscordWebhook(user.discordWebhook, catalyst);
-          if (sent) alertsSent++;
-        }
-      }
-    }
-
-    return NextResponse.json({ ingested: catalysts.length, alertsSent });
+    const result = await runIngestPipeline();
+    return NextResponse.json({ ok: true, scaleMode: isScaleMode(), ...result });
   } catch (error) {
     console.error("Cron ingest error:", error);
     return NextResponse.json({ error: "Ingest failed" }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handleCron(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handleCron(req);
 }

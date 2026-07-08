@@ -39,6 +39,12 @@ export function CatalystCard({
   inWatchlist,
 }: CatalystCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<{
+    aiSummary?: string | null;
+    keyPoints?: string[];
+    historicalAvgMove?: number | null;
+    historicalSampleSize?: number | null;
+  } | null>(null);
   const [translatedHeadline, setTranslatedHeadline] = useState<string | null>(null);
   const [detectedLang, setDetectedLang] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -54,6 +60,26 @@ export function CatalystCard({
     ? (catalyst.sourceTier as "wire" | "exchange" | "aggregator" | "other")
     : getSourceTier(catalyst.source);
   const trustLabel = confidenceLabel(catalyst.verifiedConfidence);
+
+  useEffect(() => {
+    if (!expanded) return;
+    if (detail || (catalyst.keyPoints?.length && catalyst.aiSummary)) return;
+    let cancelled = false;
+    void fetch(`/api/catalysts/${catalyst.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setDetail(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, catalyst.id, catalyst.keyPoints, catalyst.aiSummary, detail]);
+
+  const displaySummary = detail?.aiSummary ?? catalyst.aiSummary;
+  const displayKeyPoints = detail?.keyPoints ?? catalyst.keyPoints;
+  const displayHistMove = detail?.historicalAvgMove ?? catalyst.historicalAvgMove;
+  const displayHistN = detail?.historicalSampleSize ?? catalyst.historicalSampleSize;
 
   const shouldTranslate = useMemo(() => {
     const h = catalyst.headline ?? "";
@@ -327,36 +353,40 @@ export function CatalystCard({
             )}
           </div>
 
-          {(catalyst.historicalAvgMove != null || catalyst.historicalSampleSize != null) && (
+          {(displayHistMove != null || displayHistN != null) && (
             <div className="pb-2">
               <p className="text-[10px] text-zinc-500">
                 Historical move for this catalyst type:{" "}
                 <span className="text-zinc-300 font-mono">
-                  {catalyst.historicalAvgMove != null
-                    ? `${catalyst.historicalAvgMove.toFixed(1)}% avg`
+                  {displayHistMove != null
+                    ? `${displayHistMove.toFixed(1)}% avg`
                     : "—"}
                 </span>
-                {catalyst.historicalSampleSize != null && catalyst.historicalSampleSize > 0 && (
+                {displayHistN != null && displayHistN > 0 && (
                   <span className="text-zinc-600">
                     {" "}
-                    · n={catalyst.historicalSampleSize}
+                    · n={displayHistN}
                   </span>
                 )}
               </p>
             </div>
           )}
 
-          {catalyst.keyPoints && catalyst.keyPoints.length > 0 && (
+          {displayKeyPoints && displayKeyPoints.length > 0 && (
             <div className="pb-2">
               <p className="text-[10px] text-zinc-500 mb-1">Key points</p>
               <ul className="list-disc list-inside space-y-0.5">
-                {catalyst.keyPoints.slice(0, 4).map((pt) => (
+                {displayKeyPoints.slice(0, 4).map((pt) => (
                   <li key={pt} className="text-[10px] text-zinc-300">
                     {pt}
                   </li>
                 ))}
               </ul>
             </div>
+          )}
+
+          {displaySummary && !headlineText.includes(displaySummary.slice(0, 40)) && (
+            <p className="text-[10px] text-zinc-400 pb-2 leading-snug">{displaySummary}</p>
           )}
 
           {catalyst.relatedSymbols && catalyst.relatedSymbols.length > 0 && (

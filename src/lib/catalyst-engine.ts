@@ -10,7 +10,6 @@ import {
   isValidTickerFormat,
   isTrustedNewsSource,
 } from "./market-data";
-import { refreshCatalystQuotes } from "./catalyst-quotes";
 import { computeRvol } from "./volume-utils";
 import { verifyNewsArticle, isRoundupArticle, isLikelyStockNews, isKnownFalsePositive } from "./news-verifier";
 import { isMoverCatalyst, sortByRecency } from "./movers";
@@ -18,6 +17,12 @@ import { dispatchWatchlistAlerts } from "./watchlist-alerts";
 import { storyClusterKey, attachStoryClusters } from "./story-cluster";
 import { detectSetupTags } from "./setup-tags";
 import { getSourceTier } from "./source-trust";
+import { isScaleMode } from "./redis";
+import { getCachedFeed, setCachedFeed, type FeedCacheKey } from "./feed-cache";
+import {
+  getCachedQuotes,
+  mergeQuotesIntoFeed,
+} from "./quote-cache-service";
 import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
 
@@ -30,14 +35,15 @@ let ingestErrorStreak = 0;
 const lastGood = new Map<"all" | "movers", { ts: number; items: CatalystItem[] }>();
 const LAST_GOOD_TTL_MS = 3 * 60 * 1000;
 
-const WIRE_BURST_MS = 5_000;
-const FULL_INGEST_MS = 25_000;
-const MAX_NEW_INGEST_PER_CYCLE = 50;
-const MAX_WIRE_BURST_NEW = 35;
-const INGEST_SCAN_WINDOW = 500;
-const MAX_CATALYSTS_SHOWN = 400;
+const WIRE_BURST_MS = 8_000;
+const FULL_INGEST_MS = 45_000;
+const MAX_NEW_INGEST_PER_CYCLE = 30;
+const MAX_WIRE_BURST_NEW = 20;
+const INGEST_SCAN_WINDOW = 150;
+const MAX_CATALYSTS_SHOWN = 300;
 const MAX_NEWS_AGE_MS = 24 * 60 * 60 * 1000;
 const RECENT_NEWS_MS = 45 * 60 * 1000;
+const FEED_CACHE_MS = isScaleMode() ? 10_000 : 2_500;
 
 /** Stock-impact news only — blocks lifestyle PR and false ticker matches */
 function isDisplayableCatalyst(c: CatalystItem): boolean {
@@ -251,47 +257,62 @@ export async function ingestAndAnalyzeNews(
     .filter((a) => a.publishedAt.getTime() >= cutoff)
     .slice(0, INGEST_SCAN_WINDOW);
 
-  const existingRows = await prisma.catalyst.findMany({
-    where: { rawNewsId: { in: freshNews.map((a) => a.id) } },
-    select: {
-      id: true,
-      rawNewsId: true,
-      symbol: true,
-      relatedSymbols: true,
-      catalystType: true,
-      headline: true,
-      source: true,
-      sourceUrl: true,
-      publishedAt: true,
-      aiSummary: true,
-      sentimentScore: true,
-      sentimentLabel: true,
-      floatShares: true,
-      marketCap: true,
-      price: true,
-      changePercent: true,
-      volume: true,
-      avgVolume: true,
-      isPremarket: true,
-      historicalAvgMove: true,
-      historicalSampleSize: true,
-      urgencyScore: true,
-      storyClusterId: true,
-      setupTags: true,
-      verifiedConfidence: true,
-      keyPoints: true,
-      sourceTier: true,
-      createdAt: true,
-    },
-  });
-  const existingByRawId = new Map(
-    existingRows
-      .filter((r) => r.rawNewsId)
-      .map((r) => [r.rawNewsId as string, r])
-  );
+  const ids = freshNews.map((a) => a.id);
+  const existingIdSet = new Set<string>();
+  let existingByRawId = new Map<string, Parameters<typeof mapCatalyst>[0]>();
+
+  if (wireOnly) {
+    const existingIds = await prisma.catalyst.findMany({
+      where: { rawNewsId: { in: ids } },
+      select: { rawNewsId: true },
+    });
+    for (const row of existingIds) {
+      if (row.rawNewsId) existingIdSet.add(row.rawNewsId);
+    }
+  } else {
+    const existingRows = await prisma.catalyst.findMany({
+      where: { rawNewsId: { in: ids } },
+      select: {
+        id: true,
+        rawNewsId: true,
+        symbol: true,
+        relatedSymbols: true,
+        catalystType: true,
+        headline: true,
+        source: true,
+        sourceUrl: true,
+        publishedAt: true,
+        aiSummary: true,
+        sentimentScore: true,
+        sentimentLabel: true,
+        floatShares: true,
+        marketCap: true,
+        price: true,
+        changePercent: true,
+        volume: true,
+        avgVolume: true,
+        isPremarket: true,
+        historicalAvgMove: true,
+        historicalSampleSize: true,
+        urgencyScore: true,
+        storyClusterId: true,
+        setupTags: true,
+        verifiedConfidence: true,
+        keyPoints: true,
+        sourceTier: true,
+        createdAt: true,
+      },
+    });
+    existingByRawId = new Map(
+      existingRows
+        .filter((r) => r.rawNewsId)
+        .map((r) => [r.rawNewsId as string, r])
+    );
+    for (const id of existingByRawId.keys()) existingIdSet.add(id);
+  }
 
   if (!wireOnly) {
-    for (const article of freshNews.filter((a) => existingByRawId.has(a.id))) {
+    for (const article of freshNews.filter((a) => existingIdSet.has(a.id))) {
       const existing = existingByRawId.get(article.id)!;
       if (!existing.relatedSymbols || existing.relatedSymbols.length === 0) {
         try {
@@ -331,7 +352,7 @@ export async function ingestAndAnalyzeNews(
   }
 
   const unseen = freshNews
-    .filter((a) => !existingByRawId.has(a.id))
+    .filter((a) => !existingIdSet.has(a.id))
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
     .slice(0, maxNew);
 
@@ -364,35 +385,65 @@ export async function ingestWireBurst(): Promise<CatalystItem[]> {
   return ingestAndAnalyzeNews({ fast: true, wireOnly: true });
 }
 
-let wireBurstInProgress = false;
-let lastWireBurstTime = 0;
-const MIN_WIRE_BURST_GAP_MS = 4_000;
+async function buildFeedFromDatabase(
+  limit: number,
+  moversOnly: boolean
+): Promise<CatalystItem[]> {
+  const cutoff = new Date(Date.now() - MAX_NEWS_AGE_MS);
 
-function triggerWireBurst(): void {
-  if (wireBurstInProgress) return;
-  if (Date.now() - lastWireBurstTime < MIN_WIRE_BURST_GAP_MS) return;
-  wireBurstInProgress = true;
-  void ingestWireBurst()
-    .catch(() => {
-      ingestErrorStreak += 1;
-    })
-    .finally(() => {
-      wireBurstInProgress = false;
-      lastWireBurstTime = Date.now();
-    });
+  if (Date.now() - lastPurgeTime > 60 * 60_000) {
+    await purgeStaleCatalysts();
+    lastPurgeTime = Date.now();
+  }
+
+  const catalysts = await prisma.catalyst.findMany({
+    where: { publishedAt: { gte: cutoff } },
+    orderBy: { publishedAt: "desc" },
+    take: Math.min(limit * 2, 400),
+  });
+
+  if (catalysts.length === 0) return [];
+
+  let items = catalysts.map(mapCatalyst).filter(isDisplayableCatalyst);
+  items = attachRvol(items);
+  items = items.map((c) => ({
+    ...c,
+    setupTags:
+      c.setupTags?.length
+        ? c.setupTags
+        : detectSetupTags({
+            symbol: c.symbol,
+            changePercent: c.changePercent,
+            rVol: c.rVol,
+            catalystType: c.catalystType,
+            relatedSymbols: c.relatedSymbols,
+            isPremarket: c.isPremarket,
+          }),
+  }));
+  items = rankMovers(items, moversOnly);
+  items = attachStoryClusters(items);
+  return items.slice(0, limit);
 }
 
-function triggerBackgroundIngest(): void {
-  if (ingestInProgress) return;
-  ingestInProgress = true;
-  void ingestAndAnalyzeNews({ fast: true })
-    .catch(() => {
-      ingestErrorStreak += 1;
-    })
-    .finally(() => {
-      ingestInProgress = false;
-      lastIngestTime = Date.now();
-    });
+/** Called by cron/worker after ingest — writes shared feed snapshot. */
+export async function refreshPublicFeedCache(): Promise<void> {
+  const limit = MAX_CATALYSTS_SHOWN;
+  const [allItems, moverItems] = await Promise.all([
+    buildFeedFromDatabase(limit, false),
+    buildFeedFromDatabase(limit, true),
+  ]);
+
+  const symbols = [...new Set(allItems.map((c) => c.symbol))];
+  const quotes = await getCachedQuotes(symbols);
+
+  const mergedAll = mergeQuotesIntoFeed(allItems, quotes);
+  const mergedMovers = mergeQuotesIntoFeed(moverItems, quotes);
+
+  await setCachedFeed("all", mergedAll);
+  await setCachedFeed("movers", mergedMovers);
+
+  lastGood.set("all", { ts: Date.now(), items: mergedAll });
+  lastGood.set("movers", { ts: Date.now(), items: mergedMovers });
 }
 
 export async function getCatalysts(
@@ -400,62 +451,41 @@ export async function getCatalysts(
   options: { moversOnly?: boolean } = {}
 ): Promise<CatalystItem[]> {
   const moversOnly = options.moversOnly === true;
-  const cutoff = new Date(Date.now() - MAX_NEWS_AGE_MS);
-  const cacheKey: "all" | "movers" = moversOnly ? "movers" : "all";
+  const cacheKey: FeedCacheKey = moversOnly ? "movers" : "all";
+
+  const cached = lastGood.get(cacheKey);
+  if (cached && Date.now() - cached.ts < FEED_CACHE_MS) {
+    return cached.items.slice(0, limit);
+  }
+
+  const shared = await getCachedFeed(cacheKey);
+  if (shared.items.length > 0) {
+    const symbols = shared.items.map((c) => c.symbol);
+    const quotes = await getCachedQuotes(symbols);
+    const merged = mergeQuotesIntoFeed(shared.items, quotes).slice(0, limit);
+    lastGood.set(cacheKey, { ts: Date.now(), items: merged });
+    return merged;
+  }
+
+  if (isScaleMode()) {
+    const stale = lastGood.get(cacheKey);
+    if (stale && Date.now() - stale.ts < LAST_GOOD_TTL_MS) {
+      return stale.items.slice(0, limit);
+    }
+    return [];
+  }
 
   try {
-    // Stale cleanup at most once per hour — do not delete recent rows on every poll
-    if (Date.now() - lastPurgeTime > 60 * 60_000) {
-      await purgeStaleCatalysts();
-      lastPurgeTime = Date.now();
-    }
-
-    const catalysts = await prisma.catalyst.findMany({
-      where: {
-        publishedAt: { gte: cutoff },
-      },
-      orderBy: { publishedAt: "desc" },
-      // Pull a deep window so high-volume days don't cause feed flicker
-      take: Math.min(limit * 8, 2000),
-    });
-
-    // Kick wire burst on every feed poll — no throttle
-    triggerWireBurst();
-
-    if (catalysts.length === 0) {
-      return [];
-    }
-
-    let items = catalysts.map(mapCatalyst).filter(isDisplayableCatalyst);
-    items = attachRvol(items);
-    items = items.map((c) => ({
-      ...c,
-      setupTags:
-        c.setupTags?.length
-          ? c.setupTags
-          : detectSetupTags({
-              symbol: c.symbol,
-              changePercent: c.changePercent,
-              rVol: c.rVol,
-              catalystType: c.catalystType,
-              relatedSymbols: c.relatedSymbols,
-              isPremarket: c.isPremarket,
-            }),
-    }));
-    items = rankMovers(items, moversOnly);
-    items = attachStoryClusters(items);
-    const result = items.slice(0, limit);
-
-    // Refresh prices for top symbols in the feed (price-only — stays under Finnhub limits)
-    void refreshCatalystQuotes(result, 8).catch(() => {});
-
-    lastGood.set(cacheKey, { ts: Date.now(), items: result });
-    return result;
+    const result = await buildFeedFromDatabase(limit, moversOnly);
+    const quotes = await getCachedQuotes(result.map((c) => c.symbol));
+    const merged = mergeQuotesIntoFeed(result, quotes);
+    lastGood.set(cacheKey, { ts: Date.now(), items: merged });
+    void setCachedFeed(cacheKey, merged).catch(() => {});
+    return merged;
   } catch {
-    triggerWireBurst();
-    const cached = lastGood.get(cacheKey);
-    if (cached && Date.now() - cached.ts < LAST_GOOD_TTL_MS) {
-      return cached.items;
+    const stale = lastGood.get(cacheKey);
+    if (stale && Date.now() - stale.ts < LAST_GOOD_TTL_MS) {
+      return stale.items.slice(0, limit);
     }
     return [];
   }
@@ -547,11 +577,18 @@ function isPremarketHours(): boolean {
 
 let instantLoopStarted = false;
 function startInstantIngestLoop(): void {
+  if (isScaleMode()) return;
   if (instantLoopStarted) return;
   instantLoopStarted = true;
 
-  const wireTick = () => void ingestWireBurst().catch(() => {});
-  const fullTick = () => void ingestAndAnalyzeNews({ fast: true }).catch(() => {});
+  const wireTick = () =>
+    void ingestWireBurst()
+      .then(() => refreshPublicFeedCache())
+      .catch(() => {});
+  const fullTick = () =>
+    void ingestAndAnalyzeNews({ fast: true })
+      .then(() => refreshPublicFeedCache())
+      .catch(() => {});
 
   wireTick();
   fullTick();
@@ -559,6 +596,6 @@ function startInstantIngestLoop(): void {
   setInterval(fullTick, FULL_INGEST_MS);
 }
 
-if (typeof globalThis !== "undefined") {
+if (typeof globalThis !== "undefined" && process.env.NODE_ENV !== "production") {
   startInstantIngestLoop();
 }

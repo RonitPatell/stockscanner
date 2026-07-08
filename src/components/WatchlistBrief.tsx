@@ -40,6 +40,17 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
 
   if (!brief) return null;
 
+  const seen = new Set<string>();
+  const displayItems = brief.sections
+    .flatMap((s) => s.items)
+    .filter((item) => {
+      const dedupeKey = `${item.symbol}|${item.publishedAt}|${item.headline.slice(0, 60)}`;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    })
+    .slice(0, 6);
+
   return (
     <div className={cn("rounded-lg border border-zinc-800 bg-zinc-950/50 overflow-hidden", className)}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/40">
@@ -76,8 +87,11 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
         {brief.summary}
       </p>
       <div className="max-h-36 overflow-y-auto divide-y divide-zinc-800/60">
-        {brief.sections.flatMap((s) => s.items).slice(0, 6).map((item) => (
-          <div key={`${item.symbol}-${item.publishedAt}`} className="px-3 py-1.5">
+        {displayItems.map((item) => (
+          <div
+            key={`${item.symbol}-${item.publishedAt}-${item.headline.slice(0, 40)}`}
+            className="px-3 py-1.5"
+          >
             <div className="flex items-center gap-2">
               <span className="font-mono text-[11px] font-bold text-white">{item.symbol}</span>
               <span

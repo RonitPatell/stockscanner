@@ -180,6 +180,46 @@ Before accepting real money:
 
 ---
 
+## Scaling (multi-user production)
+
+TrustTicker uses a **single-writer ingest pipeline** so 1 or 1,000 users read the same cached feed.
+
+### 1. Upstash Redis (free tier)
+
+1. Create database at [upstash.com](https://upstash.com)
+2. Copy REST URL + token → `.env`:
+   ```
+   UPSTASH_REDIS_REST_URL="https://..."
+   UPSTASH_REDIS_REST_TOKEN="..."
+   ```
+3. Add the same vars in Vercel → Settings → Environment Variables
+
+### 2. Cron ingest (Vercel)
+
+`vercel.json` runs `/api/cron/ingest` every 2 minutes. Vercel sends `Authorization: Bearer CRON_SECRET` automatically.
+
+Ensure `CRON_SECRET` is set in Vercel env vars.
+
+### 3. Local dev worker (optional)
+
+With Redis configured but no Vercel cron locally:
+
+```bash
+npm run ingest:worker
+```
+
+This hits `/api/cron/ingest` every 30s.
+
+### Architecture
+
+- **Cron/worker** → ingests news → writes feed + quotes to Redis
+- **Users** → `/api/catalysts` reads Redis only (no DB, no ingest)
+- **Card expand** → `/api/catalysts/[id]` loads full summary/key points
+
+Without Redis, dev mode uses in-memory cache + local ingest loop (single machine only).
+
+---
+
 ## Revenue Math
 
 | Subscribers | Monthly Revenue | Your Profit (after Stripe) |

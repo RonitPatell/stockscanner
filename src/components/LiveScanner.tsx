@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
-const POLL_MS = 3_000;
-const QUOTE_POLL_MS = 12_000;
+const POLL_MS = 8_000;
+const QUOTE_POLL_MS = 20_000;
 const QUOTE_BATCH_SIZE = 8;
 const FETCH_TIMEOUT_MS = 30_000;
 const QUOTE_TIMEOUT_MS = 15_000;
@@ -61,6 +61,7 @@ export function LiveScanner({
   const quoteCursorRef = useRef(0);
   const quoteFetchInFlightRef = useRef(false);
   const catalystFetchInFlightRef = useRef(false);
+  const sseActiveRef = useRef(false);
   const catalystAbortRef = useRef<AbortController | null>(null);
   const quoteAbortRef = useRef<AbortController | null>(null);
 
@@ -210,16 +211,11 @@ export function LiveScanner({
 
   useEffect(() => {
     fetchCatalysts();
-    const interval = setInterval(fetchCatalysts, POLL_MS);
+    const interval = setInterval(() => {
+      if (!sseActiveRef.current) fetchCatalysts();
+    }, POLL_MS);
 
-    // Force a background news pull immediately, then every 45s
-    const kickIngest = () => {
-      void fetch("/api/catalysts/refresh", { method: "POST" }).catch(() => {});
-    };
-    kickIngest();
-    const ingestInterval = setInterval(kickIngest, 3_000);
-
-    // Live price ticks — independent of news polling
+    // Server runs its own ingest loop — no client-side hammering
     const kickQuotes = () => {
       void refreshLiveQuotes();
     };
@@ -229,7 +225,6 @@ export function LiveScanner({
 
     return () => {
       clearInterval(interval);
-      clearInterval(ingestInterval);
       clearTimeout(quoteKickoff);
       clearInterval(quoteInterval);
       catalystAbortRef.current?.abort(new DOMException("Unmounted", "AbortError"));
@@ -247,6 +242,10 @@ export function LiveScanner({
       eventSource?.close();
       eventSource = new EventSource(`/api/catalysts/stream?moversOnly=${moversOnly}`);
 
+      eventSource.onopen = () => {
+        sseActiveRef.current = true;
+      };
+
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -263,6 +262,7 @@ export function LiveScanner({
       };
 
       eventSource.onerror = () => {
+        sseActiveRef.current = false;
         setConnected(false);
         eventSource?.close();
         if (!stopped) {

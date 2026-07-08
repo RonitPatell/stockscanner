@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       const poll = async () => {
         if (closed) return;
         try {
-          const catalysts = await getCatalysts(300, { moversOnly });
+          const catalysts = await getCatalysts(150, { moversOnly });
           send({ type: "update", catalysts, timestamp: new Date().toISOString() });
         } catch {
           send({ type: "error", message: "Poll failed" });
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
       await poll();
       // Push fresh news every 5s without requiring a manual refresh
-      const interval = setInterval(poll, 2_000);
+      const interval = setInterval(poll, 5_000);
 
       const heartbeat = setInterval(() => {
         send({ type: "heartbeat", timestamp: new Date().toISOString() });
