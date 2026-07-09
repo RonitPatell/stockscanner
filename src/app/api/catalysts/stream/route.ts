@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
       await poll();
       // Push fresh news every 2s without requiring a manual refresh
-      const interval = setInterval(poll, 2_000);
+      const interval = setInterval(poll, 1_000);
 
       const heartbeat = setInterval(() => {
         send({ type: "heartbeat", timestamp: new Date().toISOString() });

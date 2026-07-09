@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Sun, Star, Radio } from "lucide-react";
 import type { CatalystItem, ScannerFilters } from "@/types";
-import dynamic from "next/dynamic";
 import { LiveScanner, type ScannerTab } from "./LiveScanner";
 import { WatchlistBrief } from "./WatchlistBrief";
 import { TrustStatusBar } from "./TrustStatusBar";
@@ -12,17 +11,9 @@ import { OnboardingWizard } from "./OnboardingWizard";
 import { SessionRecap } from "./SessionRecap";
 import { SpeedWinsPanel } from "./SpeedWinsPanel";
 import { AlertSetupNudge } from "./AlertSetupNudge";
+import { LiveQuoteProvider } from "./LiveQuoteProvider";
+import { MarketMonitor } from "./MarketMonitor";
 import { cn } from "@/lib/utils";
-
-const MarketMonitor = dynamic(
-  () => import("./MarketMonitor").then((m) => m.MarketMonitor),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 h-32 animate-pulse" />
-    ),
-  }
-);
 
 const TABS: { id: ScannerTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "all", label: "All News", icon: Radio },
@@ -52,6 +43,7 @@ export function TradingDashboard({
   }, []);
 
   return (
+    <LiveQuoteProvider>
     <div className="flex flex-col h-full min-h-0 gap-2">
       {showOnboarding && (
         <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
@@ -64,9 +56,11 @@ export function TradingDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0 flex-1">
         <div className="lg:col-span-7 min-h-0 flex flex-col gap-2">
           <PremarketCenter />
-          <SpeedWinsPanel showViewAll />
-          <WatchlistBrief className="shrink-0" />
-          <MarketMonitor className="flex-1 min-h-0" />
+          <MarketMonitor className="flex-[1.7] min-h-[380px] lg:min-h-0" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 shrink-0">
+            <SpeedWinsPanel showViewAll />
+            <WatchlistBrief />
+          </div>
         </div>
 
         <div className="lg:col-span-5 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden">
@@ -102,5 +96,6 @@ export function TradingDashboard({
         Not financial advice · ingest latency shown per headline · click ticker for chart
       </p>
     </div>
+    </LiveQuoteProvider>
   );
 }

@@ -15,6 +15,7 @@ import {
 import type { EarningsEvent, MarketAlert, MarketScannerSnapshot, VolumeLeader } from "@/types";
 import { cn, formatPercent, formatPrice } from "@/lib/utils";
 import { tradingViewUrl } from "@/lib/chart-links";
+import { pickLiveField, useLiveQuotes, useRegisterLiveSymbols, type LiveQuote } from "./LiveQuoteProvider";
 
 const SESSION_LABELS = {
   premarket: "Pre-Market",
@@ -23,12 +24,100 @@ const SESSION_LABELS = {
   closed: "Closed",
 } as const;
 
+const MARKET_STATE_SYMBOLS = [
+  "VIX",
+  "SPY",
+  "QQQ",
+  "IWM",
+  "DIA",
+  "XLK",
+  "XLF",
+  "XLE",
+  "XLV",
+  "XLI",
+  "XLY",
+  "XLP",
+  "XLC",
+  "XLU",
+  "XLB",
+] as const;
+
+const EARNINGS_STORAGE_KEY = "trustticker:earnings:v1";
+
+function todayYmd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadStoredEarnings(): EarningsEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(EARNINGS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as EarningsEvent[];
+    const today = todayYmd();
+    return parsed.filter((e) => e.date >= today);
+  } catch {
+    return [];
+  }
+}
+
+function storeEarnings(events: EarningsEvent[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(EARNINGS_STORAGE_KEY, JSON.stringify(events));
+  } catch {
+    /* ignore */
+  }
+}
+
+function mergeEarningsList(
+  prev: EarningsEvent[],
+  incoming: EarningsEvent[]
+): EarningsEvent[] {
+  const map = new Map(prev.map((e) => [e.symbol, e] as const));
+  for (const e of incoming) map.set(e.symbol, e);
+  const today = todayYmd();
+  const next = [...map.values()]
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 20);
+  storeEarnings(next);
+  return next;
+}
+
 export function MarketMonitor({ className }: { className?: string }) {
   const [snapshot, setSnapshot] = useState<MarketScannerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEvent[]>([]);
-  const [marketState, setMarketState] = useState<Record<string, { price: number; changePercent: number }>>({});
   const earningsCursorRef = useRef(0);
+  const fetchedEarningsRef = useRef<Set<string>>(new Set());
+  const liveQuotes = useLiveQuotes();
+
+  const monitorSymbols = [
+    ...(snapshot?.volumeLeaders?.map((l) => l.symbol) ?? []),
+    ...(snapshot?.alerts?.map((a) => a.symbol) ?? []),
+    ...MARKET_STATE_SYMBOLS,
+  ];
+  useRegisterLiveSymbols("market-monitor", monitorSymbols);
+
+  useEffect(() => {
+    const stored = loadStoredEarnings();
+    if (stored.length > 0) {
+      setEarnings(stored);
+      for (const e of stored) fetchedEarningsRef.current.add(e.symbol);
+    }
+    void fetch("/api/earnings?sticky=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.events) && d.events.length > 0) {
+          setEarnings((prev) => mergeEarningsList(prev, d.events as EarningsEvent[]));
+          for (const e of d.events as EarningsEvent[]) {
+            fetchedEarningsRef.current.add(e.symbol);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchScanner = useCallback(async () => {
     try {
@@ -71,18 +160,19 @@ export function MarketMonitor({ className }: { className?: string }) {
     }
     earningsCursorRef.current = (start + batch.length) % unique.length;
 
+    const needFetch = batch.filter((s) => !fetchedEarningsRef.current.has(s));
+    if (needFetch.length === 0) return;
+
     try {
-      const res = await fetch(`/api/earnings?symbols=${batch.join(",")}&max=${max}`);
+      const res = await fetch(
+        `/api/earnings?symbols=${needFetch.join(",")}&max=${needFetch.length}&sticky=1`
+      );
       if (!res.ok) return;
       const data = await res.json();
       if (!Array.isArray(data.events)) return;
 
-      // merge by symbol
-      setEarnings((prev) => {
-        const map = new Map(prev.map((e) => [e.symbol, e] as const));
-        for (const e of data.events as EarningsEvent[]) map.set(e.symbol, e);
-        return [...map.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12);
-      });
+      for (const sym of needFetch) fetchedEarningsRef.current.add(sym);
+      setEarnings((prev) => mergeEarningsList(prev, data.events as EarningsEvent[]));
     } catch {
       /* ignore */
     }
@@ -91,48 +181,22 @@ export function MarketMonitor({ className }: { className?: string }) {
   useEffect(() => {
     if (!snapshot) return;
     void fetchEarnings();
-    const interval = setInterval(fetchEarnings, 2 * 60_000);
+    const interval = setInterval(fetchEarnings, 10 * 60_000);
     return () => clearInterval(interval);
   }, [snapshot, fetchEarnings]);
-
-  const fetchMarketState = useCallback(async () => {
-    try {
-      const res = await fetch("/api/market-state");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data?.quotes || typeof data.quotes !== "object") return;
-      const out: Record<string, { price: number; changePercent: number }> = {};
-      for (const [sym, q] of Object.entries<any>(data.quotes)) {
-        if (!q) continue;
-        if (typeof q.price !== "number" || typeof q.changePercent !== "number") continue;
-        out[sym] = { price: q.price, changePercent: q.changePercent };
-      }
-      setMarketState(out);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const delay = setTimeout(() => {
-      void fetchMarketState();
-      interval = setInterval(fetchMarketState, 30_000);
-    }, 800);
-    return () => {
-      clearTimeout(delay);
-      if (interval) clearInterval(interval);
-    };
-  }, [fetchMarketState]);
 
   const session = snapshot?.marketSession ?? "closed";
 
   return (
-    <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-2 h-full min-h-0", className)}>
-      <AlertFeed alerts={snapshot?.alerts ?? []} loading={loading} session={session} />
-      <VolumePanel leaders={snapshot?.volumeLeaders ?? []} loading={loading} session={session} />
-      <MarketStatePanel quotes={marketState} loading={loading} />
-      <EarningsPanel events={earnings} loading={loading} />
+    <div className={cn("flex flex-col gap-2 h-full min-h-0", className)}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[1.7] min-h-[260px] lg:min-h-0">
+        <AlertFeed alerts={snapshot?.alerts ?? []} loading={loading} session={session} liveQuotes={liveQuotes} />
+        <VolumePanel leaders={snapshot?.volumeLeaders ?? []} loading={loading} session={session} liveQuotes={liveQuotes} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[0.9] min-h-0 max-h-44 lg:max-h-48 shrink-0">
+        <MarketStatePanel quotes={liveQuotes} loading={loading} />
+        <EarningsPanel events={earnings} loading={loading && earnings.length === 0} />
+      </div>
     </div>
   );
 }
@@ -177,10 +241,12 @@ function AlertFeed({
   alerts,
   loading,
   session,
+  liveQuotes,
 }: {
   alerts: MarketAlert[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
+  liveQuotes: Record<string, LiveQuote>;
 }) {
   return (
     <PanelShell
@@ -200,7 +266,10 @@ function AlertFeed({
           <p className="text-[10px] text-zinc-600 p-3 text-center">Watching for HOD, retests &amp; volume…</p>
         ) : (
           <ul>
-            {alerts.map((alert) => (
+            {alerts.map((alert) => {
+              const change =
+                pickLiveField(alert.symbol, liveQuotes, "changePercent", alert.changePercent) ?? 0;
+              return (
               <li
                 key={alert.id}
                 className="flex items-center gap-1.5 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]"
@@ -223,13 +292,14 @@ function AlertFeed({
                 <span
                   className={cn(
                     "font-mono text-[10px] font-semibold shrink-0",
-                    alert.changePercent >= 0 ? "text-emerald-400" : "text-red-400"
+                    change >= 0 ? "text-emerald-400" : "text-red-400"
                   )}
                 >
-                  {formatPercent(alert.changePercent)}
+                  {formatPercent(change)}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
@@ -241,10 +311,12 @@ function VolumePanel({
   leaders,
   loading,
   session,
+  liveQuotes,
 }: {
   leaders: VolumeLeader[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
+  liveQuotes: Record<string, LiveQuote>;
 }) {
   return (
     <PanelShell
@@ -273,7 +345,7 @@ function VolumePanel({
           </p>
         ) : (
           leaders.map((leader, i) => (
-            <VolumeRow key={`${leader.symbol}-${i}`} leader={leader} />
+            <VolumeRow key={`${leader.symbol}-${i}`} leader={leader} liveQuotes={liveQuotes} />
           ))
         )}
       </div>
@@ -281,9 +353,20 @@ function VolumePanel({
   );
 }
 
-function VolumeRow({ leader }: { leader: VolumeLeader }) {
-  const hot = leader.rVol >= 5;
-  const warm = leader.rVol >= 3;
+function VolumeRow({
+  leader,
+  liveQuotes,
+}: {
+  leader: VolumeLeader;
+  liveQuotes: Record<string, LiveQuote>;
+}) {
+  const price = pickLiveField(leader.symbol, liveQuotes, "price", leader.price) ?? leader.price;
+  const change =
+    pickLiveField(leader.symbol, liveQuotes, "changePercent", leader.changePercent) ?? 0;
+  const rVol =
+    pickLiveField(leader.symbol, liveQuotes, "rVol", leader.rVol) ?? leader.rVol ?? 0;
+  const hot = rVol >= 5;
+  const warm = rVol >= 3;
 
   return (
     <div className="grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 items-center px-2 py-1 border-b border-zinc-800/40 hover:bg-zinc-900/40 text-[11px]">
@@ -296,15 +379,15 @@ function VolumeRow({ leader }: { leader: VolumeLeader }) {
         >
           {leader.symbol}
         </a>
-        <div className="text-[9px] text-zinc-600">{formatPrice(leader.price)}</div>
+        <div className="text-[9px] text-zinc-600">{formatPrice(price)}</div>
       </div>
       <span
         className={cn(
           "font-mono text-center font-semibold text-[10px]",
-          leader.changePercent >= 0 ? "text-emerald-400" : "text-red-400"
+          change >= 0 ? "text-emerald-400" : "text-red-400"
         )}
       >
-        {formatPercent(leader.changePercent)}
+        {formatPercent(change)}
       </span>
       <span
         className={cn(
@@ -312,7 +395,7 @@ function VolumeRow({ leader }: { leader: VolumeLeader }) {
           hot ? "text-amber-400" : warm ? "text-orange-400" : "text-zinc-300"
         )}
       >
-        {leader.rVol.toFixed(1)}×
+        {rVol > 0 ? `${rVol.toFixed(1)}×` : "—"}
       </span>
       <span className="text-zinc-400 font-mono text-[10px] truncate">
         {leader.volume > 0 ? formatVol(leader.volume) : "—"}

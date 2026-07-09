@@ -24,6 +24,13 @@ export function computeRvol(
   return Math.round((volume / expected) * 10) / 10;
 }
 
+export function estimateRvolFromMove(changePercent: number | null | undefined): number | null {
+  if (changePercent == null) return null;
+  const abs = Math.abs(changePercent);
+  if (abs < 0.35) return 1.0;
+  return Math.round(Math.max(1.0, abs / 4.5) * 10) / 10;
+}
+
 export function formatRvol(rvol: number | null | undefined): string {
   if (rvol == null) return "—";
   return `${rvol.toFixed(1)}×`;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BarChart3, TrendingDown, TrendingUp } from "lucide-react";
 import { cn, formatPercent } from "@/lib/utils";
+import { applyLiveQuote, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
 
 interface RecapData {
   storyCount: number;
@@ -18,6 +19,14 @@ interface RecapData {
 
 export function SessionRecap({ className }: { className?: string }) {
   const [data, setData] = useState<RecapData | null>(null);
+  const liveQuotes = useLiveQuotes();
+
+  const recapSymbols = [
+    data?.best?.symbol,
+    data?.worst?.symbol,
+    ...(data?.movers?.map((m) => m.symbol) ?? []),
+  ].filter(Boolean) as string[];
+  useRegisterLiveSymbols("session-recap", recapSymbols);
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -30,6 +39,9 @@ export function SessionRecap({ className }: { className?: string }) {
   }, []);
 
   if (!data || data.storyCount === 0) return null;
+
+  const best = data.best ? applyLiveQuote(data.best, liveQuotes) : null;
+  const worst = data.worst ? applyLiveQuote(data.worst, liveQuotes) : null;
 
   return (
     <div
@@ -44,16 +56,16 @@ export function SessionRecap({ className }: { className?: string }) {
         <span className="text-[10px] text-zinc-600 ml-auto">{data.storyCount} stories on watchlist</span>
       </div>
       <div className="flex flex-wrap gap-3 text-[10px]">
-        {data.best && (
+        {best && (
           <span className="inline-flex items-center gap-1 text-emerald-400">
             <TrendingUp className="w-3 h-3" />
-            Top gainer {data.best.symbol} {formatPercent(data.best.changePercent ?? 0)}
+            Top gainer {best.symbol} {formatPercent(best.changePercent ?? 0)}
           </span>
         )}
-        {data.worst && (
+        {worst && (
           <span className="inline-flex items-center gap-1 text-red-400">
             <TrendingDown className="w-3 h-3" />
-            Biggest drop {data.worst.symbol} {formatPercent(data.worst.changePercent ?? 0)}
+            Biggest drop {worst.symbol} {formatPercent(worst.changePercent ?? 0)}
           </span>
         )}
         {data.avgSentiment != null && (

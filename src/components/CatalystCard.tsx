@@ -25,6 +25,7 @@ import {
 } from "@/lib/source-trust";
 import { setupTagMeta } from "@/lib/setup-tags";
 import { CatalystPlaybookPanel } from "./CatalystPlaybookPanel";
+import { pickLiveField, useLiveQuotesOptional } from "./LiveQuoteProvider";
 
 interface CatalystCardProps {
   catalyst: CatalystItem;
@@ -42,6 +43,27 @@ export function CatalystCard({
   inWatchlist,
   demoMode = false,
 }: CatalystCardProps) {
+  const liveQuotes = useLiveQuotesOptional();
+  const price = pickLiveField(catalyst.symbol, liveQuotes, "price", catalyst.price);
+  const changePercent = pickLiveField(
+    catalyst.symbol,
+    liveQuotes,
+    "changePercent",
+    catalyst.changePercent
+  );
+  const rVol = pickLiveField(catalyst.symbol, liveQuotes, "rVol", catalyst.rVol);
+  const floatShares = pickLiveField(
+    catalyst.symbol,
+    liveQuotes,
+    "floatShares",
+    catalyst.floatShares
+  );
+  const marketCap = pickLiveField(
+    catalyst.symbol,
+    liveQuotes,
+    "marketCap",
+    catalyst.marketCap
+  );
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<{
     aiSummary?: string | null;
@@ -52,13 +74,20 @@ export function CatalystCard({
   const [translatedHeadline, setTranslatedHeadline] = useState<string | null>(null);
   const [detectedLang, setDetectedLang] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
-  const [ageLabel, setAgeLabel] = useState(() => timeAgo(catalyst.publishedAt));
+  const [mounted, setMounted] = useState(false);
+  const [ageLabel, setAgeLabel] = useState("");
 
   useEffect(() => {
-    setAgeLabel(timeAgo(catalyst.publishedAt));
-    const id = setInterval(() => setAgeLabel(timeAgo(catalyst.publishedAt)), 1000);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const tick = () => setAgeLabel(timeAgo(catalyst.publishedAt));
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [catalyst.publishedAt]);
+  }, [catalyst.publishedAt, mounted]);
 
   const sourceTier = catalyst.sourceTier
     ? (catalyst.sourceTier as "wire" | "exchange" | "aggregator" | "other")
@@ -139,9 +168,9 @@ export function CatalystCard({
       ];
   const newsCount = catalyst.newsCount ?? headlines.length;
   const catalystType = CATALYST_TYPES.find((t) => t.id === catalyst.catalystType);
-  const absMove = Math.abs(catalyst.changePercent ?? 0);
+  const absMove = Math.abs(changePercent ?? 0);
   const isBigMover = absMove >= 5;
-  const hotRvol = (catalyst.rVol ?? 0) >= 3;
+  const hotRvol = (rVol ?? 0) >= 3;
 
   return (
     <div
@@ -182,18 +211,18 @@ export function CatalystCard({
           className={cn(
             "font-mono text-[11px] font-semibold text-center rounded px-0.5 py-0.5 transition-colors duration-500",
             isBigMover
-              ? (catalyst.changePercent ?? 0) >= 0
+              ? (changePercent ?? 0) >= 0
                 ? "bg-emerald-500/15 text-emerald-400"
                 : "bg-red-500/15 text-red-400"
-              : getChangeColor(catalyst.changePercent)
+              : getChangeColor(changePercent)
           )}
         >
-          {formatPercent(catalyst.changePercent)}
+          {formatPercent(changePercent)}
         </div>
 
         {/* Price */}
         <div className="font-mono text-[11px] text-zinc-300 text-right tabular-nums transition-colors duration-500">
-          {formatPrice(catalyst.price)}
+          {formatPrice(price)}
         </div>
 
         {/* RVOL */}
@@ -204,7 +233,7 @@ export function CatalystCard({
           )}
           title="Relative volume vs session average"
         >
-          {formatRvol(catalyst.rVol)}
+          {formatRvol(rVol)}
         </div>
 
         {/* Sentiment */}
@@ -239,7 +268,7 @@ export function CatalystCard({
               )}
             </p>
             <p className="text-[9px] text-zinc-600 truncate mt-0.5 hidden sm:block">
-              {formatFloat(catalyst.floatShares)} float · {formatMarketCap(catalyst.marketCap)}
+              {formatFloat(floatShares)} float · {formatMarketCap(marketCap)}
               {catalyst.isPremarket && " · PM"}
               {catalyst.setupTags?.length ? (
                 <span className="ml-1">
@@ -309,7 +338,7 @@ export function CatalystCard({
 
         {/* Time */}
         <div className="text-[9px] text-zinc-500 text-right whitespace-nowrap tabular-nums">
-          {ageLabel}
+          {mounted ? ageLabel : "…"}
           {catalyst.ingestDelaySec != null && catalyst.ingestDelaySec < 120 && (
             <span className="block text-emerald-500/80" title="Publish → ingest delay">
               +{catalyst.ingestDelaySec}s
@@ -365,7 +394,7 @@ export function CatalystCard({
 
           <CatalystPlaybookPanel
             catalystType={catalyst.catalystType}
-            floatShares={catalyst.floatShares}
+            floatShares={floatShares}
             className="mb-2"
           />
 
@@ -448,7 +477,7 @@ export function CatalystCard({
                 Overall {catalyst.sentimentLabel?.replace("_", " ") || "neutral"}
               </Badge>
               <span className="text-[10px] text-zinc-500">
-                {newsCount} headlines · RVol {formatRvol(catalyst.rVol)}
+                {newsCount} headlines · RVol {formatRvol(rVol)}
               </span>
             </div>
           )}
@@ -484,7 +513,7 @@ export function CatalystCard({
                         </span>
                       )}
                       <span className="text-[10px] text-zinc-600 shrink-0">
-                        {timeAgo(h.publishedAt)}
+                        {mounted ? timeAgo(h.publishedAt) : "…"}
                       </span>
                     </div>
                     {h.sourceUrl && (

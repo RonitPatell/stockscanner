@@ -6,6 +6,7 @@ import { ArrowRight, TrendingUp } from "lucide-react";
 import { SpeedWinCard } from "./LiveProofStrip";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { applyLiveQuote, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
 
 interface SpeedWin {
   id: string;
@@ -31,6 +32,9 @@ export function SpeedWinsPanel({
   showViewAll?: boolean;
 }) {
   const [wins, setWins] = useState<SpeedWin[]>([]);
+  const liveQuotes = useLiveQuotes();
+
+  useRegisterLiveSymbols("speed-wins", wins.map((w) => w.symbol));
 
   useEffect(() => {
     const load = () => {
@@ -64,24 +68,28 @@ export function SpeedWinsPanel({
         )}
       </div>
       <div className="max-h-44 overflow-y-auto divide-y divide-zinc-800/60">
-        {wins.map((w) => (
+        {wins.map((w) => {
+          const live = applyLiveQuote(w, liveQuotes);
+          const change = live.changePercent ?? w.changePercent ?? 0;
+          return (
           <div key={w.id} className="px-3 py-2 hover:bg-zinc-900/30">
             <div className="flex items-center gap-2 text-[11px]">
               <span className="font-mono font-bold text-white">{w.symbol}</span>
               <span
                 className={cn(
                   "font-mono",
-                  (w.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                  change >= 0 ? "text-emerald-400" : "text-red-400"
                 )}
               >
-                {(w.changePercent ?? 0) >= 0 ? "+" : ""}
-                {w.changePercent?.toFixed(1)}%
+                {change >= 0 ? "+" : ""}
+                {change.toFixed(1)}%
               </span>
               <span className="text-emerald-500/80 font-mono text-[10px]">+{w.ingestDelaySec}s</span>
               <span className="text-zinc-600 truncate flex-1">{w.headline}</span>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

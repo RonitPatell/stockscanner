@@ -30,6 +30,15 @@ const VOLUME_CACHE_MS = 5 * 60 * 1000;
 export async function fetchVolumeForSymbol(
   symbol: string
 ): Promise<{ volume: number; avgVolume: number } | null> {
+  return Promise.race([
+    fetchVolumeForSymbolInner(symbol),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 6_000)),
+  ]);
+}
+
+async function fetchVolumeForSymbolInner(
+  symbol: string
+): Promise<{ volume: number; avgVolume: number } | null> {
   const cached = volumeCache.get(symbol);
   if (cached && Date.now() - cached.ts < VOLUME_CACHE_MS) {
     return { volume: cached.volume, avgVolume: cached.avgVolume };
@@ -41,8 +50,9 @@ export async function fetchVolumeForSymbol(
   try {
     const to = Math.floor(Date.now() / 1000);
     const from = to - 40 * 86400;
-    const res = await finnhubFetch(
-      `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${key}`
+    const res = await finnhubFetchLive(
+      `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${key}`,
+      { signal: AbortSignal.timeout(5_000) }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -75,8 +85,9 @@ async function fetchIntradayVolumeSum(symbol: string): Promise<number | null> {
   try {
     const to = Math.floor(Date.now() / 1000);
     const from = to - 2 * 86400;
-    const res = await finnhubFetch(
-      `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=5&from=${from}&to=${to}&token=${key}`
+    const res = await finnhubFetchLive(
+      `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=5&from=${from}&to=${to}&token=${key}`,
+      { signal: AbortSignal.timeout(5_000) }
     );
     if (!res.ok) return null;
     const data = await res.json();

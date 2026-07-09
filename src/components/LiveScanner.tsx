@@ -19,12 +19,15 @@ import { Badge } from "./ui/badge";
 import type { CatalystItem, ScannerFilters } from "@/types";
 import { CATALYST_TYPES } from "@/types";
 import { cn, formatClockTime } from "@/lib/utils";
+import {
+  applyLiveQuote,
+  useLiveQuotes,
+  useRegisterLiveSymbols,
+} from "./LiveQuoteProvider";
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
 const POLL_MS = 8_000;
-const QUOTE_POLL_MS = 20_000;
-const QUOTE_BATCH_SIZE = 8;
 const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
 
 async function safeJsonFetch<T>(url: string): Promise<T | null> {
@@ -66,15 +69,15 @@ export function LiveScanner({
     new Set(initialCatalysts.map((c) => c.symbol))
   );
   const catalystsRef = useRef<CatalystItem[]>(initialCatalysts);
-  const liveQuotesRef = useRef<
-    Record<string, { price: number; changePercent: number }>
-  >({});
-  const quoteCursorRef = useRef(0);
-  const quoteFetchInFlightRef = useRef(false);
   const catalystFetchInFlightRef = useRef(false);
   const catalystGenRef = useRef(0);
-  const quoteGenRef = useRef(0);
   const [mounted, setMounted] = useState(false);
+  const liveQuotes = useLiveQuotes();
+
+  useRegisterLiveSymbols(
+    "live-scanner",
+    catalysts.map((c) => c.symbol)
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -84,72 +87,10 @@ export function LiveScanner({
     catalystsRef.current = catalysts;
   }, [catalysts]);
 
-  const applyLiveQuotes = useCallback(
-    (
-      items: CatalystItem[],
-      quotes: Record<string, { price: number; changePercent: number }>
-    ): CatalystItem[] => {
-      if (!quotes || Object.keys(quotes).length === 0) return items;
-      return items.map((c) => {
-        const q = quotes[c.symbol];
-        if (!q) return c;
-        if (c.price === q.price && c.changePercent === q.changePercent) return c;
-        return { ...c, price: q.price, changePercent: q.changePercent };
-      });
-    },
-    []
-  );
-
-  const mergeLiveQuotes = useCallback(
-    (quotes: Record<string, { price: number; changePercent: number }>) => {
-      if (!quotes || Object.keys(quotes).length === 0) return;
-      liveQuotesRef.current = { ...liveQuotesRef.current, ...quotes };
-      setCatalysts((prev) => applyLiveQuotes(prev, liveQuotesRef.current));
-    },
-    [applyLiveQuotes]
-  );
-
-  const fetchQuotesForSymbols = useCallback(
-    async (symbols: string[]) => {
-      const unique = [...new Set(symbols.filter(Boolean))].slice(0, QUOTE_BATCH_SIZE);
-      if (unique.length === 0) return;
-      const data = await safeJsonFetch<{
-        quotes?: Record<string, { price: number; changePercent: number }>;
-      }>(`/api/quotes?symbols=${unique.join(",")}&max=${QUOTE_BATCH_SIZE}`);
-      if (data?.quotes) mergeLiveQuotes(data.quotes);
-    },
-    [mergeLiveQuotes]
-  );
-
-  const refreshLiveQuotes = useCallback(async () => {
-    if (quoteFetchInFlightRef.current) return;
-    const all = [
-      ...new Set(catalystsRef.current.map((c) => c.symbol).filter(Boolean)),
-    ];
-    if (all.length === 0) return;
-
-    const start = quoteCursorRef.current % all.length;
-    const batch: string[] = [];
-    for (let i = 0; i < Math.min(QUOTE_BATCH_SIZE, all.length); i++) {
-      batch.push(all[(start + i) % all.length]);
-    }
-    quoteCursorRef.current = (start + batch.length) % all.length;
-
-    quoteFetchInFlightRef.current = true;
-    const gen = ++quoteGenRef.current;
-
-    try {
-      const data = await safeJsonFetch<{ quotes?: Record<string, { price: number; changePercent: number }> }>(
-        `/api/quotes?symbols=${batch.join(",")}&max=${QUOTE_BATCH_SIZE}`
-      );
-      if (gen !== quoteGenRef.current || !data?.quotes) return;
-      mergeLiveQuotes(data.quotes);
-    } catch {
-      /* best effort */
-    } finally {
-      quoteFetchInFlightRef.current = false;
-    }
-  }, [mergeLiveQuotes]);
+  useEffect(() => {
+    if (Object.keys(liveQuotes).length === 0) return;
+    setCatalysts((prev) => prev.map((c) => applyLiveQuote(c, liveQuotes)));
+  }, [liveQuotes]);
 
   const loadWatchlist = useCallback(async () => {
     if (initialWatchlist.length > 0) return;
@@ -191,12 +132,12 @@ export function LiveScanner({
         (c) => Date.now() - new Date(c.publishedAt).getTime() <= MAX_FEED_AGE_MS
       );
       if (fresh.length === 0 && catalystsRef.current.length > 0) return;
-      setCatalysts(applyLiveQuotes(fresh, liveQuotesRef.current));
+      setCatalysts(fresh.map((c) => applyLiveQuote(c, liveQuotes)));
       setLastUpdate(new Date());
       setConnected(true);
       setLoading(false);
     },
-    [applyLiveQuotes]
+    [liveQuotes]
   );
 
   const fetchCatalysts = useCallback(async () => {
@@ -219,17 +160,8 @@ export function LiveScanner({
 
       if (freshSymbols.size > 0 && prevSymbolsRef.current.size > 0) {
         setNewSymbols(freshSymbols);
-        void fetchQuotesForSymbols([...freshSymbols]);
         if (soundEnabled) playAlertSound();
         setTimeout(() => setNewSymbols(new Set()), 5000);
-      }
-
-      const needsQuotes = data
-        .filter((c) => c.price == null || c.changePercent == null)
-        .map((c) => c.symbol)
-        .slice(0, QUOTE_BATCH_SIZE);
-      if (needsQuotes.length > 0) {
-        void fetchQuotesForSymbols(needsQuotes);
       }
 
       prevSymbolsRef.current = currentSymbols;
@@ -240,24 +172,17 @@ export function LiveScanner({
       catalystFetchInFlightRef.current = false;
       if (catalystsRef.current.length === 0) setLoading(false);
     }
-  }, [soundEnabled, moversOnly, applyFeedUpdate, fetchQuotesForSymbols]);
+  }, [soundEnabled, moversOnly, applyFeedUpdate]);
 
   useEffect(() => {
     void fetchCatalysts();
     const interval = setInterval(() => void fetchCatalysts(), POLL_MS);
 
-    const kickQuotes = () => void refreshLiveQuotes();
-    const quoteKickoff = setTimeout(kickQuotes, 400);
-    const quoteInterval = setInterval(kickQuotes, QUOTE_POLL_MS);
-
     return () => {
       clearInterval(interval);
-      clearTimeout(quoteKickoff);
-      clearInterval(quoteInterval);
       catalystGenRef.current += 1;
-      quoteGenRef.current += 1;
     };
-  }, [fetchCatalysts, refreshLiveQuotes]);
+  }, [fetchCatalysts]);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -277,15 +202,7 @@ export function LiveScanner({
         try {
           const data = JSON.parse(event.data);
           if (data.type === "update" && Array.isArray(data.catalysts)) {
-            const items = data.catalysts as CatalystItem[];
-            applyFeedUpdate(items);
-            const needsQuotes = items
-              .filter((c) => c.price == null || c.changePercent == null)
-              .map((c) => c.symbol)
-              .slice(0, QUOTE_BATCH_SIZE);
-            if (needsQuotes.length > 0) {
-              void fetchQuotesForSymbols(needsQuotes);
-            }
+            applyFeedUpdate(data.catalysts as CatalystItem[]);
           }
         } catch { /* ignore */ }
       };
@@ -308,7 +225,7 @@ export function LiveScanner({
       if (reconnectTimer) clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, [moversOnly, applyFeedUpdate, fetchQuotesForSymbols]);
+  }, [moversOnly, applyFeedUpdate]);
 
   const toggleWatchlist = async (symbol: string) => {
     const sym = symbol.toUpperCase();

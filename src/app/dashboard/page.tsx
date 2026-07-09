@@ -26,28 +26,62 @@ export default async function DashboardPage({
   let initialFilters: ScannerFilters | null = null;
 
   if (session?.user?.id) {
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        subscriptionStatus: true,
-        subscriptionEndsAt: true,
-        watchlist: true,
-        scannerFilters: true,
-      },
-    });
-    isSubscribed = hasActiveSubscription(user ?? undefined);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          subscriptionStatus: true,
+          subscriptionEndsAt: true,
+          watchlist: true,
+          scannerFilters: true,
+        },
+      });
+      isSubscribed = hasActiveSubscription(user ?? undefined);
 
-    if (isSubscribed) {
-      const [catalysts, cached] = await Promise.all([
-        getCatalysts(150),
-        getCachedFeed("all"),
-      ]);
-      initialCatalysts =
-        catalysts.length > 0 ? catalysts : cached.items.slice(0, 150);
-      initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
-      if (user?.scannerFilters && typeof user.scannerFilters === "object") {
-        initialFilters = user.scannerFilters as ScannerFilters;
+      if (isSubscribed) {
+        const [catalysts, cached] = await Promise.all([
+          getCatalysts(150),
+          getCachedFeed("all"),
+        ]);
+        initialCatalysts =
+          catalysts.length > 0 ? catalysts : cached.items.slice(0, 150);
+        initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
+        if (user?.scannerFilters && typeof user.scannerFilters === "object") {
+          initialFilters = user.scannerFilters as ScannerFilters;
+        }
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Database unavailable";
+      const offline =
+        message.includes("Can't reach database server") ||
+        message.includes("Connection timed out") ||
+        message.includes("ENOTFOUND");
+      if (offline) {
+        return (
+          <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
+            <div className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 space-y-3">
+              <h1 className="text-lg font-semibold text-amber-200">Database offline</h1>
+              <p className="text-sm text-zinc-300">
+                Neon could not be reached. Free Neon projects sleep or expire — open{" "}
+                <a
+                  href="https://console.neon.tech"
+                  className="text-emerald-400 underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  console.neon.tech
+                </a>
+                , copy a fresh connection string into <code className="text-amber-100">DATABASE_URL</code>, then run{" "}
+                <code className="text-amber-100">npx prisma db push</code>.
+              </p>
+              <p className="text-xs text-zinc-500">
+                Test locally: <code className="text-zinc-400">node --env-file=.env scripts/test-db.mjs</code>
+              </p>
+            </div>
+          </div>
+        );
+      }
+      throw error;
     }
   }
 

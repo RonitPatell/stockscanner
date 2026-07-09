@@ -26,7 +26,9 @@ import {
   getCachedQuotes,
   mergeQuotesIntoFeed,
   refreshQuoteCache,
+  refreshQuoteVolumes,
 } from "./quote-cache-service";
+import { getCachedProfiles, refreshProfileCache } from "./profile-cache-service";
 import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
 import { getPriorityTickers } from "./priority-tickers";
@@ -96,19 +98,39 @@ async function resolveIngestQuote(
   const cached = await getCachedQuotes([symbol]);
   const hit = cached[symbol];
   if (hit && hit.price > 0) {
+    const profile = (await getCachedProfiles([symbol]))[symbol];
     return {
       symbol,
       price: hit.price,
       changePercent: hit.changePercent,
       change: hit.change,
       volume: 0,
+      floatShares: hit.floatShares ?? profile?.floatShares,
+      marketCap: hit.marketCap ?? profile?.marketCap,
     };
   }
 
-  const timeoutMs = wireOnly ? 2_500 : 2_000;
+  if (wireOnly) {
+    void (async () => {
+      const live =
+        (await quoteWithTimeout(() => fetchQuoteLive(symbol), 4_000)) ??
+        (await getQuote(symbol, articleId, source));
+      if (!live?.price) return;
+      const { seedCachedQuote } = await import("./quote-cache-service");
+      await seedCachedQuote(symbol, {
+        price: live.price,
+        changePercent: live.changePercent,
+        change: live.change,
+        volume: live.volume,
+        avgVolume: live.avgVolume,
+      });
+    })();
+    return null;
+  }
+
   const live =
-    (await quoteWithTimeout(() => fetchQuoteLive(symbol), timeoutMs)) ??
-    (wireOnly ? null : await getQuote(symbol, articleId, source));
+    (await quoteWithTimeout(() => fetchQuoteLive(symbol), 2_000)) ??
+    (await getQuote(symbol, articleId, source));
   return live;
 }
 
@@ -117,18 +139,48 @@ async function enrichItemsWithQuotes(items: CatalystItem[]): Promise<CatalystIte
   const symbols = [...new Set(items.map((c) => c.symbol))];
   let quotes = await getCachedQuotes(symbols);
   const missing = symbols.filter((s) => !quotes[s]?.price);
-  if (missing.length > 0) {
-    await refreshQuoteCache(missing.slice(0, 16));
+  const needsRvol = symbols.filter((s) => quotes[s]?.price && quotes[s]?.rVol == null);
+  const toRefresh = [...new Set([...missing, ...needsRvol])];
+  if (toRefresh.length > 0) {
+    await refreshQuoteCache(toRefresh.slice(0, 20), { fetchVolume: true });
     quotes = { ...(await getCachedQuotes(symbols)) };
+    const stillNeedRvol = symbols.filter((s) => quotes[s]?.price && quotes[s]?.rVol == null);
+    if (stillNeedRvol.length > 0) {
+      await refreshQuoteVolumes(stillNeedRvol.slice(0, 16));
+      quotes = { ...(await getCachedQuotes(symbols)) };
+    }
+    const needProfiles = symbols.filter((s) => !quotes[s]?.floatShares);
+    if (needProfiles.length > 0) {
+      await refreshProfileCache(needProfiles.slice(0, 12));
+      const profiles = await getCachedProfiles(symbols);
+      for (const sym of symbols) {
+        const p = profiles[sym];
+        if (p && quotes[sym]) {
+          quotes[sym] = { ...quotes[sym], floatShares: p.floatShares, marketCap: p.marketCap };
+        }
+      }
+    }
   }
   return items.map((c) => {
     const q = quotes[c.symbol];
     if (!q?.price) return c;
-    const enriched = { ...c, price: q.price, changePercent: q.changePercent };
+    const enriched = {
+      ...c,
+      price: q.price,
+      changePercent: q.changePercent,
+      rVol: q.rVol ?? c.rVol,
+      volume: q.volume ?? c.volume,
+      avgVolume: q.avgVolume ?? c.avgVolume,
+    };
     void prisma.catalyst
       .update({
         where: { id: c.id },
-        data: { price: q.price, changePercent: q.changePercent },
+        data: {
+          price: q.price,
+          changePercent: q.changePercent,
+          ...(q.volume != null ? { volume: q.volume } : {}),
+          ...(q.avgVolume != null ? { avgVolume: q.avgVolume } : {}),
+        },
       })
       .catch(() => {});
     return enriched;
@@ -305,8 +357,8 @@ export async function ingestAndAnalyzeNews(
           ? {
               price: quote.price,
               changePercent: quote.changePercent,
-              floatShares: quote.floatShares,
-              marketCap: quote.marketCap,
+              ...(quote.floatShares != null ? { floatShares: quote.floatShares } : {}),
+              ...(quote.marketCap != null ? { marketCap: quote.marketCap } : {}),
               setupTags,
             }
           : {}),
@@ -442,10 +494,19 @@ export async function ingestAndAnalyzeNews(
   ingestErrorStreak = 0;
 
   if (newItems.length > 0) {
-    const enriched = await enrichItemsWithQuotes(newItems);
-    newItems.length = 0;
-    newItems.push(...enriched);
-    void dispatchWatchlistAlerts(newItems).catch(() => {});
+    if (wireOnly) {
+      void enrichItemsWithQuotes(newItems)
+        .then((enriched) => {
+          void patchFeedWithEnrichedItems(enriched).catch(() => {});
+          void dispatchWatchlistAlerts(enriched).catch(() => {});
+        })
+        .catch(() => {});
+    } else {
+      const enriched = await enrichItemsWithQuotes(newItems);
+      newItems.length = 0;
+      newItems.push(...enriched);
+      void dispatchWatchlistAlerts(newItems).catch(() => {});
+    }
   }
 
   const items = rankMovers(results.filter(isDisplayableCatalyst), false);
@@ -529,17 +590,11 @@ async function buildFeedFromDatabase(
   return items.slice(0, limit);
 }
 
-/** Fast path — prepend new wire items to Redis feed without full DB rebuild */
-async function prependToPublicFeedCache(newItems: CatalystItem[]): Promise<void> {
-  const enriched = await enrichItemsWithQuotes(newItems);
-  const displayable = enriched.filter(isDisplayableCatalyst);
-  if (displayable.length === 0) return;
-
-  const [{ items: existingAll }, { items: existingMovers }] = await Promise.all([
-    getCachedFeed("all"),
-    getCachedFeed("movers"),
-  ]);
-
+function mergePrependFeeds(
+  displayable: CatalystItem[],
+  existingAll: CatalystItem[],
+  existingMovers: CatalystItem[]
+): { allMerged: CatalystItem[]; moversMerged: CatalystItem[] } {
   const seen = new Set<string>();
   const allMerged: CatalystItem[] = [];
   for (const c of [...displayable, ...existingAll]) {
@@ -558,13 +613,60 @@ async function prependToPublicFeedCache(newItems: CatalystItem[]): Promise<void>
     if (moversMerged.length >= MAX_CATALYSTS_SHOWN) break;
   }
 
+  return { allMerged, moversMerged };
+}
+
+async function writeMergedFeeds(
+  allMerged: CatalystItem[],
+  moversMerged: CatalystItem[]
+): Promise<void> {
   await Promise.all([
     setCachedFeed("all", allMerged),
     setCachedFeed("movers", moversMerged),
   ]);
-
   lastGood.set("all", { ts: Date.now(), items: allMerged });
   lastGood.set("movers", { ts: Date.now(), items: moversMerged });
+}
+
+/** Patch feed rows after async quote enrichment (wire fast path). */
+async function patchFeedWithEnrichedItems(enriched: CatalystItem[]): Promise<void> {
+  const displayable = enriched.filter(isDisplayableCatalyst);
+  if (displayable.length === 0) return;
+
+  const byId = new Map(displayable.map((c) => [c.id, c]));
+  const [{ items: existingAll }, { items: existingMovers }] = await Promise.all([
+    getCachedFeed("all"),
+    getCachedFeed("movers"),
+  ]);
+
+  const patchList = (items: CatalystItem[]) =>
+    items.map((c) => byId.get(c.id) ?? c);
+
+  const allMerged = patchList(existingAll);
+  const moversMerged = patchList(existingMovers);
+  await writeMergedFeeds(allMerged, moversMerged);
+}
+
+/** Fast path — prepend new wire items to Redis feed without full DB rebuild */
+async function prependToPublicFeedCache(newItems: CatalystItem[]): Promise<void> {
+  const displayable = newItems.filter(isDisplayableCatalyst);
+  if (displayable.length === 0) return;
+
+  const symbols = [...new Set(displayable.map((c) => c.symbol))];
+  const quotes = await getCachedQuotes(symbols);
+  const withQuotes = mergeQuotesIntoFeed(displayable, quotes);
+
+  const [{ items: existingAll }, { items: existingMovers }] = await Promise.all([
+    getCachedFeed("all"),
+    getCachedFeed("movers"),
+  ]);
+
+  const { allMerged, moversMerged } = mergePrependFeeds(
+    withQuotes,
+    existingAll,
+    existingMovers
+  );
+  await writeMergedFeeds(allMerged, moversMerged);
 }
 
 /** Called by cron/worker after ingest — writes shared feed snapshot. */
@@ -576,7 +678,19 @@ export async function refreshPublicFeedCache(): Promise<void> {
   ]);
 
   const symbols = [...new Set(allItems.map((c) => c.symbol))];
-  const quotes = await getCachedQuotes(symbols);
+  let quotes = await getCachedQuotes(symbols);
+  const needsRefresh = symbols.filter(
+    (s) => !quotes[s]?.price || quotes[s]?.rVol == null
+  );
+  if (needsRefresh.length > 0) {
+    await refreshQuoteCache(needsRefresh.slice(0, 24), { fetchVolume: true });
+    quotes = await getCachedQuotes(symbols);
+    const stillNeedRvol = symbols.filter((s) => quotes[s]?.price && quotes[s]?.rVol == null);
+    if (stillNeedRvol.length > 0) {
+      await refreshQuoteVolumes(stillNeedRvol.slice(0, 16));
+      quotes = await getCachedQuotes(symbols);
+    }
+  }
 
   const mergedAll = mergeQuotesIntoFeed(allItems, quotes);
   const mergedMovers = mergeQuotesIntoFeed(moverItems, quotes);

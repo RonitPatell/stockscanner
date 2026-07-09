@@ -5,6 +5,7 @@ import { Sun, TrendingUp, Newspaper } from "lucide-react";
 import type { CatalystItem, WatchlistBrief } from "@/types";
 import { cn, formatPercent } from "@/lib/utils";
 import { setupTagMeta } from "@/lib/setup-tags";
+import { pickLiveField, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
 
 interface PremarketData {
   session: string;
@@ -15,6 +16,10 @@ interface PremarketData {
 
 export function PremarketCenter({ className }: { className?: string }) {
   const [data, setData] = useState<PremarketData | null>(null);
+  const liveQuotes = useLiveQuotes();
+
+  const gappers = data?.gappers ?? [];
+  useRegisterLiveSymbols("premarket-center", gappers.map((c) => c.symbol));
 
   useEffect(() => {
     const load = () => {
@@ -31,7 +36,6 @@ export function PremarketCenter({ className }: { className?: string }) {
     };
   }, []);
 
-  const gappers = data?.gappers ?? [];
   const show = data?.session === "premarket" || gappers.length > 0;
 
   if (!show) return null;
@@ -63,7 +67,10 @@ export function PremarketCenter({ className }: { className?: string }) {
             <p className="text-[10px] text-zinc-600">No premarket gappers yet.</p>
           ) : (
             <div className="space-y-1">
-              {gappers.slice(0, 8).map((c) => (
+              {gappers.slice(0, 8).map((c) => {
+                const change =
+                  pickLiveField(c.symbol, liveQuotes, "changePercent", c.changePercent) ?? 0;
+                return (
                 <div
                   key={c.id}
                   className="flex items-center gap-2 text-[10px] py-1 px-1.5 rounded bg-zinc-900/50 border border-zinc-800/60"
@@ -72,14 +79,15 @@ export function PremarketCenter({ className }: { className?: string }) {
                   <span
                     className={cn(
                       "font-mono shrink-0",
-                      (c.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                      change >= 0 ? "text-emerald-400" : "text-red-400"
                     )}
                   >
-                    {formatPercent(c.changePercent ?? 0)}
+                    {formatPercent(change)}
                   </span>
                   <span className="text-zinc-500 truncate flex-1">{c.headline}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

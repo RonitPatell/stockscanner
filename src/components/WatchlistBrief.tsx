@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Newspaper, RefreshCw } from "lucide-react";
 import type { WatchlistBrief } from "@/types";
 import { cn, formatPercent } from "@/lib/utils";
 import { setupTagMeta } from "@/lib/setup-tags";
+import { applyLiveQuote, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
 
 export function WatchlistBriefPanel({ className }: { className?: string }) {
   const [brief, setBrief] = useState<WatchlistBrief | null>(null);
   const [loading, setLoading] = useState(false);
   const [kind, setKind] = useState<"delta" | "morning" | "eod">("delta");
+  const liveQuotes = useLiveQuotes();
 
   const load = async () => {
     setLoading(true);
@@ -33,22 +35,30 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
     };
   }, [kind]);
 
+  const displayItems = useMemo(() => {
+    if (!brief) return [];
+    const seen = new Set<string>();
+    return brief.sections
+      .flatMap((s) => s.items)
+      .filter((item) => {
+        const dedupeKey = `${item.symbol}|${item.publishedAt}|${item.headline.slice(0, 60)}`;
+        if (seen.has(dedupeKey)) return false;
+        seen.add(dedupeKey);
+        return true;
+      })
+      .slice(0, 6);
+  }, [brief]);
+
+  useRegisterLiveSymbols(
+    "watchlist-brief",
+    displayItems.map((item) => item.symbol)
+  );
+
   if (loading && !brief) {
     return null;
   }
 
   if (!brief) return null;
-
-  const seen = new Set<string>();
-  const displayItems = brief.sections
-    .flatMap((s) => s.items)
-    .filter((item) => {
-      const dedupeKey = `${item.symbol}|${item.publishedAt}|${item.headline.slice(0, 60)}`;
-      if (seen.has(dedupeKey)) return false;
-      seen.add(dedupeKey);
-      return true;
-    })
-    .slice(0, 6);
 
   return (
     <div className={cn("rounded-lg border border-zinc-800 bg-zinc-950/50 overflow-hidden", className)}>
@@ -86,7 +96,9 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
         {brief.summary}
       </p>
       <div className="max-h-36 overflow-y-auto divide-y divide-zinc-800/60">
-        {displayItems.map((item) => (
+        {displayItems.map((item) => {
+          const live = applyLiveQuote(item, liveQuotes);
+          return (
           <div
             key={`${item.symbol}-${item.publishedAt}-${item.headline.slice(0, 40)}`}
             className="px-3 py-1.5"
@@ -96,10 +108,10 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
               <span
                 className={cn(
                   "font-mono text-[10px]",
-                  (item.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                  (live.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
                 )}
               >
-                {formatPercent(item.changePercent)}
+                {formatPercent(live.changePercent)}
               </span>
               {item.setupTags?.slice(0, 2).map((tag) => {
                 const meta = setupTagMeta(tag);
@@ -112,7 +124,8 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
             </div>
             <p className="text-[10px] text-zinc-400 line-clamp-2 mt-0.5">{item.headline}</p>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

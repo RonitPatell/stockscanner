@@ -32,7 +32,7 @@ loadEnvFile();
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const SECRET = process.env.CRON_SECRET || "";
-const WIRE_MS = Number(process.env.INGEST_WIRE_MS || 5_000);
+const WIRE_MS = Number(process.env.INGEST_WIRE_MS || 2_000);
 const FULL_MS = Number(process.env.INGEST_FULL_MS || 90_000);
 
 if (!SECRET) {

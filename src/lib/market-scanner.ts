@@ -6,6 +6,7 @@ import type {
   VolumeLeader,
 } from "@/types";
 import { fetchQuoteTrusted, fetchVolumeForSymbol } from "./market-data";
+import { seedCachedQuote } from "./quote-cache-service";
 import { isValidTickerFormat } from "./ticker-utils";
 import { isKnownFalsePositive } from "./news-verifier";
 import { getNextTickerBatch } from "./news-sources/active-tickers";
@@ -385,6 +386,12 @@ async function runFullScan(
       } else if (Math.abs(quote.changePercent) >= 2) {
         const estimatedRvol = Math.max(1.2, Math.abs(quote.changePercent) / 6);
         volumeLeaders.push(buildVolumeLeader(quote, 0, 0, estimatedRvol));
+        void seedCachedQuote(quote.symbol, {
+          price: quote.price,
+          changePercent: quote.changePercent,
+          change: quote.change,
+          rVol: estimatedRvol,
+        }).catch(() => {});
         continue;
       } else {
         continue;
@@ -396,6 +403,14 @@ async function runFullScan(
 
     detectAlerts(quote, rVol);
     volumeLeaders.push(buildVolumeLeader(quote, volume, avgVolume, rVol));
+    void seedCachedQuote(quote.symbol, {
+      price: quote.price,
+      changePercent: quote.changePercent,
+      change: quote.change,
+      volume,
+      avgVolume,
+      rVol,
+    }).catch(() => {});
   }
 
   volumeLeaders.sort((a, b) => {
