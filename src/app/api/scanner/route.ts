@@ -48,7 +48,7 @@ export async function GET() {
         seen.add(h.symbol);
         return true;
       });
-    } catch { /* db optional */ }
+    } catch { /* db optionals */ }
 
     const extraSymbols = catalystHints.map((r) => r.symbol);
     const snapshot = await scanMarketActivity(extraSymbols, catalystHints);
