@@ -91,7 +91,7 @@ export function PremarketCenter({ className }: { className?: string }) {
           {data?.brief?.sections?.[0]?.items?.length ? (
             <div className="space-y-1">
               {data.brief.sections[0].items.slice(0, 6).map((item, i) => (
-                <div key={item.id ?? `${item.symbol}-${i}`} className="text-[10px] py-1">
+                <div key={`${item.symbol}-${item.publishedAt}-${i}`} className="text-[10px] py-1">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold">{item.symbol}</span>
                     {item.setupTags?.slice(0, 1).map((tag) => {

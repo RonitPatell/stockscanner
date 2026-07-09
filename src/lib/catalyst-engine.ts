@@ -97,11 +97,11 @@ async function resolveIngestQuote(
   const hit = cached[symbol];
   if (hit && hit.price > 0) {
     return {
+      symbol,
       price: hit.price,
       changePercent: hit.changePercent,
       change: hit.change,
-      floatShares: null,
-      marketCap: null,
+      volume: 0,
     };
   }
 
