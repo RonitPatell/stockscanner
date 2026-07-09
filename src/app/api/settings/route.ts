@@ -58,6 +58,10 @@ export async function GET() {
       alertRules: true,
       subscriptionStatus: true,
       subscriptionEndsAt: true,
+      emailAlertsEnabled: true,
+      emailBriefEnabled: true,
+      onboardingCompleted: true,
+      pushSubscription: true,
     },
   });
 
@@ -83,6 +87,8 @@ export async function PATCH(req: NextRequest) {
       ...(body.phoneNumber !== undefined && { phoneNumber: body.phoneNumber }),
       ...(body.smsAlertsEnabled !== undefined && { smsAlertsEnabled: body.smsAlertsEnabled }),
       ...(body.discordAlertsEnabled !== undefined && { discordAlertsEnabled: body.discordAlertsEnabled }),
+      ...(body.emailAlertsEnabled !== undefined && { emailAlertsEnabled: body.emailAlertsEnabled }),
+      ...(body.emailBriefEnabled !== undefined && { emailBriefEnabled: body.emailBriefEnabled }),
       ...(watchlist !== undefined && { watchlist }),
       ...(scannerFilters !== undefined && {
         scannerFilters: scannerFilters as Prisma.InputJsonValue,
@@ -98,6 +104,8 @@ export async function PATCH(req: NextRequest) {
     phoneNumber: user.phoneNumber,
     smsAlertsEnabled: user.smsAlertsEnabled,
     discordAlertsEnabled: user.discordAlertsEnabled,
+    emailAlertsEnabled: user.emailAlertsEnabled,
+    emailBriefEnabled: user.emailBriefEnabled,
     watchlist: user.watchlist,
     scannerFilters: user.scannerFilters,
     alertRules: user.alertRules,

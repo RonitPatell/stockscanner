@@ -1,8 +1,20 @@
 {
   "crons": [
     {
+      "path": "/api/cron/wire",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/ingest",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/briefs?kind=morning",
+      "schedule": "30 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/briefs?kind=eod",
+      "schedule": "15 21 * * 1-5"
     }
   ]
 }

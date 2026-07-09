@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getCatalysts } from "@/lib/catalyst-engine";
+import { getCachedFeed } from "@/lib/feed-cache";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -25,16 +26,23 @@ export async function GET(req: NextRequest) {
       const poll = async () => {
         if (closed) return;
         try {
-          const catalysts = await getCatalysts(150, { moversOnly });
-          send({ type: "update", catalysts, timestamp: new Date().toISOString() });
+          const cacheKey = moversOnly ? "movers" : "all";
+          const { items } = await getCachedFeed(cacheKey);
+          const catalysts =
+            items.length > 0
+              ? items.slice(0, 150)
+              : await getCatalysts(150, { moversOnly });
+          if (catalysts.length > 0) {
+            send({ type: "update", catalysts, timestamp: new Date().toISOString() });
+          }
         } catch {
           send({ type: "error", message: "Poll failed" });
         }
       };
 
       await poll();
-      // Push fresh news every 5s without requiring a manual refresh
-      const interval = setInterval(poll, 5_000);
+      // Push fresh news every 2s without requiring a manual refresh
+      const interval = setInterval(poll, 2_000);
 
       const heartbeat = setInterval(() => {
         send({ type: "heartbeat", timestamp: new Date().toISOString() });

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       if (userId && session.subscription) {
         const sub = await getStripe().subscriptions.retrieve(session.subscription as string);
         const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
-        await prisma.user.update({
+        const user = await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionId: sub.id,
@@ -38,7 +38,19 @@ export async function POST(req: NextRequest) {
             hasUsedTrial: true,
             subscriptionEndsAt: periodEnd ? new Date(periodEnd * 1000) : undefined,
           },
+          select: { email: true, name: true, welcomeEmailSent: true },
         });
+
+        if (user && !user.welcomeEmailSent && process.env.RESEND_API_KEY) {
+          const { sendWelcomeEmail } = await import("@/lib/email-brief");
+          const sent = await sendWelcomeEmail(user.email, user.name);
+          if (sent) {
+            await prisma.user.update({
+              where: { id: userId },
+              data: { welcomeEmailSent: true },
+            });
+          }
+        }
       }
       break;
     }

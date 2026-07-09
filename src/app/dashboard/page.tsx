@@ -1,13 +1,16 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { getCatalysts } from "@/lib/catalyst-engine";
+import { getCachedFeed } from "@/lib/feed-cache";
 import { TradingDashboard } from "@/components/TradingDashboard";
-import { CheckoutButton } from "@/components/CheckoutButton";
 import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { UserMenu } from "@/components/UserMenu";
+import { CheckoutButton } from "@/components/CheckoutButton";
 import { LogoMark } from "@/components/Logo";
-import { Button } from "@/components/ui/button";
+import type { CatalystItem, ScannerFilters } from "@/types";
 
 export default async function DashboardPage({
   searchParams,
@@ -18,19 +21,42 @@ export default async function DashboardPage({
   const params = await searchParams;
 
   let isSubscribed = false;
+  let initialCatalysts: CatalystItem[] = [];
+  let initialWatchlist: string[] = [];
+  let initialFilters: ScannerFilters | null = null;
+
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { subscriptionStatus: true, subscriptionEndsAt: true },
+      select: {
+        subscriptionStatus: true,
+        subscriptionEndsAt: true,
+        watchlist: true,
+        scannerFilters: true,
+      },
     });
     isSubscribed = hasActiveSubscription(user ?? undefined);
+
+    if (isSubscribed) {
+      const [catalysts, cached] = await Promise.all([
+        getCatalysts(150),
+        getCachedFeed("all"),
+      ]);
+      initialCatalysts =
+        catalysts.length > 0 ? catalysts : cached.items.slice(0, 150);
+      initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
+      if (user?.scannerFilters && typeof user.scannerFilters === "object") {
+        initialFilters = user.scannerFilters as ScannerFilters;
+      }
+    }
   }
 
-  // Logged-out visitors can preview; logged-in users need an active subscription
-  const hasAccess =
-    isSubscribed ||
-    process.env.NODE_ENV === "development" ||
-    !session;
+  const activatingCheckout =
+    params.subscribed === "true" && !!session && !isSubscribed;
+
+  if (!isSubscribed && !activatingCheckout) {
+    redirect("/demo");
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-zinc-950">
@@ -51,11 +77,7 @@ export default async function DashboardPage({
                 )}
                 <UserMenu />
               </>
-            ) : (
-              <Link href="/login">
-                <Button size="sm">Sign In</Button>
-              </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
@@ -67,24 +89,20 @@ export default async function DashboardPage({
           </div>
         )}
 
-        {params.subscribed === "true" && !isSubscribed && session && (
-          <SubscriptionActivating />
-        )}
+        {activatingCheckout && <SubscriptionActivating />}
 
-        {!hasAccess ? (
-          <div className="text-center py-20 max-w-md mx-auto">
-            <h2 className="text-2xl font-bold mb-2">Start your 7-day free trial</h2>
-            <p className="text-zinc-400 mb-6">
-              You&apos;re signed in. Add a payment method to unlock the live catalyst scanner.
-              You won&apos;t be charged until the trial ends.
-            </p>
-            <CheckoutButton size="lg" className="w-full text-base">
-              Start Free Trial — $40/mo after
-            </CheckoutButton>
-            <p className="text-xs text-zinc-600 mt-4">Cancel anytime from Settings</p>
-          </div>
+        {isSubscribed ? (
+          <TradingDashboard
+            initialCatalysts={initialCatalysts}
+            initialWatchlist={initialWatchlist}
+            initialFilters={initialFilters}
+          />
         ) : (
-          <TradingDashboard />
+          <div className="text-center py-20 max-w-md mx-auto">
+            <p className="text-zinc-400 text-sm">
+              Your live scanner will unlock as soon as subscription activation completes.
+            </p>
+          </div>
         )}
       </main>
     </div>

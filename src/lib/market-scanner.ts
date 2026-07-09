@@ -40,7 +40,7 @@ let cachedSnapshot: MarketScannerSnapshot | null = null;
 let lastScanAt = 0;
 let scanInFlight: Promise<MarketScannerSnapshot> | null = null;
 
-function getMarketSession(): MarketScannerSnapshot["marketSession"] {
+export function getMarketSession(): MarketScannerSnapshot["marketSession"] {
   const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
   const day = et.getDay();
   if (day === 0 || day === 6) return "closed";

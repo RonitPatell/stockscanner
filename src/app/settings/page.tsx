@@ -9,6 +9,8 @@ import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { formatSubscriptionEnd } from "@/lib/subscription";
 import { LogoMark } from "@/components/Logo";
 import { AlertRulesPanel } from "@/components/AlertRulesPanel";
+import { PushNotifyToggle } from "@/components/PushNotifyToggle";
+import { AlertHistoryPanel } from "@/components/AlertHistoryPanel";
 import type { AlertRule } from "@/lib/alert-rules";
 import { DEFAULT_ALERT_RULES } from "@/lib/alert-rules";
 
@@ -16,6 +18,8 @@ interface SettingsData {
   discordWebhook?: string;
   discordAlertsEnabled?: boolean;
   smsAlertsEnabled?: boolean;
+  emailAlertsEnabled?: boolean;
+  emailBriefEnabled?: boolean;
   watchlist?: string[];
   subscriptionStatus?: string | null;
   subscriptionEndsAt?: string | null;
@@ -26,7 +30,9 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const [discordWebhook, setDiscordWebhook] = useState("");
   const [discordAlertsEnabled, setDiscordAlertsEnabled] = useState(false);
+  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
   const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
+  const [emailBriefEnabled, setEmailBriefEnabled] = useState(true);
   const [watchlistInput, setWatchlistInput] = useState("");
   const [billing, setBilling] = useState<Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">>({});
   const [saved, setSaved] = useState(false);
@@ -42,6 +48,8 @@ export default function SettingsPage() {
           setDiscordWebhook(data.discordWebhook || "");
           setDiscordAlertsEnabled(data.discordAlertsEnabled || false);
           setSmsAlertsEnabled(data.smsAlertsEnabled || false);
+          setEmailAlertsEnabled(data.emailAlertsEnabled || false);
+          setEmailBriefEnabled(data.emailBriefEnabled !== false);
           setWatchlistInput((data.watchlist ?? []).join(", "));
           setBilling({
             subscriptionStatus: data.subscriptionStatus,
@@ -68,6 +76,8 @@ export default function SettingsPage() {
         discordWebhook,
         discordAlertsEnabled,
         smsAlertsEnabled,
+        emailAlertsEnabled,
+        emailBriefEnabled,
         watchlist,
         alertRules,
       }),
@@ -156,6 +166,37 @@ export default function SettingsPage() {
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
+                checked={emailAlertsEnabled}
+                onChange={(e) => setEmailAlertsEnabled(e.target.checked)}
+                className="rounded"
+              />
+              Email alerts (sent to your account email)
+            </label>
+            <p className="text-xs text-zinc-600">
+              Requires RESEND_API_KEY on the server. Great when you&apos;re away from Discord.
+            </p>
+
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={emailBriefEnabled}
+                onChange={(e) => setEmailBriefEnabled(e.target.checked)}
+                className="rounded"
+              />
+              Daily email briefs (morning + EOD recap)
+            </label>
+            <p className="text-xs text-zinc-600">
+              Watchlist summary delivered ~7:30 AM and ~4:15 PM ET. Also sends push if enabled.
+            </p>
+
+            <div>
+              <p className="text-sm font-medium text-zinc-300 mb-2">Browser push notifications</p>
+              <PushNotifyToggle />
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
                 checked={smsAlertsEnabled}
                 onChange={(e) => setSmsAlertsEnabled(e.target.checked)}
                 className="rounded"
@@ -178,6 +219,11 @@ export default function SettingsPage() {
               Trader-grade filters: % move, RVOL, float cap, cooldowns, and news-only triggers.
             </p>
             <AlertRulesPanel rules={alertRules} onChange={setAlertRules} />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-zinc-300">Recent alerts</h3>
+            <AlertHistoryPanel />
           </div>
         </section>
 

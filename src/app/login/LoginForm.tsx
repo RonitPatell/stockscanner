@@ -61,7 +61,7 @@ export default function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(next === "checkout" ? "/subscribe" : "/dashboard");
       router.refresh();
     } catch {
       setError("Something went wrong");

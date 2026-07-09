@@ -8,7 +8,7 @@ const LIQUID_ALWAYS = [
 let cache: { symbols: string[]; ts: number } = { symbols: [...LIQUID_ALWAYS], ts: 0 };
 
 export async function getPriorityTickers(): Promise<string[]> {
-  if (Date.now() - cache.ts < 60_000) return cache.symbols;
+  if (Date.now() - cache.ts < 30_000) return cache.symbols;
   try {
     const users = await prisma.user.findMany({
       select: { watchlist: true },

@@ -1,6 +1,6 @@
 import type { CatalystItem } from "@/types";
 
-export type AlertRuleChannel = "discord" | "sms";
+export type AlertRuleChannel = "discord" | "sms" | "email" | "push";
 
 export interface AlertRule {
   id: string;
@@ -50,7 +50,10 @@ export function normalizeAlertRules(raw: unknown): AlertRule[] {
       name: typeof o.name === "string" ? o.name : "Alert rule",
       scope: o.scope === "any" ? "any" : "watchlist",
       channels: Array.isArray(o.channels)
-        ? o.channels.filter((c): c is AlertRuleChannel => c === "discord" || c === "sms")
+        ? o.channels.filter(
+            (c): c is AlertRuleChannel =>
+              c === "discord" || c === "sms" || c === "email" || c === "push"
+          )
         : ["discord"],
       minChangePercent: num(o.minChangePercent),
       maxChangePercent: num(o.maxChangePercent),

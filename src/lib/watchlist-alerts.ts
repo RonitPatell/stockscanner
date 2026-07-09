@@ -54,13 +54,18 @@ function hodSymbolsFromCatalysts(catalysts: CatalystItem[]): Set<string> {
   return out;
 }
 
+import type { PushSubscriptionJson } from "./web-push";
+
 async function dispatchForRule(
   user: {
     id: string;
+    email: string;
     discordWebhook: string | null;
     discordAlertsEnabled: boolean;
     smsAlertsEnabled: boolean;
+    emailAlertsEnabled: boolean;
     phoneNumber: string | null;
+    pushSubscription: unknown;
   },
   catalyst: CatalystItem,
   rule: AlertRule
@@ -134,6 +139,71 @@ async function dispatchForRule(
     }
   }
 
+  if (channels.includes("email") && user.emailAlertsEnabled && user.email) {
+    const okCooldown = await canAlertDb(user.id, catalyst.symbol, "email", cooldownMs);
+    if (okCooldown) {
+      try {
+        const { sendEmailAlert } = await import("./email-alerts");
+        const ok = await sendEmailAlert(user.email, catalyst, rule.name);
+        await prisma.alertLog
+          .create({
+            data: {
+              userId: user.id,
+              catalystId: catalyst.id,
+              channel: "email",
+              status: ok ? "sent" : "failed",
+            },
+          })
+          .catch(() => {});
+        if (ok) sent++;
+      } catch {
+        await prisma.alertLog
+          .create({
+            data: {
+              userId: user.id,
+              catalystId: catalyst.id,
+              channel: "email",
+              status: "failed",
+            },
+          })
+          .catch(() => {});
+      }
+    }
+  }
+
+  if (channels.includes("push") && user.pushSubscription) {
+    const okCooldown = await canAlertDb(user.id, catalyst.symbol, "push", cooldownMs);
+    if (okCooldown) {
+      try {
+        const { sendPushAlert } = await import("./web-push");
+        const sub = user.pushSubscription as PushSubscriptionJson;
+        const ok = await sendPushAlert(sub, catalyst, rule.name);
+        await prisma.alertLog
+          .create({
+            data: {
+              userId: user.id,
+              catalystId: catalyst.id,
+              channel: "push",
+              status: ok ? "sent" : "failed",
+            },
+          })
+          .catch(() => {});
+        if (ok) sent++;
+      } catch {
+        await prisma.alertLog
+          .create({
+            data: {
+              userId: user.id,
+              catalystId: catalyst.id,
+              channel: "push",
+              status: "failed",
+            },
+          })
+          .catch(() => {});
+      }
+    }
+  }
+
   return sent;
 }
 
@@ -150,12 +220,15 @@ export async function dispatchWatchlistAlerts(catalysts: CatalystItem[]): Promis
     },
     select: {
       id: true,
+      email: true,
       watchlist: true,
       alertRules: true,
       discordWebhook: true,
       discordAlertsEnabled: true,
       smsAlertsEnabled: true,
+      emailAlertsEnabled: true,
       phoneNumber: true,
+      pushSubscription: true,
     },
   });
 

@@ -10,7 +10,16 @@ export interface FeedMeta {
 }
 
 const REDIS_TTL_SEC = 300;
-const MEMORY_TTL_MS = 15_000;
+const MEMORY_TTL_MS = 60_000;
+const STALE_MEMORY_TTL_MS = 10 * 60_000;
+const REDIS_BUDGET_MS = 10_000;
+
+async function withRedisBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    fn(),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), REDIS_BUDGET_MS)),
+  ]);
+}
 
 type MemoryEntry = { ts: number; items: CatalystItem[]; meta: FeedMeta };
 
@@ -47,10 +56,14 @@ export async function getCachedFeed(
   const redis = getRedis();
   if (redis) {
     try {
-      const [items, meta] = await Promise.all([
-        redis.get<CatalystItem[]>(redisKey(key)),
-        redis.get<FeedMeta>(metaKey()),
-      ]);
+      const [items, meta] = await withRedisBudget(
+        () =>
+          Promise.all([
+            redis.get<CatalystItem[]>(redisKey(key)),
+            redis.get<FeedMeta>(metaKey()),
+          ]),
+        [null, null] as [CatalystItem[] | null, FeedMeta | null]
+      );
       if (items && Array.isArray(items) && items.length > 0) {
         return {
           items,
@@ -67,8 +80,17 @@ export async function getCachedFeed(
   }
 
   const mem = memoryStore().get(key);
-  if (mem && Date.now() - mem.ts < MEMORY_TTL_MS) {
-    return { items: mem.items, meta: mem.meta };
+  if (mem) {
+    const age = Date.now() - mem.ts;
+    if (age < MEMORY_TTL_MS) {
+      return { items: mem.items, meta: mem.meta };
+    }
+    if (redis && age < STALE_MEMORY_TTL_MS && mem.items.length > 0) {
+      return {
+        items: mem.items,
+        meta: { ...mem.meta, source: "memory" as const },
+      };
+    }
   }
   return { items: [], meta: null };
 }

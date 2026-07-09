@@ -1,5 +1,5 @@
 import type { NewsArticle } from "@/types";
-import { resolveArticleSymbol, isNonStockArticle } from "../news-verifier";
+import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from "../news-verifier";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
 
 const GLOBE_FEEDS = [
@@ -33,7 +33,7 @@ export async function fetchGlobeNewswirePRs(): Promise<NewsArticle[]> {
         if (isNonStockArticle(item.title, summary)) continue;
 
         const resolved = resolveArticleSymbol(item.title, summary);
-        if (!resolved) continue;
+        if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
         out.push({
           id: `globe-${hashStr(key)}`,

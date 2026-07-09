@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runIngestPipeline } from "@/lib/ingest-pipeline";
 import { isScaleMode } from "@/lib/redis";
+import {
+  getSystemHealth,
+  markPipelineStarted,
+  markPipelineFinished,
+  markPipelineFailed,
+  isPipelineInFlight,
+  setAvgIngestDelaySec,
+} from "@/lib/system-health";
+import { computeAvgIngestDelaySec } from "@/lib/playbooks";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 function authorize(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
@@ -18,13 +27,33 @@ async function handleCron(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const result = await runIngestPipeline();
-    return NextResponse.json({ ok: true, scaleMode: isScaleMode(), ...result });
-  } catch (error) {
-    console.error("Cron ingest error:", error);
-    return NextResponse.json({ error: "Ingest failed" }, { status: 500 });
+  if (isPipelineInFlight()) {
+    return NextResponse.json({
+      ok: true,
+      status: "already_running",
+      ...getSystemHealth(isScaleMode()),
+    });
   }
+
+  markPipelineStarted();
+  void runIngestPipeline()
+    .then((result) => {
+      markPipelineFinished({ ok: true, scaleMode: isScaleMode(), ...result });
+      void computeAvgIngestDelaySec()
+        .then((delay) => setAvgIngestDelaySec(delay))
+        .catch(() => {});
+    })
+    .catch((error) => {
+      console.error("Cron ingest error:", error);
+      markPipelineFailed("Ingest failed");
+    });
+
+  return NextResponse.json({
+    ok: true,
+    status: "started",
+    scaleMode: isScaleMode(),
+    startedAt: new Date().toISOString(),
+  });
 }
 
 export async function GET(req: NextRequest) {

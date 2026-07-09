@@ -8,7 +8,7 @@ import { setupTagMeta } from "@/lib/setup-tags";
 
 export function WatchlistBriefPanel({ className }: { className?: string }) {
   const [brief, setBrief] = useState<WatchlistBrief | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [kind, setKind] = useState<"delta" | "morning" | "eod">("delta");
 
   const load = async () => {
@@ -25,17 +25,16 @@ export function WatchlistBriefPanel({ className }: { className?: string }) {
   };
 
   useEffect(() => {
-    void load();
+    const delay = setTimeout(() => void load(), 600);
     const t = setInterval(load, 60_000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(delay);
+      clearInterval(t);
+    };
   }, [kind]);
 
   if (loading && !brief) {
-    return (
-      <div className={cn("rounded-lg border border-zinc-800 bg-zinc-950/50 p-3", className)}>
-        <p className="text-[11px] text-zinc-500">Loading watchlist brief…</p>
-      </div>
-    );
+    return null;
   }
 
   if (!brief) return null;

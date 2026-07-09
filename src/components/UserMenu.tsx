@@ -6,9 +6,12 @@ import { signOut, useSession } from "next-auth/react";
 import { ChevronDown, LogOut, Settings, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { isSubscribedFromSettings } from "@/lib/subscription-client";
+
 export function UserMenu() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,9 +22,27 @@ export function UserMenu() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    if (!session?.user) return;
+    let cancelled = false;
+    void fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) {
+          setIsSubscribed(isSubscribedFromSettings(data));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user]);
+
   if (!session?.user) return null;
 
   const label = session.user.name || session.user.email?.split("@")[0] || "Account";
+  const homeHref = isSubscribed ? "/dashboard" : "/demo";
+  const homeLabel = isSubscribed ? "Live Scanner" : "Demo";
 
   return (
     <div className="relative" ref={ref}>
@@ -49,11 +70,11 @@ export function UserMenu() {
             <p className="text-xs text-zinc-500 truncate">{session.user.email}</p>
           </div>
           <Link
-            href="/dashboard"
+            href={homeHref}
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900 transition-colors"
           >
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
+            <LayoutDashboard className="w-4 h-4" /> {homeLabel}
           </Link>
           <Link
             href="/settings"

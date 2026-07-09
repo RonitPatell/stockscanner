@@ -60,11 +60,12 @@ export function hashStr(s: string): string {
   return Math.abs(h).toString(36);
 }
 
-export async function fetchRssXml(url: string): Promise<string | null> {
+export async function fetchRssXml(url: string, timeoutMs = 4_000): Promise<string | null> {
   try {
     const res = await fetch(url, {
       cache: "no-store",
       redirect: "follow",
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",

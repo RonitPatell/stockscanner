@@ -18,52 +18,67 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import type { CatalystItem, ScannerFilters } from "@/types";
 import { CATALYST_TYPES } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, formatClockTime } from "@/lib/utils";
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
 const POLL_MS = 8_000;
 const QUOTE_POLL_MS = 20_000;
 const QUOTE_BATCH_SIZE = 8;
-const FETCH_TIMEOUT_MS = 30_000;
-const QUOTE_TIMEOUT_MS = 15_000;
 const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
 
-function isAbortError(err: unknown): boolean {
-  return (
-    (err instanceof DOMException && err.name === "AbortError") ||
-    (err instanceof Error && err.name === "AbortError")
-  );
+async function safeJsonFetch<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 export function LiveScanner({
   embedded = false,
   tab = "all",
+  initialCatalysts = [],
+  initialWatchlist = [],
+  initialFilters = null,
 }: {
   embedded?: boolean;
   tab?: ScannerTab;
+  initialCatalysts?: CatalystItem[];
+  initialWatchlist?: string[];
+  initialFilters?: ScannerFilters | null;
 }) {
-  const [catalysts, setCatalysts] = useState<CatalystItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [catalysts, setCatalysts] = useState<CatalystItem[]>(initialCatalysts);
+  const [loading, setLoading] = useState(initialCatalysts.length === 0);
+  const [connected, setConnected] = useState(initialCatalysts.length > 0);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(
+    initialCatalysts.length > 0 ? new Date() : null
+  );
   const [newSymbols, setNewSymbols] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState<ScannerFilters>({});
+  const [filters, setFilters] = useState<ScannerFilters>(initialFilters ?? {});
   const [showFilters, setShowFilters] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [moversOnly, setMoversOnly] = useState(false);
-  const [watchlist, setWatchlist] = useState<string[]>([]);
-  const prevSymbolsRef = useRef<Set<string>>(new Set());
-  const catalystsRef = useRef<CatalystItem[]>([]);
+  const [watchlist, setWatchlist] = useState<string[]>(initialWatchlist);
+  const prevSymbolsRef = useRef<Set<string>>(
+    new Set(initialCatalysts.map((c) => c.symbol))
+  );
+  const catalystsRef = useRef<CatalystItem[]>(initialCatalysts);
   const liveQuotesRef = useRef<
     Record<string, { price: number; changePercent: number }>
   >({});
   const quoteCursorRef = useRef(0);
   const quoteFetchInFlightRef = useRef(false);
   const catalystFetchInFlightRef = useRef(false);
-  const sseActiveRef = useRef(false);
-  const catalystAbortRef = useRef<AbortController | null>(null);
-  const quoteAbortRef = useRef<AbortController | null>(null);
+  const catalystGenRef = useRef(0);
+  const quoteGenRef = useRef(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     catalystsRef.current = catalysts;
@@ -94,6 +109,18 @@ export function LiveScanner({
     [applyLiveQuotes]
   );
 
+  const fetchQuotesForSymbols = useCallback(
+    async (symbols: string[]) => {
+      const unique = [...new Set(symbols.filter(Boolean))].slice(0, QUOTE_BATCH_SIZE);
+      if (unique.length === 0) return;
+      const data = await safeJsonFetch<{
+        quotes?: Record<string, { price: number; changePercent: number }>;
+      }>(`/api/quotes?symbols=${unique.join(",")}&max=${QUOTE_BATCH_SIZE}`);
+      if (data?.quotes) mergeLiveQuotes(data.quotes);
+    },
+    [mergeLiveQuotes]
+  );
+
   const refreshLiveQuotes = useCallback(async () => {
     if (quoteFetchInFlightRef.current) return;
     const all = [
@@ -109,32 +136,23 @@ export function LiveScanner({
     quoteCursorRef.current = (start + batch.length) % all.length;
 
     quoteFetchInFlightRef.current = true;
-    quoteAbortRef.current?.abort(new DOMException("Superseded", "AbortError"));
-    const controller = new AbortController();
-    quoteAbortRef.current = controller;
-    const timeout = setTimeout(() => {
-      controller.abort(new DOMException("Quote request timed out", "AbortError"));
-    }, QUOTE_TIMEOUT_MS);
+    const gen = ++quoteGenRef.current;
 
     try {
-      const res = await fetch(
-        `/api/quotes?symbols=${batch.join(",")}&max=${QUOTE_BATCH_SIZE}`,
-        { signal: controller.signal }
+      const data = await safeJsonFetch<{ quotes?: Record<string, { price: number; changePercent: number }> }>(
+        `/api/quotes?symbols=${batch.join(",")}&max=${QUOTE_BATCH_SIZE}`
       );
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.quotes) mergeLiveQuotes(data.quotes);
-    } catch (err) {
-      if (!isAbortError(err)) {
-        /* ignore network errors */
-      }
+      if (gen !== quoteGenRef.current || !data?.quotes) return;
+      mergeLiveQuotes(data.quotes);
+    } catch {
+      /* best effort */
     } finally {
-      clearTimeout(timeout);
       quoteFetchInFlightRef.current = false;
     }
   }, [mergeLiveQuotes]);
 
   const loadWatchlist = useCallback(async () => {
+    if (initialWatchlist.length > 0) return;
     try {
       const res = await fetch("/api/settings");
       if (!res.ok) return;
@@ -144,7 +162,7 @@ export function LiveScanner({
         setFilters(data.scannerFilters as ScannerFilters);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [initialWatchlist.length]);
 
   useEffect(() => {
     loadWatchlist();
@@ -166,23 +184,32 @@ export function LiveScanner({
     };
   }, [filters]);
 
+  const applyFeedUpdate = useCallback(
+    (items: CatalystItem[]) => {
+      if (items.length === 0 && catalystsRef.current.length > 0) return;
+      const fresh = items.filter(
+        (c) => Date.now() - new Date(c.publishedAt).getTime() <= MAX_FEED_AGE_MS
+      );
+      if (fresh.length === 0 && catalystsRef.current.length > 0) return;
+      setCatalysts(applyLiveQuotes(fresh, liveQuotesRef.current));
+      setLastUpdate(new Date());
+      setConnected(true);
+      setLoading(false);
+    },
+    [applyLiveQuotes]
+  );
+
   const fetchCatalysts = useCallback(async () => {
     if (catalystFetchInFlightRef.current) return;
 
     catalystFetchInFlightRef.current = true;
-    catalystAbortRef.current?.abort(new DOMException("Superseded", "AbortError"));
-    const controller = new AbortController();
-    catalystAbortRef.current = controller;
-    const timeout = setTimeout(() => {
-      controller.abort(new DOMException("Catalyst request timed out", "AbortError"));
-    }, FETCH_TIMEOUT_MS);
+    const gen = ++catalystGenRef.current;
 
     try {
-      const res = await fetch(`/api/catalysts?moversOnly=${moversOnly}`, {
-        signal: controller.signal,
-      });
-      if (!res.ok) return;
-      const data: CatalystItem[] = await res.json();
+      const data = await safeJsonFetch<CatalystItem[]>(
+        `/api/catalysts?moversOnly=${moversOnly}`
+      );
+      if (!data || gen !== catalystGenRef.current) return;
 
       const currentSymbols = new Set(data.map((c) => c.symbol));
       const freshSymbols = new Set<string>();
@@ -192,43 +219,43 @@ export function LiveScanner({
 
       if (freshSymbols.size > 0 && prevSymbolsRef.current.size > 0) {
         setNewSymbols(freshSymbols);
+        void fetchQuotesForSymbols([...freshSymbols]);
         if (soundEnabled) playAlertSound();
         setTimeout(() => setNewSymbols(new Set()), 5000);
       }
 
+      const needsQuotes = data
+        .filter((c) => c.price == null || c.changePercent == null)
+        .map((c) => c.symbol)
+        .slice(0, QUOTE_BATCH_SIZE);
+      if (needsQuotes.length > 0) {
+        void fetchQuotesForSymbols(needsQuotes);
+      }
+
       prevSymbolsRef.current = currentSymbols;
-      setCatalysts(applyLiveQuotes(data, liveQuotesRef.current));
-      setLastUpdate(new Date());
-      setConnected(true);
-    } catch (err) {
-      if (!isAbortError(err)) setConnected(false);
+      applyFeedUpdate(data);
+    } catch {
+      /* best effort */
     } finally {
-      clearTimeout(timeout);
       catalystFetchInFlightRef.current = false;
-      setLoading(false);
+      if (catalystsRef.current.length === 0) setLoading(false);
     }
-  }, [soundEnabled, moversOnly, applyLiveQuotes]);
+  }, [soundEnabled, moversOnly, applyFeedUpdate, fetchQuotesForSymbols]);
 
   useEffect(() => {
-    fetchCatalysts();
-    const interval = setInterval(() => {
-      if (!sseActiveRef.current) fetchCatalysts();
-    }, POLL_MS);
+    void fetchCatalysts();
+    const interval = setInterval(() => void fetchCatalysts(), POLL_MS);
 
-    // Server runs its own ingest loop — no client-side hammering
-    const kickQuotes = () => {
-      void refreshLiveQuotes();
-    };
-    // First quote refresh shortly after initial feed load
-    const quoteKickoff = setTimeout(kickQuotes, 2_500);
+    const kickQuotes = () => void refreshLiveQuotes();
+    const quoteKickoff = setTimeout(kickQuotes, 400);
     const quoteInterval = setInterval(kickQuotes, QUOTE_POLL_MS);
 
     return () => {
       clearInterval(interval);
       clearTimeout(quoteKickoff);
       clearInterval(quoteInterval);
-      catalystAbortRef.current?.abort(new DOMException("Unmounted", "AbortError"));
-      quoteAbortRef.current?.abort(new DOMException("Unmounted", "AbortError"));
+      catalystGenRef.current += 1;
+      quoteGenRef.current += 1;
     };
   }, [fetchCatalysts, refreshLiveQuotes]);
 
@@ -243,28 +270,31 @@ export function LiveScanner({
       eventSource = new EventSource(`/api/catalysts/stream?moversOnly=${moversOnly}`);
 
       eventSource.onopen = () => {
-        sseActiveRef.current = true;
+        setConnected(true);
       };
 
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "update" && Array.isArray(data.catalysts)) {
-            const fresh = (data.catalysts as CatalystItem[]).filter(
-              (c) => Date.now() - new Date(c.publishedAt).getTime() <= MAX_FEED_AGE_MS
-            );
-            setCatalysts(applyLiveQuotes(fresh, liveQuotesRef.current));
-            setLastUpdate(new Date());
-            setConnected(true);
-            setLoading(false);
+            const items = data.catalysts as CatalystItem[];
+            applyFeedUpdate(items);
+            const needsQuotes = items
+              .filter((c) => c.price == null || c.changePercent == null)
+              .map((c) => c.symbol)
+              .slice(0, QUOTE_BATCH_SIZE);
+            if (needsQuotes.length > 0) {
+              void fetchQuotesForSymbols(needsQuotes);
+            }
           }
         } catch { /* ignore */ }
       };
 
       eventSource.onerror = () => {
-        sseActiveRef.current = false;
-        setConnected(false);
         eventSource?.close();
+        if (catalystsRef.current.length > 0) {
+          setConnected(true);
+        }
         if (!stopped) {
           reconnectTimer = setTimeout(connect, 3_000);
         }
@@ -278,7 +308,7 @@ export function LiveScanner({
       if (reconnectTimer) clearTimeout(reconnectTimer);
       eventSource?.close();
     };
-  }, [moversOnly, applyLiveQuotes]);
+  }, [moversOnly, applyFeedUpdate, fetchQuotesForSymbols]);
 
   const toggleWatchlist = async (symbol: string) => {
     const sym = symbol.toUpperCase();
@@ -370,16 +400,16 @@ export function LiveScanner({
                 {connected ? "Live" : "Offline"}
               </span>
             </div>
-            {embedded && lastUpdate && (
+            {embedded && lastUpdate && mounted && (
               <span className="text-[9px] text-zinc-600 hidden sm:inline">
-                {filtered.length} · {lastUpdate.toLocaleTimeString()}
+                {filtered.length} · {formatClockTime(lastUpdate)}
               </span>
             )}
           </div>
-          {!embedded && lastUpdate && (
+          {!embedded && lastUpdate && mounted && (
             <p className="text-[11px] text-zinc-600 mt-0.5">
               {moversOnly ? "Movers with news" : "All verified catalysts"} · newest first ·{" "}
-              {lastUpdate.toLocaleTimeString()}
+              {formatClockTime(lastUpdate)}
             </p>
           )}
         </div>
@@ -424,7 +454,12 @@ export function LiveScanner({
           >
             <Download className="w-3.5 h-3.5" /> Export
           </Button>
-          <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={fetchCatalysts}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => void fetchCatalysts()}
+          >
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
           </Button>
         </div>

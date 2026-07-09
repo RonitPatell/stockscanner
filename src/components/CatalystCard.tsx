@@ -24,12 +24,15 @@ import {
   sourceTierLabel,
 } from "@/lib/source-trust";
 import { setupTagMeta } from "@/lib/setup-tags";
+import { CatalystPlaybookPanel } from "./CatalystPlaybookPanel";
 
 interface CatalystCardProps {
   catalyst: CatalystItem;
   isNew?: boolean;
   onWatchlistToggle?: (symbol: string) => void;
   inWatchlist?: boolean;
+  /** Static demo page — no API calls */
+  demoMode?: boolean;
 }
 
 export function CatalystCard({
@@ -37,6 +40,7 @@ export function CatalystCard({
   isNew,
   onWatchlistToggle,
   inWatchlist,
+  demoMode = false,
 }: CatalystCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<{
@@ -62,7 +66,7 @@ export function CatalystCard({
   const trustLabel = confidenceLabel(catalyst.verifiedConfidence);
 
   useEffect(() => {
-    if (!expanded) return;
+    if (demoMode || !expanded) return;
     if (detail || (catalyst.keyPoints?.length && catalyst.aiSummary)) return;
     let cancelled = false;
     void fetch(`/api/catalysts/${catalyst.id}`)
@@ -74,7 +78,7 @@ export function CatalystCard({
     return () => {
       cancelled = true;
     };
-  }, [expanded, catalyst.id, catalyst.keyPoints, catalyst.aiSummary, detail]);
+  }, [demoMode, expanded, catalyst.id, catalyst.keyPoints, catalyst.aiSummary, detail]);
 
   const displaySummary = detail?.aiSummary ?? catalyst.aiSummary;
   const displayKeyPoints = detail?.keyPoints ?? catalyst.keyPoints;
@@ -88,6 +92,7 @@ export function CatalystCard({
   }, [catalyst.headline]);
 
   useEffect(() => {
+    if (demoMode) return;
     let cancelled = false;
     async function run() {
       if (!shouldTranslate) {
@@ -114,7 +119,7 @@ export function CatalystCard({
     return () => {
       cancelled = true;
     };
-  }, [shouldTranslate, catalyst.headline]);
+  }, [demoMode, shouldTranslate, catalyst.headline]);
 
   const headlineText =
     translatedHeadline && !showOriginal ? translatedHeadline : catalyst.headline;
@@ -305,6 +310,11 @@ export function CatalystCard({
         {/* Time */}
         <div className="text-[9px] text-zinc-500 text-right whitespace-nowrap tabular-nums">
           {ageLabel}
+          {catalyst.ingestDelaySec != null && catalyst.ingestDelaySec < 120 && (
+            <span className="block text-emerald-500/80" title="Publish → ingest delay">
+              +{catalyst.ingestDelaySec}s
+            </span>
+          )}
         </div>
 
         {/* Expand */}
@@ -352,6 +362,12 @@ export function CatalystCard({
               </button>
             )}
           </div>
+
+          <CatalystPlaybookPanel
+            catalystType={catalyst.catalystType}
+            floatShares={catalyst.floatShares}
+            className="mb-2"
+          />
 
           {(displayHistMove != null || displayHistN != null) && (
             <div className="pb-2">

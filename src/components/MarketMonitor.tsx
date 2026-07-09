@@ -43,9 +43,15 @@ export function MarketMonitor({ className }: { className?: string }) {
   }, []);
 
   useEffect(() => {
-    fetchScanner();
-    const interval = setInterval(fetchScanner, 25_000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const delay = setTimeout(() => {
+      fetchScanner();
+      interval = setInterval(fetchScanner, 25_000);
+    }, 500);
+    return () => {
+      clearTimeout(delay);
+      if (interval) clearInterval(interval);
+    };
   }, [fetchScanner]);
 
   const fetchEarnings = useCallback(async () => {
@@ -108,9 +114,15 @@ export function MarketMonitor({ className }: { className?: string }) {
   }, []);
 
   useEffect(() => {
-    void fetchMarketState();
-    const interval = setInterval(fetchMarketState, 30_000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const delay = setTimeout(() => {
+      void fetchMarketState();
+      interval = setInterval(fetchMarketState, 30_000);
+    }, 800);
+    return () => {
+      clearTimeout(delay);
+      if (interval) clearInterval(interval);
+    };
   }, [fetchMarketState]);
 
   const session = snapshot?.marketSession ?? "closed";

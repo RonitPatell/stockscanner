@@ -42,6 +42,10 @@ export interface CatalystItem {
   /** All headlines when multiple news items exist for this symbol */
   headlines?: CatalystHeadline[];
   newsCount?: number;
+  /** When TrustTicker first ingested this headline (ISO) */
+  ingestedAt?: string;
+  /** Seconds from publish → ingest */
+  ingestDelaySec?: number;
 }
 
 export interface ScannerFilters {

@@ -1,14 +1,40 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "./ui/button";
 import { UserMenu } from "./UserMenu";
 import { LogoMark } from "./Logo";
 
+import { isSubscribedFromSettings } from "@/lib/subscription-client";
+
 export function Navbar() {
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated" && !!session?.user;
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsSubscribed(false);
+      return;
+    }
+    let cancelled = false;
+    void fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) {
+          setIsSubscribed(isSubscribedFromSettings(data));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, session?.user?.id]);
+
+  const scannerHref = isSubscribed ? "/dashboard" : "/demo";
+  const scannerLabel = isSubscribed ? "Open Scanner" : "View Demo";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
@@ -24,6 +50,8 @@ export function Navbar() {
           {!isLoggedIn && (
             <>
               <Link href="/#features" className="hover:text-zinc-100 transition-colors">Features</Link>
+              <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
+              <Link href="/wins" className="hover:text-zinc-100 transition-colors">Speed wins</Link>
               <Link href="/#testimonials" className="hover:text-zinc-100 transition-colors">Reviews</Link>
               <Link href="/pricing" className="hover:text-zinc-100 transition-colors">Pricing</Link>
             </>
@@ -32,7 +60,12 @@ export function Navbar() {
             <>
               <Link href="/#features" className="hover:text-zinc-100 transition-colors">Features</Link>
               <Link href="/#testimonials" className="hover:text-zinc-100 transition-colors">Reviews</Link>
-              <Link href="/dashboard" className="hover:text-zinc-100 transition-colors">Scanner</Link>
+              {!isSubscribed && (
+                <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
+              )}
+              {isSubscribed && (
+                <Link href="/dashboard" className="hover:text-zinc-100 transition-colors">Scanner</Link>
+              )}
             </>
           )}
           <Link href="/legal/disclaimer" className="hover:text-zinc-100 transition-colors">Legal</Link>
@@ -41,8 +74,8 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <>
-              <Link href="/dashboard" className="hidden sm:block">
-                <Button size="sm">Open Scanner</Button>
+              <Link href={scannerHref} className="hidden sm:block">
+                <Button size="sm">{scannerLabel}</Button>
               </Link>
               <UserMenu />
             </>

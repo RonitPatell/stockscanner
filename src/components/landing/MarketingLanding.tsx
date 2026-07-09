@@ -3,9 +3,7 @@ import {
   Zap,
   Brain,
   Bell,
-  TrendingUp,
   Shield,
-  Clock,
   BarChart3,
   Radio,
   ArrowRight,
@@ -15,61 +13,65 @@ import {
   Target,
   LineChart,
   Users,
+  Layers,
+  Newspaper,
+  BadgeCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { TickerMarquee } from "./TickerMarquee";
+import { LiveProofStrip } from "@/components/LiveProofStrip";
 
 const features = [
   {
     icon: Radio,
-    title: "Live Catalyst Feed",
+    title: "Near-Real-Time Feed",
     description:
-      "Breaking PRs and wire hits land in your feed within seconds. SSE streaming — no refresh spam.",
+      "Wire hits ingested on ~8s cycles and pushed to your dashboard instantly via SSE. Stock-impact headlines only — no filler.",
     accent: "from-emerald-500/20 to-cyan-500/10",
   },
   {
-    icon: Brain,
-    title: "Sentiment Engine",
+    icon: Layers,
+    title: "Story Clustering",
     description:
-      "Every headline scored -100 to +100 with catalyst tagging. Know if news is bullish noise or real fuel.",
+      "The same PR on three wires becomes one clean card. See how many sources picked it up without reading duplicates.",
     accent: "from-violet-500/20 to-fuchsia-500/10",
   },
   {
-    icon: TrendingUp,
-    title: "Historical Context",
+    icon: Newspaper,
+    title: "Watchlist Briefs",
     description:
-      "See how similar FDA wins, contracts, and upgrades moved stocks before. Pattern memory built in.",
+      "Morning brief and EOD recap for your tickers. Walk into the session knowing what moved overnight on your names.",
     accent: "from-amber-500/20 to-orange-500/10",
   },
   {
-    icon: Clock,
-    title: "Premarket Edge",
+    icon: Bell,
+    title: "Pro Alert Rules",
     description:
-      "Catalysts flagged before the bell so you're not chasing the 9:31 rip blind.",
+      "Trader-grade triggers: HOD breaks, VWAP, float size, relative volume, and news urgency. Discord webhooks included.",
     accent: "from-cyan-500/20 to-blue-500/10",
   },
   {
-    icon: BarChart3,
-    title: "Float & Cap Intel",
+    icon: Target,
+    title: "Setup Tags",
     description:
-      "Float and market cap on every card. A headline on a 400M float hits different than 40M.",
+      "Gapper, sympathy, sector momentum, heavy volume — auto-tagged so you spot the play type in one glance.",
     accent: "from-emerald-500/20 to-teal-500/10",
   },
   {
-    icon: Bell,
-    title: "Discord Alerts",
+    icon: BadgeCheck,
+    title: "Trust Signals",
     description:
-      "High-urgency catalysts ping your webhook instantly. Set it once, never miss a runner.",
+      "Source tier badges, ingest latency per headline, and a live trust bar showing feed freshness.",
     accent: "from-rose-500/20 to-pink-500/10",
   },
-];
-
-const stats = [
-  { value: "<30s", label: "Avg. feed latency" },
-  { value: "24/7", label: "News monitoring" },
-  { value: "6+", label: "Verified sources" },
-  { value: "$40", label: "Flat monthly price" },
+  {
+    icon: Brain,
+    title: "Catalyst Playbooks",
+    description:
+      "Float-bucket stats: avg 30m move, gap rate, win rate, and trader playbooks for FDA, offerings, earnings, and more.",
+    accent: "from-indigo-500/20 to-purple-500/10",
+  },
 ];
 
 const testimonials = [
@@ -139,22 +141,29 @@ const steps = [
   {
     step: "01",
     title: "News breaks",
-    body: "GlobeNewswire, Business Wire, SEC filings, and market feeds get ingested and verified against real tickers.",
+    body: "GlobeNewswire, Business Wire, SEC filings, and market feeds ingested on fast wire cycles — filtered to real stock-impact headlines only.",
   },
   {
     step: "02",
-    title: "AI scores it",
-    body: "Sentiment, catalyst type, urgency, and float context attach to every headline in real time.",
+    title: "We enrich it",
+    body: "AI sentiment, setup tags, story clustering, source trust, and float context attach before the headline ever hits your feed.",
   },
   {
     step: "03",
     title: "You react first",
-    body: "Scanner, wire alerts, and Discord pings surface what matters before the crowd catches on.",
+    body: "Live scanner, watchlist briefs, pro alert rules, and Discord pings surface what matters before the crowd catches on.",
   },
 ];
 
-export function MarketingLanding({ displayName }: { displayName?: string }) {
+export function MarketingLanding({
+  displayName,
+  isSubscribed = false,
+}: {
+  displayName?: string;
+  isSubscribed?: boolean;
+}) {
   const isSignedIn = !!displayName;
+  const scannerHref = isSubscribed ? "/dashboard" : "/demo";
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -170,7 +179,7 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
               <Sparkles className="w-4 h-4" />
               {isSignedIn
                 ? `Welcome back, ${displayName}`
-                : "Trusted by active traders scanning every session"}
+                : "Pro-grade catalyst intelligence · $40/mo flat"}
             </div>
 
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 landing-fade-up landing-delay-1">
@@ -197,9 +206,10 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                 </>
               ) : (
                 <>
-                  TrustTicker is a live news scanner built for traders who need the{" "}
-                  <span className="text-zinc-200">why</span> behind the move — verified tickers,
-                  sentiment scores, float data, and alerts that actually fire.
+                  TrustTicker is a live catalyst command center — near-real-time wire ingest,
+                  story clustering, setup tags, watchlist briefs, and pro alert rules. Built for
+                  traders who need the <span className="text-zinc-200">why</span> before the crowd
+                  does.
                 </>
               )}
             </p>
@@ -207,9 +217,9 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 landing-fade-up landing-delay-3">
               {isSignedIn ? (
                 <>
-                  <Link href="/dashboard">
+                  <Link href={scannerHref}>
                     <Button size="lg" className="text-base px-8 min-w-[220px] shadow-lg shadow-emerald-500/20">
-                      Open Scanner <ArrowRight className="w-5 h-5" />
+                      {isSubscribed ? "Open Scanner" : "View Demo"} <ArrowRight className="w-5 h-5" />
                     </Button>
                   </Link>
                   <Link href="/settings">
@@ -225,9 +235,9 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                       Start 7-Day Free Trial <ArrowRight className="w-5 h-5" />
                     </Button>
                   </Link>
-                  <Link href="/dashboard">
+                  <Link href="/demo">
                     <Button variant="outline" size="lg" className="text-base px-8 min-w-[200px] border-zinc-700 hover:border-zinc-500">
-                      View Live Demo
+                      View Demo
                     </Button>
                   </Link>
                 </>
@@ -241,25 +251,13 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
             </p>
           </div>
 
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-16 max-w-3xl mx-auto landing-fade-up landing-delay-4">
-            {(isSignedIn
-              ? [
-                  { value: "<30s", label: "Avg. feed latency" },
-                  { value: "24/7", label: "News monitoring" },
-                  { value: "6+", label: "Verified sources" },
-                  { value: "LIVE", label: "Scanner ready" },
-                ]
-              : stats
-            ).map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm px-4 py-3 text-center"
-              >
-                <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono">{s.value}</div>
-                <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">{s.label}</div>
-              </div>
-            ))}
+          <div className="mt-8 max-w-3xl mx-auto landing-fade-up landing-delay-4">
+            <LiveProofStrip />
+            <p className="text-center mt-2">
+              <Link href="/wins" className="text-xs text-emerald-500 hover:underline">
+                See all speed wins →
+              </Link>
+            </p>
           </div>
 
           {/* Product preview */}
@@ -272,7 +270,7 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                 </div>
-                <span className="text-[10px] text-zinc-500 font-mono ml-2">trustticker.app/dashboard</span>
+                <span className="text-[10px] text-zinc-500 font-mono ml-2">trustticker.app/demo</span>
                 <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   LIVE
@@ -300,6 +298,9 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                       sentiment={82}
                       type="FDA / Biotech"
                       historical="+18.5% avg"
+                      setupTag="Gapper"
+                      trust="Tier 1 wire"
+                      sources={3}
                     />
                     <DemoCatalyst
                       symbol="AMD"
@@ -308,6 +309,9 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                       sentiment={71}
                       type="Contract Win"
                       historical="+12.3% avg"
+                      setupTag="Heavy vol"
+                      trust="Verified"
+                      sources={2}
                     />
                     <DemoCatalyst
                       symbol="PLTR"
@@ -316,6 +320,9 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
                       sentiment={64}
                       type="Gov Contract"
                       historical="+9.1% avg"
+                      setupTag="Sector"
+                      trust="Tier 1 wire"
+                      sources={4}
                     />
                   </div>
                 </div>
@@ -336,7 +343,8 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
               Everything a news trader actually needs
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto text-lg">
-              Not another generic screener. A catalyst command center tuned for speed.
+              Everything in TrustTicker Pro — tuned for speed, filtered for signal, built to scale
+              with you.
             </p>
           </div>
 
@@ -438,10 +446,12 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
               </h2>
               <ul className="space-y-4">
                 {[
-                  "Headlines matched to the right company — not keyword noise",
-                  "Sentiment + catalyst type on every headline",
-                  "Historical similar-news move averages",
-                  "Wire alerts, heavy volume, and HOD tracking",
+                  "Stock-impact headlines only — filtered before they hit your feed",
+                  "Near-real-time wire ingest with instant SSE push to your dashboard",
+                  "Story clustering, setup tags, and source trust on every card",
+                  "Watchlist morning briefs and EOD recaps",
+                  "Pro alert rules: HOD, VWAP, float, RVol, and news triggers",
+                  "Float, cap, sentiment, and historical move context",
                   "Discord webhooks for your trading group",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 text-zinc-300">
@@ -500,7 +510,7 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
           </div>
           <div className="flex items-center gap-2 text-zinc-400">
             <Zap className="w-5 h-5 text-emerald-500" />
-            <span className="text-sm">Sub-30s live updates</span>
+            <span className="text-sm">~8s wire ingest · SSE live push</span>
           </div>
         </div>
       </section>
@@ -527,11 +537,15 @@ export function MarketingLanding({ displayName }: { displayName?: string }) {
           <p className="text-zinc-400 mb-8 text-lg">
             {isSignedIn
               ? "Your live feed, wire alerts, and volume panel are one click away."
-              : "7-day free trial. Full scanner access. Cancel anytime from Settings."}
+              : "7-day free trial. Full Pro access — clustering, briefs, alert rules, and more. Cancel anytime."}
           </p>
-          <Link href={isSignedIn ? "/dashboard" : "/pricing"}>
+          <Link href={isSignedIn ? scannerHref : "/pricing"}>
             <Button size="lg" className="text-base px-10 shadow-lg shadow-emerald-500/25">
-              {isSignedIn ? "Open Scanner" : "Start Free Trial — $40/mo after"}
+              {isSignedIn
+                ? isSubscribed
+                  ? "Open Scanner"
+                  : "View Demo"
+                : "Start Free Trial — $40/mo after"}
             </Button>
           </Link>
         </div>
@@ -579,6 +593,9 @@ function DemoCatalyst({
   sentiment,
   type,
   historical,
+  setupTag,
+  trust,
+  sources,
 }: {
   symbol: string;
   change: string;
@@ -586,26 +603,34 @@ function DemoCatalyst({
   sentiment: number;
   type: string;
   historical: string;
+  setupTag: string;
+  trust: string;
+  sources: number;
 }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-left">
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono font-bold">{symbol}</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/30">
             {type}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
+            {setupTag}
           </span>
         </div>
         <span className="font-mono text-emerald-400 font-medium text-sm">{change}</span>
       </div>
       <p className="text-xs text-zinc-300 mb-1.5 line-clamp-1">{headline}</p>
-      <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+      <div className="flex items-center gap-3 flex-wrap text-[10px] text-zinc-500">
         <span>
           Sentiment <span className="text-emerald-400 font-mono">{sentiment}</span>
         </span>
         <span>
           Similar <span className="text-emerald-400">{historical}</span>
         </span>
+        <span className="text-emerald-500/80">{trust}</span>
+        <span>{sources} sources</span>
       </div>
     </div>
   );

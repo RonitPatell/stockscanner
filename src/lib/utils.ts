@@ -32,6 +32,17 @@ export function formatPrice(value: number | null | undefined): string {
   return `$${value.toFixed(2)}`;
 }
 
+/** Stable clock format for SSR + client (avoids Node vs browser locale drift). */
+export function formatClockTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
 export function timeAgo(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const seconds = Math.floor((Date.now() - d.getTime()) / 1000);

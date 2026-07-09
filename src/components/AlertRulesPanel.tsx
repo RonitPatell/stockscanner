@@ -127,6 +127,22 @@ export function AlertRulesPanel({ rules, onChange }: AlertRulesPanelProps) {
           </div>
 
           <div className="flex flex-wrap gap-3 text-xs text-zinc-400">
+            <span className="text-zinc-500 w-full">Alert channels:</span>
+            {(["discord", "sms", "email", "push"] as const).map((ch) => (
+              <label key={ch} className="flex items-center gap-1 capitalize">
+                <input
+                  type="checkbox"
+                  checked={rule.channels.includes(ch)}
+                  onChange={(e) => {
+                    const channels = e.target.checked
+                      ? [...new Set([...rule.channels, ch])]
+                      : rule.channels.filter((c) => c !== ch);
+                    updateRule(rule.id, { channels: channels.length ? channels : ["discord"] });
+                  }}
+                />
+                {ch}
+              </label>
+            ))}
             <label className="flex items-center gap-1">
               <input
                 type="checkbox"

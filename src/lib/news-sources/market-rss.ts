@@ -1,26 +1,33 @@
 import type { NewsArticle } from "@/types";
-import { resolveArticleSymbol, isNonStockArticle } from "../news-verifier";
+import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from "../news-verifier";
 import { isValidTickerFormat } from "../ticker-utils";
 import { getNextTickerBatch } from "./active-tickers";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
 
 /** Broad market/news RSS feeds — symbol resolved from headline when present */
-const MARKET_FEEDS: { url: string; source: string }[] = [
+const FAST_MARKET_FEEDS: { url: string; source: string }[] = [
+  { url: "https://www.benzinga.com/feed", source: "Benzinga" },
   { url: "https://feeds.marketwatch.com/marketwatch/marketpulse/", source: "MarketWatch" },
-  { url: "https://feeds.marketwatch.com/marketwatch/topstories/", source: "MarketWatch" },
   { url: "https://www.cnbc.com/id/15839135/device/rss/rss.html", source: "CNBC" },
+  { url: "https://feeds.marketwatch.com/marketwatch/topstories/", source: "MarketWatch" },
+];
+
+const SLOW_MARKET_FEEDS: { url: string; source: string }[] = [
   { url: "https://seekingalpha.com/market_currents.xml", source: "Seeking Alpha" },
   { url: "https://www.nasdaq.com/feed/rssoutbound?category=Stocks", source: "Nasdaq" },
   { url: "https://markets.businessinsider.com/rss/news", source: "Business Insider" },
-  { url: "https://www.benzinga.com/feed", source: "Benzinga" },
 ];
 
-export async function fetchMarketRssNews(): Promise<NewsArticle[]> {
+const MARKET_FEEDS = [...FAST_MARKET_FEEDS, ...SLOW_MARKET_FEEDS];
+
+async function fetchRssFeedBatch(
+  feeds: { url: string; source: string }[],
+  seen: Set<string>
+): Promise<NewsArticle[]> {
   const articles: NewsArticle[] = [];
-  const seen = new Set<string>();
 
   const results = await Promise.all(
-    MARKET_FEEDS.map(async ({ url, source }) => {
+    feeds.map(async ({ url, source }) => {
       const xml = await fetchRssXml(url);
       if (!xml) return [] as NewsArticle[];
       const out: NewsArticle[] = [];
@@ -34,7 +41,7 @@ export async function fetchMarketRssNews(): Promise<NewsArticle[]> {
         if (isNonStockArticle(item.title, summary)) continue;
 
         const resolved = resolveArticleSymbol(item.title, summary);
-        if (!resolved) continue;
+        if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
         out.push({
           id: `rss-${hashStr(key)}`,
@@ -52,6 +59,19 @@ export async function fetchMarketRssNews(): Promise<NewsArticle[]> {
 
   for (const batch of results) articles.push(...batch);
   return articles;
+}
+
+/** Benzinga + MarketWatch + CNBC — polled every few seconds */
+export async function fetchFastMarketRssNews(): Promise<NewsArticle[]> {
+  return fetchRssFeedBatch(FAST_MARKET_FEEDS, new Set());
+}
+
+export async function fetchSlowMarketRssNews(): Promise<NewsArticle[]> {
+  return fetchRssFeedBatch(SLOW_MARKET_FEEDS, new Set());
+}
+
+export async function fetchMarketRssNews(): Promise<NewsArticle[]> {
+  return fetchRssFeedBatch(MARKET_FEEDS, new Set());
 }
 
 /**
@@ -91,19 +111,8 @@ export async function fetchYahooTickerNews(
         // Prefer ticker named in headline; else map to a chunk symbol via $TICKER / (TICKER)
         let symbol =
           resolveArticleSymbol(item.title, item.description.slice(0, 300))?.symbol ?? "";
-        if (!symbol) {
-          for (const s of chunk) {
-            if (
-              new RegExp(`\\b${s}\\b`).test(item.title) ||
-              new RegExp(`\\$${s}\\b`).test(item.title)
-            ) {
-              symbol = s;
-              break;
-            }
-          }
-        }
-        // If still unknown, skip — avoid attaching wrong ticker
         if (!symbol || !isValidTickerFormat(symbol)) continue;
+        if (!articleIsAboutSymbol(symbol, item.title, item.description.slice(0, 300))) continue;
 
         articles.push({
           id: `yh-${hashStr(key)}`,

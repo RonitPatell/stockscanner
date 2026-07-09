@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import type { BriefItem, BriefSection, CatalystItem, WatchlistBrief } from "@/types";
+import { articleIsAboutSymbol } from "./news-verifier";
 
 export type { WatchlistBrief, BriefItem, BriefSection };
 
@@ -51,23 +52,25 @@ export async function buildWatchlistBrief(
       ? user.lastBriefSeenAt
       : sessionCutoff(kind === "delta" ? "morning" : kind);
 
-  const rows = await prisma.catalyst.findMany({
-    where: {
-      symbol: { in: symbols },
-      publishedAt: { gte: since },
-    },
-    orderBy: { publishedAt: "desc" },
-    take: 80,
-    select: {
-      symbol: true,
-      headline: true,
-      changePercent: true,
-      catalystType: true,
-      publishedAt: true,
-      setupTags: true,
-      urgencyScore: true,
-    },
-  });
+  const rows = (
+    await prisma.catalyst.findMany({
+      where: {
+        symbol: { in: symbols },
+        publishedAt: { gte: since },
+      },
+      orderBy: { publishedAt: "desc" },
+      take: 80,
+      select: {
+        symbol: true,
+        headline: true,
+        changePercent: true,
+        catalystType: true,
+        publishedAt: true,
+        setupTags: true,
+        urgencyScore: true,
+      },
+    })
+  ).filter((r) => articleIsAboutSymbol(r.symbol, r.headline));
 
   const movers = rows
     .filter((r) => Math.abs(r.changePercent ?? 0) >= 3)
@@ -121,7 +124,11 @@ export function briefFromCatalysts(
   kind: "morning" | "delta"
 ): WatchlistBrief {
   const set = new Set(watchlist.map((s) => s.toUpperCase()));
-  const hits = catalysts.filter((c) => set.has(c.symbol.toUpperCase()));
+  const hits = catalysts.filter(
+    (c) =>
+      set.has(c.symbol.toUpperCase()) &&
+      articleIsAboutSymbol(c.symbol, c.headline, c.aiSummary ?? undefined)
+  );
   const movers = hits
     .filter((c) => Math.abs(c.changePercent ?? 0) >= 3)
     .slice(0, 8)

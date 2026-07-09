@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
 import { resolveFinnhubKey } from "@/lib/finnhub-key";
 import { fetchQuoteLive } from "@/lib/market-data";
+import { getCachedQuotes } from "@/lib/quote-cache-service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-let inFlight: Promise<any> | null = null;
-let last: { ts: number; payload: any } | null = null;
-const CACHE_MS = 15_000;
+let inFlight: Promise<MarketStatePayload> | null = null;
+let last: { ts: number; payload: MarketStatePayload } | null = null;
+const CACHE_MS = 30_000;
 
 const SYMBOLS = [
-  // Indices
   "SPY",
   "QQQ",
   "IWM",
   "DIA",
-  // Volatility proxy (kept as fallback when VIX is unavailable)
   "VIXY",
-  // Key sectors / risk gauges
   "XLK",
   "XLF",
   "XLE",
@@ -28,85 +26,50 @@ const SYMBOLS = [
   "XLC",
   "XLU",
   "XLB",
-  // Semi gauge
   "SMH",
 ] as const;
 
-async function fetchVixFromFinnhub(): Promise<
-  { price: number; change: number; changePercent: number } | null
-> {
+type QuoteRow = { price: number; changePercent: number; change: number };
+type MarketStatePayload = {
+  quotes: Record<string, QuoteRow>;
+  updatedAt: string;
+  cached?: boolean;
+};
+
+async function fetchVixFromFinnhub(): Promise<QuoteRow | null> {
   const key = resolveFinnhubKey();
   if (!key) return null;
-  // Finnhub supports VIX as an index in many accounts via ^VIX
   try {
     const res = await fetch(
       `https://finnhub.io/api/v1/quote?symbol=%5EVIX&token=${encodeURIComponent(key)}`,
-      { cache: "no-store" }
+      { cache: "no-store", signal: AbortSignal.timeout(4_000) }
     );
     if (!res.ok) return null;
     const q = await res.json();
     if (!q?.c || q.c <= 0) return null;
-    return {
-      price: q.c,
-      change: q.d ?? 0,
-      changePercent: q.dp ?? 0,
-    };
+    return { price: q.c, change: q.d ?? 0, changePercent: q.dp ?? 0 };
   } catch {
     return null;
   }
 }
 
-async function fetchVixFromCboe(): Promise<
-  { price: number; change: number; changePercent: number } | null
-> {
-  // Official Cboe daily history CSV (updated daily). We use the latest 2 closes.
-  // https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
-  try {
-    const res = await fetch(
-      "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
-      { cache: "no-store" }
-    );
-    if (!res.ok) return null;
-    const csv = (await res.text()).trim();
-    const lines = csv.split(/\r?\n/).filter(Boolean);
-    if (lines.length < 3) return null;
-
-    const parseClose = (line: string): number | null => {
-      const cols = line.split(",");
-      const close = Number(cols[4]);
-      return Number.isFinite(close) && close > 0 ? close : null;
-    };
-
-    const close0 = parseClose(lines[1]);
-    const close1 = parseClose(lines[2]);
-    if (close0 == null || close1 == null) return null;
-    const change = close0 - close1;
-    const changePercent = (change / close1) * 100;
-    return { price: close0, change, changePercent };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchVixFromYahoo(): Promise<
-  { price: number; change: number; changePercent: number } | null
-> {
-  // Best-effort intraday spot VIX via Yahoo chart API (no key).
-  // https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d
+async function fetchVixFromYahoo(): Promise<QuoteRow | null> {
   try {
     const res = await fetch(
       "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d",
       {
         cache: "no-store",
+        signal: AbortSignal.timeout(4_000),
         headers: {
-          // Yahoo often blocks requests without a UA
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
           Accept: "application/json,text/plain,*/*",
         },
       }
     );
     if (!res.ok) return null;
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as {
+      chart?: { result?: { meta?: { regularMarketPrice?: number; previousClose?: number } }[] };
+    };
     const meta = data?.chart?.result?.[0]?.meta;
     const price = Number(meta?.regularMarketPrice);
     const prevClose = Number(meta?.previousClose);
@@ -114,11 +77,49 @@ async function fetchVixFromYahoo(): Promise<
       return null;
     }
     const change = price - prevClose;
-    const changePercent = (change / prevClose) * 100;
-    return { price, change, changePercent };
+    return { price, change, changePercent: (change / prevClose) * 100 };
   } catch {
     return null;
   }
+}
+
+async function buildFromQuoteCache(): Promise<MarketStatePayload> {
+  const cached = await getCachedQuotes([...SYMBOLS]);
+  const quotes: Record<string, QuoteRow> = {};
+  for (const symbol of SYMBOLS) {
+    const q = cached[symbol];
+    if (!q) continue;
+    quotes[symbol] = {
+      price: q.price,
+      changePercent: q.changePercent,
+      change: q.change,
+    };
+  }
+  return { quotes, updatedAt: new Date().toISOString(), cached: true };
+}
+
+async function refreshLiveMarketState(): Promise<MarketStatePayload> {
+  const key = resolveFinnhubKey();
+  if (!key) {
+    return { quotes: {}, updatedAt: new Date().toISOString() };
+  }
+
+  const quotes: Record<string, QuoteRow> = {};
+
+  const vix = (await fetchVixFromFinnhub()) ?? (await fetchVixFromYahoo());
+  if (vix) quotes.VIX = vix;
+
+  for (const symbol of SYMBOLS) {
+    const q = await fetchQuoteLive(symbol);
+    if (!q) continue;
+    quotes[symbol] = {
+      price: q.price,
+      changePercent: q.changePercent,
+      change: q.change,
+    };
+  }
+
+  return { quotes, updatedAt: new Date().toISOString() };
 }
 
 export async function GET() {
@@ -126,65 +127,59 @@ export async function GET() {
     if (last && Date.now() - last.ts < CACHE_MS) {
       return NextResponse.json(last.payload);
     }
-    if (inFlight) {
-      const payload = await inFlight;
-      return NextResponse.json(payload);
+
+    const cachedPayload = await buildFromQuoteCache();
+    if (Object.keys(cachedPayload.quotes).length >= 4) {
+      last = { ts: Date.now(), payload: cachedPayload };
+      if (!inFlight) {
+        inFlight = refreshLiveMarketState()
+          .then((payload) => {
+            if (Object.keys(payload.quotes).length > 0) {
+              last = { ts: Date.now(), payload };
+            }
+            return payload;
+          })
+          .finally(() => {
+            inFlight = null;
+          });
+      }
+      return NextResponse.json(cachedPayload);
     }
 
-    inFlight = (async () => {
-      const key = resolveFinnhubKey();
-      if (!key) {
-        const payload = { quotes: {}, updatedAt: new Date().toISOString() };
-        last = { ts: Date.now(), payload };
-        return payload;
-      }
+    if (last) {
+      void refreshLiveMarketState().then((payload) => {
+        if (Object.keys(payload.quotes).length > 0) {
+          last = { ts: Date.now(), payload };
+        }
+      });
+      return NextResponse.json(last.payload);
+    }
 
-    const quotes: Record<
-      string,
-      { price: number; changePercent: number; change: number }
-    > = {};
+    if (!inFlight) {
+      inFlight = refreshLiveMarketState().finally(() => {
+        inFlight = null;
+      }) as Promise<MarketStatePayload>;
+    }
 
-      // Prefer intraday VIX (Finnhub → Yahoo intraday), else fall back to Cboe daily close.
-      const vix =
-        (await fetchVixFromFinnhub()) ??
-        (await fetchVixFromYahoo()) ??
-        (await fetchVixFromCboe());
-      if (vix) {
-        quotes.VIX = {
-          price: vix.price,
-          changePercent: vix.changePercent,
-          change: vix.change,
-        };
-      }
+    const payload = await Promise.race([
+      inFlight,
+      new Promise<MarketStatePayload>((resolve) =>
+        setTimeout(
+          () => resolve({ quotes: {}, updatedAt: new Date().toISOString() }),
+          2_500
+        )
+      ),
+    ]);
 
-      for (const symbol of SYMBOLS) {
-        const q = await fetchQuoteLive(symbol);
-        if (!q) continue;
-        quotes[symbol] = {
-          price: q.price,
-          changePercent: q.changePercent,
-          change: q.change,
-        };
-      }
-
-      const payload = {
-        quotes,
-        updatedAt: new Date().toISOString(),
-      };
+    if (Object.keys(payload.quotes).length > 0) {
       last = { ts: Date.now(), payload };
-      return payload;
-    })();
+    }
 
-    const payload = await inFlight;
-    inFlight = null;
     return NextResponse.json(payload);
   } catch (error) {
     inFlight = null;
     console.error("Market state API error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch market state" },
-      { status: 500 }
-    );
+    if (last) return NextResponse.json(last.payload);
+    return NextResponse.json({ quotes: {}, updatedAt: new Date().toISOString() });
   }
 }
-

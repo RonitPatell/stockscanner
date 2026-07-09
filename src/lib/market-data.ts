@@ -5,11 +5,10 @@ import { fetchSec8KFilings } from "./news-sources/sec-edgar";
 import { fetchGlobeNewswirePRs } from "./news-sources/globenewswire";
 import { fetchBusinessWirePRs } from "./news-sources/businesswire";
 import { fetchPrNewswirePRs } from "./news-sources/prnewswire";
-import { fetchMarketRssNews, fetchYahooTickerNews } from "./news-sources/market-rss";
+import { fetchMarketRssNews, fetchFastMarketRssNews, fetchSlowMarketRssNews, fetchYahooTickerNews } from "./news-sources/market-rss";
 import { finnhubFetch, finnhubFetchLive } from "./finnhub-queue";
 import { resolveFinnhubKey } from "./finnhub-key";
-import { resolveArticleSymbol } from "./news-verifier";
-import { isLikelyStockNews } from "./news-verifier";
+import { isLikelyStockNews, resolveArticleSymbol, articleIsAboutSymbol } from "./news-verifier";
 import { getPriorityTickers } from "./priority-tickers";
 
 export { TICKER_BLACKLIST, isValidTickerFormat, extractSymbolFromHeadline };
@@ -164,36 +163,20 @@ export async function fetchMarketNews(options: { fast?: boolean } = {}): Promise
 }
 
 /** Fast wire + RSS poll — no SEC/merger/rotating scans (runs every few seconds) */
-export async function fetchFastWireNews(): Promise<NewsArticle[]> {
-  const key = resolveFinnhubKey();
-  const priorityTickers = await getPriorityTickers();
-
-  const [globePRs, businessWirePRs, prnPRs, marketRss, yahooNews, marketNews, priorityNews] =
-    await Promise.all([
-      fetchGlobeNewswirePRs(),
-      fetchBusinessWirePRs(),
-      fetchPrNewswirePRs(),
-      fetchMarketRssNews(),
-      fetchYahooTickerNews(28, priorityTickers),
-      key ? fetchFinnhubMarketNews(key) : Promise.resolve([]),
-      key ? fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 20)) : Promise.resolve([]),
-    ]);
-
-  const articles = [
-    ...globePRs,
-    ...businessWirePRs,
-    ...prnPRs,
-    ...marketRss,
-    ...yahooNews,
-    ...marketNews,
-    ...priorityNews,
-  ];
-
-  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+function dedupeWireArticles(articles: NewsArticle[], maxAgeMs: number): NewsArticle[] {
+  const cutoff = Date.now() - maxAgeMs;
   const seen = new Set<string>();
   return articles
-    .filter((a) => {
-      if (!a.symbol || !isValidTickerFormat(a.symbol)) return false;
+    .map((a) => {
+      if (a.symbol && isValidTickerFormat(a.symbol) && articleIsAboutSymbol(a.symbol, a.headline, a.summary)) {
+        return a;
+      }
+      const resolved = resolveArticleSymbol(a.headline, a.summary);
+      if (!resolved || !articleIsAboutSymbol(resolved.symbol, a.headline, a.summary)) return null;
+      return { ...a, symbol: resolved.symbol };
+    })
+    .filter((a): a is NewsArticle => {
+      if (!a) return false;
       if (!isLikelyStockNews(a.headline, a.summary)) return false;
       if (a.publishedAt.getTime() < cutoff) return false;
       const keyHash = `${a.symbol}|${a.headline.slice(0, 80)}`;
@@ -201,8 +184,60 @@ export async function fetchFastWireNews(): Promise<NewsArticle[]> {
       seen.add(keyHash);
       return true;
     })
-    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
-    .slice(0, 200);
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+}
+
+/** Sub-3s sources — Benzinga RSS, fast market RSS, Yahoo watchlist, Finnhub market */
+export async function fetchUltraFastWireNews(
+  priorityTickers: string[]
+): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
+  const [marketRss, yahooNews, marketNews] = await Promise.all([
+    fetchFastMarketRssNews(),
+    fetchYahooTickerNews(32, priorityTickers),
+    key ? fetchFinnhubMarketNews(key) : Promise.resolve([]),
+  ]);
+
+  return dedupeWireArticles(
+    [...marketRss, ...yahooNews, ...marketNews],
+    2 * 60 * 60 * 1000
+  ).slice(0, 120);
+}
+
+/** Slower PR wires + extended RSS + per-symbol Finnhub — runs in background */
+export async function fetchExtendedWireNews(
+  priorityTickers: string[]
+): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
+  const [globePRs, businessWirePRs, prnPRs, slowRss, companyNews] = await Promise.all([
+    fetchGlobeNewswirePRs(),
+    fetchBusinessWirePRs(),
+    fetchPrNewswirePRs(),
+    fetchSlowMarketRssNews(),
+    key
+      ? fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 40))
+      : Promise.resolve([]),
+  ]);
+
+  return dedupeWireArticles(
+    [...globePRs, ...businessWirePRs, ...prnPRs, ...slowRss, ...companyNews],
+    6 * 60 * 60 * 1000
+  ).slice(0, 160);
+}
+
+export async function fetchFastWireNews(): Promise<NewsArticle[]> {
+  const priorityTickers = await getPriorityTickers();
+  const [ultra, extended] = await Promise.all([
+    fetchUltraFastWireNews(priorityTickers),
+    fetchExtendedWireNews(priorityTickers),
+  ]);
+  const seen = new Set<string>();
+  return [...ultra, ...extended].filter((a) => {
+    const key = `${a.symbol}|${a.headline.slice(0, 80)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Scan watchlist for stocks moving ≥ minPercent today */
@@ -337,10 +372,9 @@ async function fetchFinnhubMarketNews(key: string): Promise<NewsArticle[]> {
   }
 }
 
-function resolveFinnhubSymbol(item: FinnhubNewsItem, fallback: string): string {
+function resolveFinnhubSymbol(item: FinnhubNewsItem, _fallback: string): string {
   const resolved = resolveArticleSymbol(item.headline, item.summary, item.related);
-  if (resolved) return resolved.symbol;
-  return fallback && isValidTickerFormat(fallback) ? fallback : "";
+  return resolved?.symbol ?? "";
 }
 
 async function fetchMergerNews(key: string): Promise<NewsArticle[]> {

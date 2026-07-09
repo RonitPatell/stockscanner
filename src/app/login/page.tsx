@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import LoginForm from "./LoginForm";
 
 export default async function LoginPage({
@@ -15,7 +17,12 @@ export default async function LoginPage({
     if (params.next === "checkout") {
       redirect("/subscribe");
     }
-    redirect("/dashboard");
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { subscriptionStatus: true, subscriptionEndsAt: true },
+    });
+    redirect(hasActiveSubscription(user ?? undefined) ? "/dashboard" : "/demo");
   }
 
   return (

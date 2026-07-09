@@ -6,8 +6,14 @@ import {
 import { refreshQuoteCache } from "./quote-cache-service";
 import { getCachedFeed } from "./feed-cache";
 
-export interface IngestPipelineResult {
+export interface WirePipelineResult {
   wireNew: number;
+  feedAll: number;
+  feedMovers: number;
+  finishedAt: string;
+}
+
+export interface IngestPipelineResult {
   fullNew: number;
   feedAll: number;
   feedMovers: number;
@@ -15,10 +21,34 @@ export interface IngestPipelineResult {
   finishedAt: string;
 }
 
-/** Single writer pipeline — run from cron/worker only. */
-export async function runIngestPipeline(): Promise<IngestPipelineResult> {
+/** Fast wire path — headline insert + immediate feed cache refresh. */
+export async function runWirePipeline(): Promise<WirePipelineResult> {
   const wire = await ingestWireBurst();
-  const full = await ingestAndAnalyzeNews({ fast: false });
+
+  const all = await getCachedFeed("all");
+  const movers = await getCachedFeed("movers");
+
+  return {
+    wireNew: wire.newCount,
+    feedAll: all.items.length,
+    feedMovers: movers.items.length,
+    finishedAt: new Date().toISOString(),
+  };
+}
+
+/** Heavier full ingest — movers scan, quote refresh; does not block wire ticks. */
+export async function runIngestPipeline(): Promise<IngestPipelineResult> {
+  const PIPELINE_TIMEOUT_MS = 4 * 60_000;
+  return Promise.race([
+    runIngestPipelineInner(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Ingest pipeline timed out")), PIPELINE_TIMEOUT_MS)
+    ),
+  ]);
+}
+
+async function runIngestPipelineInner(): Promise<IngestPipelineResult> {
+  const full = await ingestAndAnalyzeNews({ fast: true });
 
   await refreshPublicFeedCache();
 
@@ -32,8 +62,7 @@ export async function runIngestPipeline(): Promise<IngestPipelineResult> {
   const movers = await getCachedFeed("movers");
 
   return {
-    wireNew: wire.length,
-    fullNew: full.length,
+    fullNew: full.newCount,
     feedAll: all.items.length,
     feedMovers: movers.items.length,
     quotesUpdated,

@@ -50,6 +50,77 @@ const ROUNDUP_LANGUAGE =
 
 const INDEX_ETFS = new Set(["SPY", "QQQ", "IWM", "DIA", "VTI", "VOO"]);
 
+/** Private / non-listed names that often appear in misleading "X Stock …" headlines */
+const NON_TRADABLE_COMPANY =
+  /\b(SpaceX|OpenAI|Anthropic|Stripe|Databricks|ByteDance|Epic\s+Games|Shein)\b/i;
+
+/** Company names that map to a single tradable ticker */
+const TICKER_COMPANY_NAMES: Record<string, string[]> = {
+  AAPL: ["apple"],
+  AMD: ["amd", "advanced micro devices", "advanced micro"],
+  AMZN: ["amazon"],
+  GOOG: ["google", "alphabet"],
+  GOOGL: ["google", "alphabet"],
+  LMND: ["lemonade"],
+  META: ["meta platforms", "facebook"],
+  MRNA: ["moderna"],
+  MSFT: ["microsoft"],
+  NVDA: ["nvidia"],
+  PLTR: ["palantir"],
+  SOFI: ["sofi", "sofi technologies"],
+  TSLA: ["tesla"],
+};
+
+const HEADLINE_LEAD_COMPANY_STOCK =
+  /^([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)?)\s+stock\b/i;
+
+function companyNamesForTicker(symbol: string): string[] {
+  return TICKER_COMPANY_NAMES[symbol] ?? [];
+}
+
+/** Ticker implied by a leading "Company stock …" headline pattern */
+export function companyLeadTicker(headline: string): string | null {
+  const lead = headline.match(HEADLINE_LEAD_COMPANY_STOCK);
+  if (!lead?.[1]) return null;
+
+  const raw = lead[1].trim();
+  const compact = raw.replace(/\s+/g, "").toUpperCase();
+  if (isValidTickerFormat(compact)) return compact;
+
+  const lower = raw.toLowerCase();
+  for (const [sym, names] of Object.entries(TICKER_COMPANY_NAMES)) {
+    if (names.some((n) => lower === n || lower.startsWith(`${n} `) || lower.includes(n))) {
+      return sym;
+    }
+  }
+  return null;
+}
+
+/**
+ * Article must clearly be about this one symbol — no inferred / feed-metadata guesses.
+ */
+export function articleIsAboutSymbol(
+  symbol: string,
+  headline: string,
+  summary?: string
+): boolean {
+  if (headlineSubjectConflictsWithSymbol(headline, symbol, summary)) return false;
+  if (isRoundupArticle(headline, summary)) return false;
+
+  const text = normalizeText(headline, summary);
+  if (hasExplicitTickerForm(symbol, text)) return true;
+  if (new RegExp(`\\b${symbol}\\b`).test(headline)) return true;
+
+  const lead = companyLeadTicker(headline);
+  if (lead === symbol) return true;
+
+  for (const name of companyNamesForTicker(symbol)) {
+    if (new RegExp(`\\b${name.replace(/\s+/g, "\\s+")}\\b`, "i").test(text)) return true;
+  }
+
+  return false;
+}
+
 export interface VerifiedTicker {
   symbol: string;
   confidence: number;
@@ -118,7 +189,58 @@ export function isLikelyStockNews(headline: string, summary?: string): boolean {
 
 export function isKnownFalsePositive(symbol: string, headline: string, summary?: string): boolean {
   if (isNonStockArticle(headline, summary)) return true;
+  if (headlineSubjectConflictsWithSymbol(headline, symbol, summary)) return true;
   return isFalsePositive(symbol, normalizeText(headline, summary));
+}
+
+/**
+ * Reject assigning a watchlist ticker when the headline is clearly about another
+ * subject (e.g. "SpaceX Stock …" tagged as NVDA via Finnhub `related` metadata).
+ */
+export function headlineSubjectConflictsWithSymbol(
+  headline: string,
+  symbol: string,
+  summary?: string
+): boolean {
+  const text = normalizeText(headline, summary);
+  if (hasExplicitTickerForm(symbol, text)) return false;
+  if (new RegExp(`\\b${symbol}\\b`).test(headline)) return false;
+
+  const leadTicker = companyLeadTicker(headline);
+  if (leadTicker && leadTicker !== symbol) return true;
+
+  if (NON_TRADABLE_COMPANY.test(text)) return true;
+
+  const lead = headline.match(HEADLINE_LEAD_COMPANY_STOCK);
+  if (lead?.[1]) {
+    const compact = lead[1].replace(/\s+/g, "").toUpperCase();
+    if (compact !== symbol && !isValidTickerFormat(compact)) return true;
+  }
+
+  return false;
+}
+
+function isNonTradableCompanyStockStory(headline: string, summary?: string): boolean {
+  const text = normalizeText(headline, summary);
+  if (!NON_TRADABLE_COMPANY.test(text)) return false;
+  const explicit = extractTickerCandidates(headline, summary).some((s) =>
+    hasExplicitTickerForm(s, text)
+  );
+  return !explicit;
+}
+
+function finnhubRelatedMentionedInCopy(
+  symbol: string,
+  headline: string,
+  summary: string | undefined,
+  headlineCandidates: string[]
+): boolean {
+  const text = normalizeText(headline, summary);
+  if (headlineSubjectConflictsWithSymbol(headline, symbol, summary)) return false;
+  if (hasExplicitTickerForm(symbol, text) || new RegExp(`\\b${symbol}\\b`).test(headline)) {
+    return true;
+  }
+  return false;
 }
 
 export function isRoundupArticle(headline: string, summary?: string): boolean {
@@ -224,17 +346,22 @@ export function resolveAllArticleSymbols(
   summary?: string,
   finnhubRelated?: string
 ): VerifiedTicker[] {
+  if (isRoundupArticle(headline, summary)) return [];
+  if (isNonTradableCompanyStockStory(headline, summary)) return [];
   if (!isLikelyStockNews(headline, summary) && !finnhubRelated) {
     return [];
   }
 
   const text = normalizeText(headline, summary);
-  const candidates = new Set(extractTickerCandidates(headline, summary));
+  const headlineCandidates = extractTickerCandidates(headline, summary);
+  const candidates = new Set(headlineCandidates);
 
   if (finnhubRelated) {
     for (const s of finnhubRelated.split(",")) {
       const sym = s.trim().toUpperCase();
-      if (isValidTickerFormat(sym) && !isFalsePositive(sym, text)) candidates.add(sym);
+      if (!isValidTickerFormat(sym) || isFalsePositive(sym, text)) continue;
+      if (!finnhubRelatedMentionedInCopy(sym, headline, summary, headlineCandidates)) continue;
+      candidates.add(sym);
     }
   }
 
@@ -242,6 +369,7 @@ export function resolveAllArticleSymbols(
 
   const scored: VerifiedTicker[] = [];
   for (const symbol of candidates) {
+    if (headlineSubjectConflictsWithSymbol(headline, symbol, summary)) continue;
     const score = scoreCandidate(symbol, headline, summary);
     if (score < 10) continue;
     if (isFalsePositive(symbol, text)) continue;
@@ -283,7 +411,18 @@ export async function verifyNewsArticle(
     preferredSymbol,
     options
   );
-  if (all.length === 0) {
+
+  if (isRoundupArticle(headline, summary)) {
+    return {
+      valid: false,
+      symbol: preferredSymbol || "",
+      confidence: 0,
+      reason: "roundup",
+    };
+  }
+
+  const singleStock = all.filter((c) => articleIsAboutSymbol(c.symbol, headline, summary));
+  if (singleStock.length === 0) {
     return {
       valid: false,
       symbol: preferredSymbol || "",
@@ -291,15 +430,22 @@ export async function verifyNewsArticle(
       reason: "no_ticker_found",
     };
   }
+  if (singleStock.length > 1) {
+    return {
+      valid: false,
+      symbol: preferredSymbol || "",
+      confidence: 0,
+      reason: "multi_ticker",
+    };
+  }
 
-  const primary = all[0];
-  const related = all.slice(1).map((t) => t.symbol);
+  const primary = singleStock[0];
   return {
     valid: true,
     symbol: primary.symbol,
     confidence: primary.confidence,
-    relatedSymbols: related,
-    isRoundup: related.length > 0 || isRoundupArticle(headline, summary),
+    relatedSymbols: [],
+    isRoundup: false,
   };
 }
 
@@ -317,12 +463,11 @@ export async function verifyAllArticleSymbols(
   const text = normalizeText(headline, summary);
 
   if (preferredSymbol && isValidTickerFormat(preferredSymbol) && !isFalsePositive(preferredSymbol, text)) {
-    const rawScore = scoreCandidate(preferredSymbol, headline, summary);
-    // Never invent a floor of 25 for weak preferred symbols (this caused RARE steak)
-    if (rawScore >= 10) {
+    if (articleIsAboutSymbol(preferredSymbol, headline, summary)) {
+      const rawScore = scoreCandidate(preferredSymbol, headline, summary);
       const pref: VerifiedTicker = {
         symbol: preferredSymbol,
-        confidence: Math.max(rawScore, 15),
+        confidence: Math.max(rawScore, 30),
         method: "preferred",
       };
       candidates = [pref, ...candidates.filter((c) => c.symbol !== preferredSymbol)];

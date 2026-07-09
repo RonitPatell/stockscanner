@@ -220,6 +220,45 @@ Without Redis, dev mode uses in-memory cache + local ingest loop (single machine
 
 ---
 
+## Email, push & daily briefs
+
+### Resend (email alerts + daily briefs)
+
+1. Sign up at [resend.com](https://resend.com) and create an API key
+2. Add to `.env` and Vercel:
+   ```
+   RESEND_API_KEY="re_..."
+   RESEND_FROM_EMAIL="TrustTicker <alerts@yourdomain.com>"
+   ```
+3. Verify your sending domain in Resend for production
+
+**What sends email:**
+- Catalyst alerts (when enabled in alert rules)
+- Welcome email on subscription
+- Morning brief (~7:30 AM ET) and EOD recap (~4:15 PM ET) via cron
+
+### Browser push (VAPID)
+
+VAPID keys are in `.env`. Users enable push in Settings or onboarding.
+
+Generate new keys anytime:
+```bash
+npx web-push generate-vapid-keys
+```
+
+### Brief cron (Vercel)
+
+`vercel.json` schedules:
+- `GET /api/cron/briefs?kind=morning` — weekdays 12:30 UTC (~7:30 AM ET)
+- `GET /api/cron/briefs?kind=eod` — weekdays 21:15 UTC (~4:15 PM ET)
+
+Test locally:
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "http://localhost:3000/api/cron/briefs?kind=morning"
+```
+
+---
+
 ## Revenue Math
 
 | Subscribers | Monthly Revenue | Your Profit (after Stripe) |

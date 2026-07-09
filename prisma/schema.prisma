@@ -26,6 +26,13 @@ model User {
   scannerFilters   Json?
   alertRules       Json?
   lastBriefSeenAt  DateTime?
+  onboardingCompleted Boolean @default(false)
+  emailAlertsEnabled Boolean @default(false)
+  emailBriefEnabled  Boolean @default(true)
+  pushSubscription Json?
+  welcomeEmailSent   Boolean @default(false)
+  lastMorningBriefSentAt DateTime?
+  lastEodBriefSentAt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]

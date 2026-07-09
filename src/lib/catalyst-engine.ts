@@ -3,15 +3,18 @@ import { analyzeNews } from "./ai";
 import {
   fetchMarketNews,
   fetchFastWireNews,
+  fetchUltraFastWireNews,
+  fetchExtendedWireNews,
   fetchQuote,
   fetchQuoteTrusted,
+  fetchQuoteLive,
   estimateHistoricalMove,
   isPlaceholderQuote,
   isValidTickerFormat,
   isTrustedNewsSource,
 } from "./market-data";
 import { computeRvol } from "./volume-utils";
-import { verifyNewsArticle, isRoundupArticle, isLikelyStockNews, isKnownFalsePositive } from "./news-verifier";
+import { verifyNewsArticle, isRoundupArticle, isLikelyStockNews, isKnownFalsePositive, articleIsAboutSymbol } from "./news-verifier";
 import { isMoverCatalyst, sortByRecency } from "./movers";
 import { dispatchWatchlistAlerts } from "./watchlist-alerts";
 import { storyClusterKey, attachStoryClusters } from "./story-cluster";
@@ -22,9 +25,11 @@ import { getCachedFeed, setCachedFeed, type FeedCacheKey } from "./feed-cache";
 import {
   getCachedQuotes,
   mergeQuotesIntoFeed,
+  refreshQuoteCache,
 } from "./quote-cache-service";
 import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
+import { getPriorityTickers } from "./priority-tickers";
 
 let lastIngestTime = 0;
 let lastPurgeTime = 0;
@@ -35,20 +40,21 @@ let ingestErrorStreak = 0;
 const lastGood = new Map<"all" | "movers", { ts: number; items: CatalystItem[] }>();
 const LAST_GOOD_TTL_MS = 3 * 60 * 1000;
 
-const WIRE_BURST_MS = 8_000;
+const WIRE_BURST_MS = 3_000;
 const FULL_INGEST_MS = 45_000;
 const MAX_NEW_INGEST_PER_CYCLE = 30;
-const MAX_WIRE_BURST_NEW = 20;
+const MAX_WIRE_BURST_NEW = 40;
 const INGEST_SCAN_WINDOW = 150;
 const MAX_CATALYSTS_SHOWN = 300;
 const MAX_NEWS_AGE_MS = 24 * 60 * 60 * 1000;
 const RECENT_NEWS_MS = 45 * 60 * 1000;
-const FEED_CACHE_MS = isScaleMode() ? 10_000 : 2_500;
+const FEED_CACHE_MS = isScaleMode() ? 1_500 : 2_500;
 
 /** Stock-impact news only — blocks lifestyle PR and false ticker matches */
 function isDisplayableCatalyst(c: CatalystItem): boolean {
   if (!isValidTickerFormat(c.symbol)) return false;
   if (!isLikelyStockNews(c.headline, c.aiSummary ?? undefined)) return false;
+  if (!articleIsAboutSymbol(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
   if (isKnownFalsePositive(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
   if (Date.now() - new Date(c.publishedAt).getTime() > MAX_NEWS_AGE_MS) return false;
   const hasPrice =
@@ -80,6 +86,55 @@ async function quoteWithTimeout<T>(
   ]);
 }
 
+async function resolveIngestQuote(
+  symbol: string,
+  articleId: string,
+  source: string,
+  wireOnly: boolean,
+  getQuote: (symbol: string, articleId: string, source: string) => Promise<Awaited<ReturnType<typeof fetchQuote>> | null>
+): Promise<Awaited<ReturnType<typeof fetchQuote>> | null> {
+  const cached = await getCachedQuotes([symbol]);
+  const hit = cached[symbol];
+  if (hit && hit.price > 0) {
+    return {
+      price: hit.price,
+      changePercent: hit.changePercent,
+      change: hit.change,
+      floatShares: null,
+      marketCap: null,
+    };
+  }
+
+  const timeoutMs = wireOnly ? 2_500 : 2_000;
+  const live =
+    (await quoteWithTimeout(() => fetchQuoteLive(symbol), timeoutMs)) ??
+    (wireOnly ? null : await getQuote(symbol, articleId, source));
+  return live;
+}
+
+async function enrichItemsWithQuotes(items: CatalystItem[]): Promise<CatalystItem[]> {
+  if (items.length === 0) return items;
+  const symbols = [...new Set(items.map((c) => c.symbol))];
+  let quotes = await getCachedQuotes(symbols);
+  const missing = symbols.filter((s) => !quotes[s]?.price);
+  if (missing.length > 0) {
+    await refreshQuoteCache(missing.slice(0, 16));
+    quotes = { ...(await getCachedQuotes(symbols)) };
+  }
+  return items.map((c) => {
+    const q = quotes[c.symbol];
+    if (!q?.price) return c;
+    const enriched = { ...c, price: q.price, changePercent: q.changePercent };
+    void prisma.catalyst
+      .update({
+        where: { id: c.id },
+        data: { price: q.price, changePercent: q.changePercent },
+      })
+      .catch(() => {});
+    return enriched;
+  });
+}
+
 /** Only remove items older than 24h — never re-purge recent headlines */
 async function purgeStaleCatalysts(): Promise<void> {
   try {
@@ -91,19 +146,27 @@ async function purgeStaleCatalysts(): Promise<void> {
   }
 }
 
+export interface IngestBatchResult {
+  items: CatalystItem[];
+  newCount: number;
+  newItems: CatalystItem[];
+}
+
 export async function ingestAndAnalyzeNews(
-  options: { fast?: boolean; wireOnly?: boolean } = {}
-): Promise<CatalystItem[]> {
+  options: { fast?: boolean; wireOnly?: boolean; articles?: NewsArticle[] } = {}
+): Promise<IngestBatchResult> {
   const wireOnly = options.wireOnly === true;
-  const news = wireOnly
-    ? await fetchFastWireNews()
-    : await fetchMarketNews({ fast: options.fast !== false });
+  const news =
+    options.articles ??
+    (wireOnly
+      ? await fetchFastWireNews()
+      : await fetchMarketNews({ fast: options.fast !== false }));
   const results: CatalystItem[] = [];
   const quoteCache = new Map<string, Awaited<ReturnType<typeof fetchQuote>>>();
   const cutoff = Date.now() - MAX_NEWS_AGE_MS;
+  const wireRecentCutoff = Date.now() - 45 * 60 * 1000;
   const maxNew = wireOnly ? MAX_WIRE_BURST_NEW : MAX_NEW_INGEST_PER_CYCLE;
-  const concurrency = wireOnly ? 10 : 5;
-  const quoteTimeoutMs = wireOnly ? 600 : 2000;
+  const concurrency = wireOnly ? 15 : 5;
 
   const getQuote = async (symbol: string, articleId: string, source: string) => {
     const cached = quoteCache.get(symbol);
@@ -163,15 +226,19 @@ export async function ingestAndAnalyzeNews(
     if (!verified.valid) return null;
 
     const symbol = verified.symbol;
+    if (!articleIsAboutSymbol(symbol, article.headline, article.summary)) return null;
     if (isKnownFalsePositive(symbol, article.headline, article.summary)) return null;
 
     const relatedSymbols = (verified.relatedSymbols ?? [])
       .filter((s) => s !== symbol)
       .slice(0, 10);
 
-    const quote = await quoteWithTimeout(
-      () => getQuote(symbol, article.id, article.source),
-      quoteTimeoutMs
+    const quote = await resolveIngestQuote(
+      symbol,
+      article.id,
+      article.source,
+      wireOnly,
+      getQuote
     );
 
     const analysis = await analyzeNews(
@@ -255,7 +322,8 @@ export async function ingestAndAnalyzeNews(
   const newItems: CatalystItem[] = [];
   const freshNews = news
     .filter((a) => a.publishedAt.getTime() >= cutoff)
-    .slice(0, INGEST_SCAN_WINDOW);
+    .filter((a) => !wireOnly || a.publishedAt.getTime() >= wireRecentCutoff)
+    .slice(0, wireOnly ? 80 : INGEST_SCAN_WINDOW);
 
   const ids = freshNews.map((a) => a.id);
   const existingIdSet = new Set<string>();
@@ -374,15 +442,51 @@ export async function ingestAndAnalyzeNews(
   ingestErrorStreak = 0;
 
   if (newItems.length > 0) {
+    const enriched = await enrichItemsWithQuotes(newItems);
+    newItems.length = 0;
+    newItems.push(...enriched);
     void dispatchWatchlistAlerts(newItems).catch(() => {});
   }
 
-  return rankMovers(results.filter(isDisplayableCatalyst), false);
+  const items = rankMovers(results.filter(isDisplayableCatalyst), false);
+  return { items, newCount: newItems.length, newItems };
 }
 
-/** Wire + RSS burst — runs every few seconds for near-real-time headlines */
-export async function ingestWireBurst(): Promise<CatalystItem[]> {
-  return ingestAndAnalyzeNews({ fast: true, wireOnly: true });
+/** Wire + RSS burst — ultra-fast sources first, extended sources in background */
+let extendedWireInFlight = false;
+
+async function runExtendedWireIngest(): Promise<void> {
+  if (extendedWireInFlight) return;
+  extendedWireInFlight = true;
+  try {
+    const priority = await getPriorityTickers();
+    const news = await fetchExtendedWireNews(priority);
+    const batch = await ingestAndAnalyzeNews({
+      fast: true,
+      wireOnly: true,
+      articles: news,
+    });
+    if (batch.newCount > 0) await prependToPublicFeedCache(batch.newItems);
+  } catch {
+    /* best effort */
+  } finally {
+    extendedWireInFlight = false;
+  }
+}
+
+export async function ingestWireBurst(): Promise<IngestBatchResult> {
+  const priority = await getPriorityTickers();
+  const ultra = await fetchUltraFastWireNews(priority);
+  const batch = await ingestAndAnalyzeNews({
+    fast: true,
+    wireOnly: true,
+    articles: ultra,
+  });
+  if (batch.newCount > 0) {
+    await prependToPublicFeedCache(batch.newItems);
+  }
+  void runExtendedWireIngest();
+  return batch;
 }
 
 async function buildFeedFromDatabase(
@@ -425,6 +529,44 @@ async function buildFeedFromDatabase(
   return items.slice(0, limit);
 }
 
+/** Fast path — prepend new wire items to Redis feed without full DB rebuild */
+async function prependToPublicFeedCache(newItems: CatalystItem[]): Promise<void> {
+  const enriched = await enrichItemsWithQuotes(newItems);
+  const displayable = enriched.filter(isDisplayableCatalyst);
+  if (displayable.length === 0) return;
+
+  const [{ items: existingAll }, { items: existingMovers }] = await Promise.all([
+    getCachedFeed("all"),
+    getCachedFeed("movers"),
+  ]);
+
+  const seen = new Set<string>();
+  const allMerged: CatalystItem[] = [];
+  for (const c of [...displayable, ...existingAll]) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    allMerged.push(c);
+    if (allMerged.length >= MAX_CATALYSTS_SHOWN) break;
+  }
+
+  const moverSeen = new Set<string>();
+  const moversMerged: CatalystItem[] = [];
+  for (const c of [...displayable.filter(isMoverCatalyst), ...existingMovers]) {
+    if (moverSeen.has(c.id)) continue;
+    moverSeen.add(c.id);
+    moversMerged.push(c);
+    if (moversMerged.length >= MAX_CATALYSTS_SHOWN) break;
+  }
+
+  await Promise.all([
+    setCachedFeed("all", allMerged),
+    setCachedFeed("movers", moversMerged),
+  ]);
+
+  lastGood.set("all", { ts: Date.now(), items: allMerged });
+  lastGood.set("movers", { ts: Date.now(), items: moversMerged });
+}
+
 /** Called by cron/worker after ingest — writes shared feed snapshot. */
 export async function refreshPublicFeedCache(): Promise<void> {
   const limit = MAX_CATALYSTS_SHOWN;
@@ -460,11 +602,9 @@ export async function getCatalysts(
 
   const shared = await getCachedFeed(cacheKey);
   if (shared.items.length > 0) {
-    const symbols = shared.items.map((c) => c.symbol);
-    const quotes = await getCachedQuotes(symbols);
-    const merged = mergeQuotesIntoFeed(shared.items, quotes).slice(0, limit);
-    lastGood.set(cacheKey, { ts: Date.now(), items: merged });
-    return merged;
+    const items = shared.items.slice(0, limit);
+    lastGood.set(cacheKey, { ts: Date.now(), items });
+    return items;
   }
 
   if (isScaleMode()) {
@@ -561,6 +701,14 @@ function mapCatalyst(c: {
     verifiedConfidence: c.verifiedConfidence ?? undefined,
     keyPoints: c.keyPoints?.length ? c.keyPoints : undefined,
     sourceTier: c.sourceTier ?? undefined,
+    ingestedAt: c.createdAt?.toISOString(),
+    ingestDelaySec:
+      c.createdAt != null
+        ? Math.max(
+            0,
+            Math.round((c.createdAt.getTime() - c.publishedAt.getTime()) / 1000)
+          )
+        : undefined,
   };
 }
 
@@ -577,17 +725,18 @@ function isPremarketHours(): boolean {
 
 let instantLoopStarted = false;
 function startInstantIngestLoop(): void {
-  if (isScaleMode()) return;
   if (instantLoopStarted) return;
+  // Production scale mode relies on cron/worker; local dev always runs the loop.
+  if (isScaleMode() && process.env.NODE_ENV === "production") return;
   instantLoopStarted = true;
 
   const wireTick = () =>
-    void ingestWireBurst()
-      .then(() => refreshPublicFeedCache())
-      .catch(() => {});
+    void ingestWireBurst().catch(() => {});
   const fullTick = () =>
     void ingestAndAnalyzeNews({ fast: true })
-      .then(() => refreshPublicFeedCache())
+      .then((batch) => {
+        if (batch.newCount > 0) return prependToPublicFeedCache(batch.newItems);
+      })
       .catch(() => {});
 
   wireTick();

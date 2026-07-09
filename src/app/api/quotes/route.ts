@@ -5,6 +5,16 @@ import { getCachedQuotes, refreshQuoteCache } from "@/lib/quote-cache-service";
 import { isScaleMode } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
+
+const ROUTE_BUDGET_MS = 8_000;
+
+async function withBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    fn(),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ROUTE_BUDGET_MS)),
+  ]);
+}
 
 /** Live prices — reads shared quote cache; no Finnhub per user in scale mode. */
 export async function GET(req: NextRequest) {
@@ -24,12 +34,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ quotes: {} });
     }
 
-    let quotes = await getCachedQuotes(symbols);
+    let quotes = await withBudget(
+      () => getCachedQuotes(symbols),
+      {} as Record<string, { price: number; changePercent: number; change: number }>
+    );
     const missing = symbols.filter((s) => !quotes[s]);
 
     if (missing.length > 0 && !isScaleMode()) {
-      await refreshQuoteCache(missing);
-      quotes = { ...(await getCachedQuotes(symbols)), ...quotes };
+      await withBudget(() => refreshQuoteCache(missing), 0);
+      quotes = {
+        ...(await withBudget(
+          () => getCachedQuotes(symbols),
+          {} as Record<string, { price: number; changePercent: number; change: number }>
+        )),
+        ...quotes,
+      };
     }
 
     if (Object.keys(quotes).length === 0 && !isScaleMode()) {
@@ -39,7 +58,7 @@ export async function GET(req: NextRequest) {
           try {
             const res = await fetch(
               `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(key)}`,
-              { cache: "no-store" }
+              { cache: "no-store", signal: AbortSignal.timeout(4_000) }
             );
             if (!res.ok) continue;
             const quote = await res.json();
@@ -63,6 +82,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Quotes API error:", error);
-    return NextResponse.json({ error: "Failed to fetch quotes" }, { status: 500 });
+    return NextResponse.json({ quotes: {}, error: "Failed to fetch quotes" }, { status: 200 });
   }
 }
