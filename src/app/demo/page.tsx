@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { DemoDashboard } from "@/components/demo/DemoDashboard";
-import { CheckoutButton } from "@/components/CheckoutButton";
 import { UserMenu } from "@/components/UserMenu";
 import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,9 @@ export default async function DemoPage() {
             {session ? (
               <>
                 {!isSubscribed && (
-                  <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
+                  <Link href="/pricing">
+                    <Button size="sm">See pricing</Button>
+                  </Link>
                 )}
                 <UserMenu />
               </>
