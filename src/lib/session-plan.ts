@@ -28,20 +28,35 @@ export interface SessionPlan {
   mantra: string;
 }
 
+/** Keep first occurrence per symbol (caller should sort preferred-first). */
+function uniqueBySymbol<T extends { c: CatalystItem }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const sym = row.c.symbol.toUpperCase();
+    if (seen.has(sym)) continue;
+    seen.add(sym);
+    out.push(row);
+  }
+  return out;
+}
+
 export async function buildSessionPlan(): Promise<SessionPlan> {
   const { items } = await getCachedFeed("all");
   const recent = items.slice(0, 80) as CatalystItem[];
 
   const scored = recent.map((c) => ({ c, playbook: buildActionPlaybook(c) }));
 
-  const setups = scored
-    .filter(
-      ({ playbook, c }) =>
-        (playbook.bias === "long" || playbook.bias === "short") &&
-        playbook.antiFomoScore < 70 &&
-        Math.abs(c.changePercent ?? 0) >= 1.5
-    )
-    .sort((a, b) => b.playbook.conviction - a.playbook.conviction)
+  const setups = uniqueBySymbol(
+    scored
+      .filter(
+        ({ playbook, c }) =>
+          (playbook.bias === "long" || playbook.bias === "short") &&
+          playbook.antiFomoScore < 70 &&
+          Math.abs(c.changePercent ?? 0) >= 1.5
+      )
+      .sort((a, b) => b.playbook.conviction - a.playbook.conviction)
+  )
     .slice(0, 3)
     .map(({ c, playbook }) => ({
       symbol: c.symbol,
@@ -54,13 +69,19 @@ export async function buildSessionPlan(): Promise<SessionPlan> {
       changePercent: c.changePercent,
     }));
 
-  const skips = scored
-    .filter(
-      ({ playbook, c }) =>
-        playbook.bias === "avoid" ||
-        playbook.antiFomoScore >= 75 ||
-        isDilutionCatalyst(c)
-    )
+  const setupSymbols = new Set(setups.map((s) => s.symbol.toUpperCase()));
+
+  const skips = uniqueBySymbol(
+    scored
+      .filter(
+        ({ playbook, c }) =>
+          !setupSymbols.has(c.symbol.toUpperCase()) &&
+          (playbook.bias === "avoid" ||
+            playbook.antiFomoScore >= 75 ||
+            isDilutionCatalyst(c))
+      )
+      .sort((a, b) => b.playbook.antiFomoScore - a.playbook.antiFomoScore)
+  )
     .slice(0, 2)
     .map(({ c, playbook }) => ({
       symbol: c.symbol,

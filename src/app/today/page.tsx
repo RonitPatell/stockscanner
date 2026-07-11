@@ -100,7 +100,7 @@ export default async function TodayPage() {
           ) : (
             <ul className="space-y-4">
               {plan.setups.map((s) => (
-                <li key={s.symbol + s.headline} className="border-b border-emerald-500/10 pb-3 last:border-0">
+                <li key={s.symbol} className="border-b border-emerald-500/10 pb-3 last:border-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Link
                       href={`/ticker/${s.symbol}`}
@@ -134,7 +134,7 @@ export default async function TodayPage() {
           ) : (
             <ul className="space-y-4">
               {plan.skips.map((s) => (
-                <li key={s.symbol + s.headline} className="border-b border-amber-500/10 pb-3 last:border-0">
+                <li key={s.symbol} className="border-b border-amber-500/10 pb-3 last:border-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Link
                       href={`/ticker/${s.symbol}`}

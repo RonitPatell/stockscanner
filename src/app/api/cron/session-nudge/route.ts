@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCachedFeed } from "@/lib/feed-cache";
-import { buildActionPlaybook, isDilutionCatalyst } from "@/lib/action-playbook";
+import { buildSessionPlan } from "@/lib/session-plan";
 import { sendPushNotification } from "@/lib/web-push";
-import type { CatalystItem } from "@/types";
 import type { PushSubscriptionJson } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
@@ -25,34 +23,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { items } = await getCachedFeed("all");
-  const recent = items.slice(0, 80) as CatalystItem[];
-  const scored = recent.map((c) => ({ c, playbook: buildActionPlaybook(c) }));
+  const plan = await buildSessionPlan();
 
-  const setups = scored
-    .filter(
-      ({ playbook, c }) =>
-        (playbook.bias === "long" || playbook.bias === "short") &&
-        playbook.antiFomoScore < 70 &&
-        Math.abs(c.changePercent ?? 0) >= 1.5
-    )
-    .sort((a, b) => b.playbook.conviction - a.playbook.conviction)
-    .slice(0, 3);
-
-  const skips = scored
-    .filter(
-      ({ c, playbook }) =>
-        isDilutionCatalyst(c) ||
-        playbook.bias === "avoid" ||
-        playbook.antiFomoScore >= 75
-    )
-    .slice(0, 2);
-
-  const setupLine = setups.length
-    ? setups.map((s) => `${s.c.symbol} ${s.playbook.bias}`).join(" · ")
+  const setupLine = plan.setups.length
+    ? plan.setups.map((s) => `${s.symbol} ${s.bias}`).join(" · ")
     : "No high-conviction setups yet — check the desk";
-  const skipLine = skips.length
-    ? `Skip: ${skips.map((s) => s.c.symbol).join(", ")}`
+  const skipLine = plan.skips.length
+    ? `Skip: ${plan.skips.map((s) => s.symbol).join(", ")}`
     : "No dilution skips flagged";
 
   const users = await prisma.user.findMany({
@@ -79,8 +56,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    setups: setups.length,
-    skips: skips.length,
+    setups: plan.setups.length,
+    skips: plan.skips.length,
     pushed: sent,
     finishedAt: new Date().toISOString(),
   });

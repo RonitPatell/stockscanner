@@ -58,7 +58,7 @@ export function SessionPlanCard({ className }: { className?: string }) {
             <Target className="w-3 h-3" /> Trade
           </div>
           {setups.map((s) => (
-            <div key={s.symbol + s.headline.slice(0, 12)} className="rounded border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+            <div key={s.symbol} className="rounded border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="font-mono font-bold text-white">{s.symbol}</span>
                 <span className="text-[9px] uppercase text-emerald-400">{s.bias}</span>
@@ -78,7 +78,7 @@ export function SessionPlanCard({ className }: { className?: string }) {
             <ListX className="w-3 h-3" /> Skip
           </div>
           {skips.map((s) => (
-            <div key={s.symbol + s.headline.slice(0, 12)} className="rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
+            <div key={s.symbol} className="rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="font-mono font-bold text-white">{s.symbol}</span>
                 <span className="text-[9px] text-amber-400 font-mono">FOMO {s.antiFomoScore}</span>
