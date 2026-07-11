@@ -24,6 +24,9 @@ import {
   SUBSCRIPTION_PRICE_MO,
   SUBSCRIPTION_ANNUAL_LABEL,
   SUBSCRIPTION_ANNUAL_SAVE,
+  SUBSCRIPTION_ANNUAL_SAVE_USD,
+  SUBSCRIPTION_ANNUAL_PER_MO_LABEL,
+  SUBSCRIPTION_ANNUAL_PRICE,
 } from "@/lib/stripe";
 
 const pillars = [
@@ -183,12 +186,12 @@ export default async function PricingPage({
               </Link>
             </div>
             <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5 text-left">
-              <p className="text-xs uppercase tracking-wide text-emerald-400 mb-2">Pro — $19.99/mo</p>
+              <p className="text-xs uppercase tracking-wide text-emerald-400 mb-2">Pro — live desk</p>
               <ul className="space-y-2 text-sm text-zinc-300">
                 <li>· Live wire feed + SSE (the real product)</li>
                 <li>· Alerts, dilution, Prop Desk, briefs</li>
-                <li>· Simple &amp; Advanced are just layout toggles</li>
-                <li>· Not a second paywall — both included in Pro</li>
+                <li>· Monthly ${SUBSCRIPTION_PRICE}/mo or annual ${SUBSCRIPTION_ANNUAL_PRICE}/yr</li>
+                <li>· Annual is cheaper — {SUBSCRIPTION_ANNUAL_SAVE} vs paying monthly</li>
               </ul>
             </div>
           </div>
@@ -214,93 +217,102 @@ export default async function PricingPage({
           </div>
 
           <div className="grid lg:grid-cols-5 gap-8 items-start">
-            <div className="lg:col-span-2 price-rise" style={{ animationDelay: "0.2s" }}>
-              <div className="rounded-2xl border border-emerald-500/35 bg-zinc-900/60 p-8 glow-emerald relative overflow-hidden sticky top-8">
-                <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wide">
-                  PRO
+            <div className="lg:col-span-2 space-y-4 price-rise sticky top-8" style={{ animationDelay: "0.2s" }}>
+              {/* Monthly */}
+              <div className="rounded-2xl border border-zinc-700/80 bg-zinc-900/60 p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-zinc-700 text-zinc-100 text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wide">
+                  MONTHLY
                 </div>
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-emerald-500/20 via-transparent to-transparent pointer-events-none" />
-
-                <div className="relative mb-6">
-                  <h2 className="text-xl font-bold mb-1 display-font">TrustTicker Pro</h2>
-                  <p className="text-sm text-zinc-400">Full desk · judgment · proof</p>
+                <div className="mb-4 pr-16">
+                  <h2 className="text-lg font-bold display-font">Pro Monthly</h2>
+                  <p className="text-sm text-zinc-400">Flexible · cancel anytime</p>
                 </div>
-
-                <div className="relative flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl sm:text-6xl font-extrabold tracking-tight">
-                    ${SUBSCRIPTION_PRICE}
-                  </span>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-4xl font-extrabold tracking-tight">${SUBSCRIPTION_PRICE}</span>
                   <span className="text-zinc-400">/mo</span>
                 </div>
-                <p className="relative text-sm text-emerald-400 mb-6">
+                <p className="text-xs text-zinc-500 mb-4">
+                  Billed monthly · ${Math.round(SUBSCRIPTION_PRICE * 12)}/yr if you stay all year
+                </p>
+                <p className="text-sm text-emerald-400 mb-5">
                   {trialAvailable
                     ? "7-day free trial included"
                     : "No trial — billed immediately at checkout"}
                 </p>
-
-                <div className="relative grid grid-cols-3 gap-2 mb-8">
-                  {[
-                    { label: "~2s", desc: "Wire cycle" },
-                    { label: "SSE", desc: "Live push" },
-                    { label: "ROI", desc: "Edge ledger" },
-                  ].map((h) => (
-                    <div
-                      key={h.label}
-                      className="rounded-lg border border-zinc-800 bg-zinc-950/70 px-2 py-2.5 text-center"
-                    >
-                      <div className="text-base font-bold text-emerald-400 font-mono">{h.label}</div>
-                      <div className="text-[9px] text-zinc-500 mt-0.5">{h.desc}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="relative mb-6 space-y-2">
-                  {session ? (
-                    <>
-                      <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="monthly">
-                        {trialAvailable ? "Start free trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
-                      </CheckoutButton>
-                      <CheckoutButton
-                        size="lg"
-                        className="w-full text-base border border-zinc-600 bg-transparent hover:bg-zinc-800"
-                        plan="annual"
-                        showIcon={false}
-                      >
-                        Founding annual — {SUBSCRIPTION_ANNUAL_LABEL} ({SUBSCRIPTION_ANNUAL_SAVE})
-                      </CheckoutButton>
-                    </>
-                  ) : (
-                    <>
-                      <Link href="/login?register=true&next=checkout" className="block">
-                        <Button size="lg" className="w-full text-base cta-glow">
-                          Create account & start trial
-                        </Button>
-                      </Link>
-                      <p className="text-[11px] text-zinc-500 text-center">
-                        After signup you can also lock {SUBSCRIPTION_ANNUAL_LABEL} at checkout
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                <div className="relative flex items-center gap-2 text-xs text-zinc-500 mb-2">
-                  <Zap className="w-3.5 h-3.5 text-emerald-500" />
-                  See → Skip → Prove — cancel anytime
-                </div>
-                <div className="relative flex items-center gap-2 text-xs text-zinc-500">
-                  <Bell className="w-3.5 h-3.5 text-emerald-500" />
-                  Discord · email · SMS · push · Chrome overlay
-                </div>
-
-                {!session && (
-                  <p className="relative text-center text-sm text-zinc-500 mt-6">
-                    Already have an account?{" "}
-                    <Link href="/login?next=checkout" className="text-emerald-400 hover:underline">
-                      Sign in
-                    </Link>
-                  </p>
+                {session ? (
+                  <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="monthly">
+                    {trialAvailable ? "Start free trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
+                  </CheckoutButton>
+                ) : (
+                  <Link href="/login?register=true&next=checkout" className="block">
+                    <Button size="lg" className="w-full text-base cta-glow">
+                      Create account & start trial
+                    </Button>
+                  </Link>
                 )}
               </div>
+
+              {/* Annual */}
+              <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 glow-emerald relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wide">
+                  BEST VALUE
+                </div>
+                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-emerald-500/15 via-transparent to-transparent pointer-events-none" />
+                <div className="relative mb-4 pr-20">
+                  <h2 className="text-lg font-bold display-font">Pro Annual</h2>
+                  <p className="text-sm text-zinc-400">Same Pro desk · cheaper by the year</p>
+                </div>
+                <div className="relative flex items-baseline gap-1 mb-1">
+                  <span className="text-4xl font-extrabold tracking-tight">
+                    ${SUBSCRIPTION_ANNUAL_PRICE}
+                  </span>
+                  <span className="text-zinc-400">/yr</span>
+                </div>
+                <p className="relative text-sm text-emerald-300 font-medium mb-1">
+                  {SUBSCRIPTION_ANNUAL_PER_MO_LABEL} effective · {SUBSCRIPTION_ANNUAL_SAVE}
+                </p>
+                <p className="relative text-xs text-zinc-400 mb-4">
+                  vs ${Math.round(SUBSCRIPTION_PRICE * 12)}/yr on monthly — you keep ~$
+                  {SUBSCRIPTION_ANNUAL_SAVE_USD} (about{" "}
+                  {Math.round(SUBSCRIPTION_ANNUAL_SAVE_USD / SUBSCRIPTION_PRICE)} months free)
+                </p>
+                <p className="relative text-sm text-emerald-400 mb-5">
+                  {trialAvailable
+                    ? "7-day free trial, then billed annually"
+                    : "Billed annually at checkout"}
+                </p>
+                {session ? (
+                  <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="annual">
+                    Lock annual — {SUBSCRIPTION_ANNUAL_LABEL}
+                  </CheckoutButton>
+                ) : (
+                  <Link href="/login?register=true&next=checkout" className="block">
+                    <Button size="lg" className="w-full text-base cta-glow">
+                      Create account & lock annual
+                    </Button>
+                  </Link>
+                )}
+                <p className="relative text-[11px] text-zinc-500 mt-3 text-center">
+                  Same features as monthly — just a lower effective rate
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
+                <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                See → Skip → Prove — cancel anytime
+              </div>
+              <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
+                <Bell className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                Discord · email · SMS · push · Chrome overlay
+              </div>
+              {!session && (
+                <p className="text-center text-sm text-zinc-500 px-1">
+                  Already have an account?{" "}
+                  <Link href="/login?next=checkout" className="text-emerald-400 hover:underline">
+                    Sign in
+                  </Link>
+                </p>
+              )}
             </div>
 
             <div className="lg:col-span-3 space-y-6 price-rise" style={{ animationDelay: "0.28s" }}>
