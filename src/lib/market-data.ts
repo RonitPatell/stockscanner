@@ -6,6 +6,7 @@ import { fetchGlobeNewswirePRs } from "./news-sources/globenewswire";
 import { fetchBusinessWirePRs } from "./news-sources/businesswire";
 import { fetchPrNewswirePRs } from "./news-sources/prnewswire";
 import { fetchMarketRssNews, fetchFastMarketRssNews, fetchSlowMarketRssNews, fetchYahooTickerNews } from "./news-sources/market-rss";
+import { fetchBenzingaApiNews } from "./news-sources/benzinga-api";
 import { finnhubFetch, finnhubFetchLive } from "./finnhub-queue";
 import { resolveFinnhubKey } from "./finnhub-key";
 import { isLikelyStockNews, resolveArticleSymbol, articleIsAboutSymbol } from "./news-verifier";
@@ -198,21 +199,22 @@ function dedupeWireArticles(articles: NewsArticle[], maxAgeMs: number): NewsArti
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 }
 
-/** Sub-3s sources — Benzinga RSS, fast market RSS, Yahoo watchlist, Finnhub market */
+/** Sub-3s sources — optional Benzinga API, RSS, Yahoo watchlist, Finnhub market */
 export async function fetchUltraFastWireNews(
   priorityTickers: string[]
 ): Promise<NewsArticle[]> {
   const key = resolveFinnhubKey();
-  const [marketRss, yahooNews, marketNews] = await Promise.all([
+  const [benzingaApi, marketRss, yahooNews, marketNews] = await Promise.all([
+    fetchBenzingaApiNews(50),
     fetchFastMarketRssNews(),
     fetchYahooTickerNews(32, priorityTickers),
     key ? fetchFinnhubMarketNews(key) : Promise.resolve([]),
   ]);
 
   return dedupeWireArticles(
-    [...marketRss, ...yahooNews, ...marketNews],
+    [...benzingaApi, ...marketRss, ...yahooNews, ...marketNews],
     2 * 60 * 60 * 1000
-  ).slice(0, 120);
+  ).slice(0, 140);
 }
 
 /** Slower PR wires + extended RSS + per-symbol Finnhub — runs in background */

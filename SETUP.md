@@ -200,15 +200,25 @@ TrustTicker uses a **single-writer ingest pipeline** so 1 or 1,000 users read th
 
 Ensure `CRON_SECRET` is set in Vercel env vars.
 
-### 3. Local dev worker (optional)
+### 3. Local / always-on wire worker (required for speed)
 
-With Redis configured but no Vercel cron locally:
+Vercel cron alone polls wire about once per minute. For ~2s cycles:
 
 ```bash
 npm run ingest:worker
 ```
 
-This hits `/api/cron/ingest` every 30s.
+Run this 24/7 on a cheap VPS / Railway / Fly (or your PC while testing).
+
+**True “couple seconds from publish”** needs a paid wire (free RSS cannot beat publisher lag). Cheapest realistic option: Benzinga News API trial/Essential — set `BENZINGA_API_KEY` in `.env`. Without it we still use Benzinga/MarketWatch/CNBC RSS + Finnhub (free, often tens of seconds behind).
+
+### 4. Live quotes without Redis
+
+```bash
+npm run quote:stream
+```
+
+If Upstash is unset, quotes POST to `/api/quotes/ingest` (memory mode on the Next server). Fresh Upstash Redis is still better for production multi-instance.
 
 ### Architecture
 

@@ -10,6 +10,7 @@ import { DailyEdgeRecap } from "./DailyEdgeRecap";
 import { SpeedEdgeLedger } from "./SpeedEdgeLedger";
 import { LiveQuoteProvider } from "./LiveQuoteProvider";
 import { TrustStatusBar } from "./TrustStatusBar";
+import { PlatformGuide } from "./PlatformGuide";
 import { cn } from "@/lib/utils";
 
 const TABS: { id: ScannerTab; label: string }[] = [
@@ -33,13 +34,21 @@ export function PropDesk({
   return (
     <LiveQuoteProvider>
       <div className="flex flex-col h-full min-h-0 gap-2">
-        <TrustStatusBar />
-        <DailyEdgeRecap />
+        <div data-guide="trust-status">
+          <TrustStatusBar />
+        </div>
+        <div data-guide="daily-edge">
+          <DailyEdgeRecap />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0 flex-1">
           <div className="lg:col-span-4 min-h-0 flex flex-col gap-2 overflow-y-auto">
-            <SessionPlanCard />
-            <DilutionRadar />
+            <div data-guide="session-plan">
+              <SessionPlanCard />
+            </div>
+            <div data-guide="dilution-radar">
+              <DilutionRadar />
+            </div>
             <div className="flex items-center gap-2 px-1">
               <button
                 type="button"
@@ -66,11 +75,16 @@ export function PropDesk({
                 My watchlist
               </button>
             </div>
-            <CallBoard watchlistOnly={watchlistCalls} />
+            <div data-guide="call-board">
+              <CallBoard watchlistOnly={watchlistCalls} />
+            </div>
             <SpeedEdgeLedger />
           </div>
 
-          <div className="lg:col-span-8 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden">
+          <div
+            data-guide="news-feed"
+            className="lg:col-span-8 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden"
+          >
             <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-800 bg-zinc-900/40 shrink-0">
               {TABS.map(({ id, label }) => (
                 <button
@@ -87,7 +101,9 @@ export function PropDesk({
                   {label}
                 </button>
               ))}
-              <span className="ml-auto text-[9px] text-zinc-600">j/k · Enter · w · 1/2/3 · /</span>
+              <span className="ml-auto text-[9px] text-zinc-600">
+                j/k · Enter · w · 1/2/3 · /
+              </span>
             </div>
             <LiveScanner
               embedded
@@ -99,6 +115,8 @@ export function PropDesk({
             />
           </div>
         </div>
+
+        <PlatformGuide surface="desk" />
       </div>
     </LiveQuoteProvider>
   );

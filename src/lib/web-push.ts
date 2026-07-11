@@ -19,28 +19,40 @@ export function getVapidPublicKey(): string | null {
   return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null;
 }
 
+export async function sendPushNotification(
+  subscription: PushSubscriptionJson,
+  payload: { title: string; body: string; url?: string; symbol?: string }
+): Promise<boolean> {
+  if (!configureVapid()) return false;
+  try {
+    await webpush.sendNotification(
+      subscription as unknown as Parameters<typeof webpush.sendNotification>[0],
+      JSON.stringify({
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || "/dashboard",
+        symbol: payload.symbol,
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendPushAlert(
   subscription: PushSubscriptionJson,
   catalyst: CatalystItem,
   ruleName?: string
 ): Promise<boolean> {
-  if (!configureVapid()) return false;
-
   const move =
     catalyst.changePercent != null
       ? `${catalyst.changePercent >= 0 ? "+" : ""}${catalyst.changePercent.toFixed(1)}%`
       : "";
-  const payload = JSON.stringify({
+  return sendPushNotification(subscription, {
     title: `${catalyst.symbol} ${move}`.trim(),
     body: `[${ruleName || "Alert"}] ${catalyst.headline.slice(0, 120)}`,
-    url: "/dashboard",
+    url: `/ticker/${encodeURIComponent(catalyst.symbol)}`,
     symbol: catalyst.symbol,
   });
-
-  try {
-    await webpush.sendNotification(subscription as unknown as Parameters<typeof webpush.sendNotification>[0], payload);
-    return true;
-  } catch {
-    return false;
-  }
 }

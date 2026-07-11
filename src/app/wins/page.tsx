@@ -8,6 +8,7 @@ import { SpeedWinCard, LiveProofStrip } from "@/components/LiveProofStrip";
 import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { CatchesBoard } from "@/components/CatchesBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,7 @@ export default async function WinsPage() {
         </div>
 
         <LiveProofStrip className="mb-10" />
+        <CatchesBoard className="mb-10" />
 
         {latency.sampleSize > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">

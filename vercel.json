@@ -9,6 +9,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/session-nudge",
+      "schedule": "25 12 * * 1-5"
+    },
+    {
       "path": "/api/cron/briefs?kind=morning",
       "schedule": "30 12 * * 1-5"
     },

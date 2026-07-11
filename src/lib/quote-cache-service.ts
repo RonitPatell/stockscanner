@@ -117,6 +117,14 @@ export async function touchLiveQuoteStreamTimestamp(): Promise<void> {
 /** @deprecated Use touchLiveQuoteStreamTimestamp */
 export const touchAlpacaLiveTimestamp = touchLiveQuoteStreamTimestamp;
 
+export async function mergeLiveQuotes(
+  quotes: Record<string, CachedQuote>
+): Promise<void> {
+  if (!quotes || Object.keys(quotes).length === 0) return;
+  await persistQuotes(quotes);
+  await touchLiveQuoteStreamTimestamp();
+}
+
 export async function isLiveQuoteStreamFresh(): Promise<boolean> {
   const redis = getRedis();
   if (redis) {
@@ -127,7 +135,8 @@ export async function isLiveQuoteStreamFresh(): Promise<boolean> {
       /* fall through */
     }
   }
-  return false;
+  const mem = memoryQuotes();
+  return mem.ts > 0 && Date.now() - mem.ts < LIVE_STREAM_FRESH_MS;
 }
 
 /** @deprecated Use isLiveQuoteStreamFresh */

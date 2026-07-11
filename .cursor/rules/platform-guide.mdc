@@ -1,0 +1,16 @@
+---
+description: Keep the in-app Platform Guide in sync when the dashboard or Prop Desk changes
+alwaysApply: true
+---
+
+# Platform Guide updates (required)
+
+Whenever you make a **major change** to the trading dashboard, Prop Desk, or primary panels traders see (add/remove/rename/reorder features like Wire Alerts, High Volume, Dilution Radar, Call Board, Daily Edge, feed tabs, etc.):
+
+1. Update `src/lib/platform-guide.ts`
+   - Edit `DASHBOARD_GUIDE_STEPS` and/or `DESK_GUIDE_STEPS` so copy matches the UI
+   - Bump `PLATFORM_GUIDE_VERSION`
+2. Ensure new panels have a matching `data-guide="..."` attribute if they should be spotlighted
+3. Keep language trader-plain (what it does + when to use it), not marketing fluff
+
+Do this in the same change set as the UI work — do not leave the Guide stale.

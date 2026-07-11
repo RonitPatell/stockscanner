@@ -15,7 +15,7 @@ import {
   getChangeColor,
 } from "@/lib/utils";
 import { formatRvol } from "@/lib/volume-utils";
-import { tradingViewUrl, finvizUrl } from "@/lib/chart-links";
+import { brokerDeepLinks, tradingViewUrl } from "@/lib/chart-links";
 import { CATALYST_TYPES } from "@/types";
 import {
   confidenceLabel,
@@ -377,22 +377,17 @@ export function CatalystCard({
       {expanded && (
         <div className="px-3 sm:px-4 pb-3 pt-0 border-t border-zinc-800/50 bg-zinc-950/40">
           <div className="flex flex-wrap items-center gap-2 py-2">
-            <a
-              href={tradingViewUrl(catalyst.symbol)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
-            >
-              TradingView
-            </a>
-            <a
-              href={finvizUrl(catalyst.symbol)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
-            >
-              Finviz
-            </a>
+            {brokerDeepLinks(catalyst.symbol).map((link) => (
+              <a
+                key={link.id}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
             {onWatchlistToggle && (
               <button
                 type="button"

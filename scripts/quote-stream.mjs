@@ -38,6 +38,13 @@ const FINNHUB_KEY = process.env.FINNHUB_API_KEY || "";
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || "";
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || "";
 const POLL_MS = Number(process.env.QUOTE_STREAM_MS || 1_200);
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(
+  /\/$/,
+  ""
+);
+const CRON_SECRET = process.env.CRON_SECRET || "";
+const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
+const USE_HTTP = !USE_REDIS;
 
 const QUOTES_KEY = "quotes:v2";
 const LIVE_STREAM_TS_KEY = "quotes:live:ts";
@@ -68,12 +75,20 @@ const CORE_SYMBOLS = [
   "VIX",
 ];
 
-if (!REDIS_URL || !REDIS_TOKEN) {
-  console.error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required.");
-  process.exit(1);
+if (USE_REDIS) {
+  console.log("Quote stream → Redis", QUOTES_KEY);
+} else {
+  console.log(
+    "Quote stream → HTTP",
+    `${APP_URL}/api/quotes/ingest`,
+    "(no Upstash — memory mode on Next server)"
+  );
+  if (!CRON_SECRET && process.env.NODE_ENV === "production") {
+    console.warn("CRON_SECRET missing — HTTP ingest may reject in production");
+  }
 }
 
-const redis = new Redis({ url: REDIS_URL, token: REDIS_TOKEN });
+const redis = USE_REDIS ? new Redis({ url: REDIS_URL, token: REDIS_TOKEN }) : null;
 
 let pendingQuotes = {};
 let flushTimer = null;
@@ -135,6 +150,24 @@ async function flushQuotes() {
 
   for (const sym of syms) {
     localQuotes[sym] = { ...(localQuotes[sym] || {}), ...batch[sym] };
+  }
+
+  if (USE_HTTP) {
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (CRON_SECRET) headers.Authorization = `Bearer ${CRON_SECRET}`;
+      const res = await fetch(`${APP_URL}/api/quotes/ingest`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ quotes: batch }),
+      });
+      if (!res.ok) {
+        console.error(new Date().toISOString(), "http ingest", res.status);
+      }
+    } catch (err) {
+      console.error(new Date().toISOString(), "http ingest error:", err?.message || err);
+    }
+    return;
   }
 
   if (Date.now() < redisDisabledUntil) return;
@@ -216,10 +249,25 @@ function rowToQuote(row) {
 async function loadWatchSymbols() {
   const out = new Set(CORE_SYMBOLS);
   try {
-    const feed = await redis.get(FEED_KEY);
-    if (Array.isArray(feed)) {
-      for (const row of feed.slice(0, 150)) {
-        if (row?.symbol) out.add(String(row.symbol).toUpperCase());
+    if (redis) {
+      const feed = await redis.get(FEED_KEY);
+      if (Array.isArray(feed)) {
+        for (const row of feed.slice(0, 150)) {
+          if (row?.symbol) out.add(String(row.symbol).toUpperCase());
+        }
+      }
+    } else {
+      const res = await fetch(`${APP_URL}/api/catalysts?limit=80`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : data?.items || data?.catalysts || [];
+        if (Array.isArray(items)) {
+          for (const row of items.slice(0, 150)) {
+            if (row?.symbol) out.add(String(row.symbol).toUpperCase());
+          }
+        }
       }
     }
   } catch {
@@ -352,14 +400,16 @@ function connectFinnhub() {
 }
 
 console.log(
-  `Quote stream → Redis (Yahoo${FINNHUB_KEY ? " + Finnhub WS" : ""}, poll ${POLL_MS}ms)`
+  `Quote stream → ${USE_REDIS ? "Redis" : "HTTP"} (Yahoo${FINNHUB_KEY ? " + Finnhub WS" : ""}, poll ${POLL_MS}ms)`
 );
 
-try {
-  const existing = (await redis.get(QUOTES_KEY)) || {};
-  if (existing && typeof existing === "object") localQuotes = existing;
-} catch {
-  /* start empty */
+if (redis) {
+  try {
+    const existing = (await redis.get(QUOTES_KEY)) || {};
+    if (existing && typeof existing === "object") localQuotes = existing;
+  } catch {
+    /* start empty */
+  }
 }
 
 void yahooPollLoop();
