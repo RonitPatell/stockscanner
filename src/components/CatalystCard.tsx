@@ -25,7 +25,11 @@ import {
 } from "@/lib/source-trust";
 import { setupTagMeta } from "@/lib/setup-tags";
 import { CatalystPlaybookPanel } from "./CatalystPlaybookPanel";
+import { ActionPlaybookCard } from "./ActionPlaybookCard";
+import { PaperTradeButtons } from "./PaperTradeLedger";
+import { PostCallButton } from "./CallBoard";
 import { pickLiveField, useLiveQuotesOptional } from "./LiveQuoteProvider";
+import { antiFomoClass, buildActionPlaybook } from "@/lib/action-playbook";
 
 interface CatalystCardProps {
   catalyst: CatalystItem;
@@ -34,6 +38,10 @@ interface CatalystCardProps {
   inWatchlist?: boolean;
   /** Static demo page — no API calls */
   demoMode?: boolean;
+  /** Keyboard focus highlight */
+  highlighted?: boolean;
+  /** Controlled expand from hotkeys */
+  forceExpanded?: boolean;
 }
 
 export function CatalystCard({
@@ -42,6 +50,8 @@ export function CatalystCard({
   onWatchlistToggle,
   inWatchlist,
   demoMode = false,
+  highlighted = false,
+  forceExpanded,
 }: CatalystCardProps) {
   const liveQuotes = useLiveQuotesOptional();
   const price = pickLiveField(catalyst.symbol, liveQuotes, "price", catalyst.price);
@@ -76,6 +86,11 @@ export function CatalystCard({
   const [showOriginal, setShowOriginal] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ageLabel, setAgeLabel] = useState("");
+
+  useEffect(() => {
+    if (forceExpanded === undefined) return;
+    setExpanded(forceExpanded);
+  }, [forceExpanded, catalyst.id]);
 
   useEffect(() => {
     setMounted(true);
@@ -178,6 +193,7 @@ export function CatalystCard({
         "border-b border-zinc-800/80 last:border-b-0 transition-colors",
         isNew && "bg-emerald-500/5",
         expanded && "bg-zinc-900/60",
+        highlighted && "ring-1 ring-inset ring-emerald-500/50 bg-emerald-500/5",
         inWatchlist && "ring-1 ring-inset ring-amber-500/20"
       )}
     >
@@ -300,6 +316,7 @@ export function CatalystCard({
                 {catalyst.newsCount} sources
               </span>
             )}
+            <FomoBadge catalyst={catalyst} changePercent={changePercent} rVol={rVol} floatShares={floatShares} />
           </div>
           {translatedHeadline && (
             <div className="mt-0.5">
@@ -390,7 +407,32 @@ export function CatalystCard({
                 {inWatchlist ? "★ On watchlist" : "☆ Add to watchlist"}
               </button>
             )}
+            {!demoMode && (
+              <>
+                <PaperTradeButtons
+                  catalystId={catalyst.id}
+                  symbol={catalyst.symbol}
+                  headline={catalyst.headline}
+                  price={price}
+                  changePercent={changePercent}
+                />
+                <PostCallButton symbol={catalyst.symbol} headline={catalyst.headline} bias="long" />
+                <PostCallButton symbol={catalyst.symbol} headline={catalyst.headline} bias="short" />
+              </>
+            )}
           </div>
+
+          <ActionPlaybookCard
+            catalyst={{
+              ...catalyst,
+              price,
+              changePercent,
+              rVol,
+              floatShares,
+              marketCap,
+            }}
+            className="mb-2"
+          />
 
           <CatalystPlaybookPanel
             catalystType={catalyst.catalystType}
@@ -539,5 +581,39 @@ export function CatalystCard({
         </div>
       )}
     </div>
+  );
+}
+
+function FomoBadge({
+  catalyst,
+  changePercent,
+  rVol,
+  floatShares,
+}: {
+  catalyst: CatalystItem;
+  changePercent: number | null | undefined;
+  rVol: number | null | undefined;
+  floatShares: number | null | undefined;
+}) {
+  const playbook = useMemo(
+    () =>
+      buildActionPlaybook({
+        ...catalyst,
+        changePercent: changePercent ?? catalyst.changePercent,
+        rVol: rVol ?? catalyst.rVol,
+        floatShares: floatShares ?? catalyst.floatShares,
+      }),
+    [catalyst, changePercent, rVol, floatShares]
+  );
+  if (playbook.antiFomoScore < 55) return null;
+  return (
+    <span
+      className={cn(
+        "text-[8px] px-1 py-0 rounded border font-mono",
+        antiFomoClass(playbook.antiFomoScore)
+      )}
+    >
+      FOMO {playbook.antiFomoScore}
+    </span>
   );
 }

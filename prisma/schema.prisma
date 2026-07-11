@@ -36,6 +36,7 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]
+  traderCalls      TraderCall[]
 }
 
 model Catalyst {
@@ -90,4 +91,22 @@ model AlertLog {
   @@index([userId])
   @@index([catalystId])
   @@unique([userId, catalystId, channel])
+}
+
+// Prop-style call board — who called the ticker first
+model TraderCall {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName String   @default("Trader")
+  symbol      String
+  bias        String   // long, short, avoid, watch
+  headline    String?
+  note        String?
+  priceAtCall Float?
+  changeAtCall Float?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([symbol])
 }

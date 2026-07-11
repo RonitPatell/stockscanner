@@ -10,6 +10,16 @@ import { PremarketCenter } from "./PremarketCenter";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { SessionRecap } from "./SessionRecap";
 import { SpeedWinsPanel } from "./SpeedWinsPanel";
+import { SpeedEdgeLedger } from "./SpeedEdgeLedger";
+import { DilutionRadar } from "./DilutionRadar";
+import { WatchlistAutopsy } from "./WatchlistAutopsy";
+import { SessionPlanCard } from "./SessionPlanCard";
+import { PaperTradeLedger } from "./PaperTradeLedger";
+import { SympathyMapPanel } from "./SympathyMapPanel";
+import { CatalystReplayPanel } from "./CatalystReplayPanel";
+import { DailyEdgeRecap } from "./DailyEdgeRecap";
+import { SpeedBacktestPanel } from "./SpeedBacktestPanel";
+import { CallBoard } from "./CallBoard";
 import { AlertSetupNudge } from "./AlertSetupNudge";
 import { LiveQuoteProvider } from "./LiveQuoteProvider";
 import { MarketMonitor } from "./MarketMonitor";
@@ -51,16 +61,30 @@ export function TradingDashboard({
 
       <TrustStatusBar />
       <AlertSetupNudge />
+      <DailyEdgeRecap />
+      <SessionPlanCard />
       <SessionRecap />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0 flex-1">
-        <div className="lg:col-span-7 min-h-0 flex flex-col gap-2">
+        <div className="lg:col-span-7 min-h-0 flex flex-col gap-2 overflow-y-auto">
           <PremarketCenter />
-          <MarketMonitor className="flex-[1.7] min-h-[380px] lg:min-h-0" />
+          <MarketMonitor className="flex-[1.7] min-h-[320px] lg:min-h-0" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 shrink-0">
             <SpeedWinsPanel showViewAll />
             <WatchlistBrief />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 shrink-0">
+            <DilutionRadar />
+            <WatchlistAutopsy symbols={initialWatchlist} />
+          </div>
+          <SympathyMapPanel seedSymbol={initialWatchlist[0]} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 shrink-0">
+            <CatalystReplayPanel />
+            <CallBoard />
+          </div>
+          <SpeedBacktestPanel />
+          <SpeedEdgeLedger />
+          <PaperTradeLedger />
         </div>
 
         <div className="lg:col-span-5 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden">
@@ -81,10 +105,12 @@ export function TradingDashboard({
                 {label}
               </button>
             ))}
+            <span className="ml-auto text-[9px] text-zinc-600 hidden sm:inline">j/k · Enter · /</span>
           </div>
           <LiveScanner
             embedded
             tab={tab}
+            onTabChange={setTab}
             initialCatalysts={initialCatalysts}
             initialWatchlist={initialWatchlist}
             initialFilters={initialFilters}

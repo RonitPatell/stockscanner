@@ -43,12 +43,14 @@ async function safeJsonFetch<T>(url: string): Promise<T | null> {
 export function LiveScanner({
   embedded = false,
   tab = "all",
+  onTabChange,
   initialCatalysts = [],
   initialWatchlist = [],
   initialFilters = null,
 }: {
   embedded?: boolean;
   tab?: ScannerTab;
+  onTabChange?: (tab: ScannerTab) => void;
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
   initialFilters?: ScannerFilters | null;
@@ -65,6 +67,10 @@ export function LiveScanner({
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [moversOnly, setMoversOnly] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>(initialWatchlist);
+  const [focusIndex, setFocusIndex] = useState(0);
+  const [hotkeyExpanded, setHotkeyExpanded] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const prevSymbolsRef = useRef<Set<string>>(
     new Set(initialCatalysts.map((c) => c.symbol))
   );
@@ -251,6 +257,88 @@ export function LiveScanner({
     })
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
+  useEffect(() => {
+    setFocusIndex(0);
+    setHotkeyExpanded(false);
+  }, [tab, moversOnly, filters.search]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        if (e.key === "Escape") el.blur();
+        return;
+      }
+
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowFilters(true);
+        requestAnimationFrame(() => searchRef.current?.focus());
+        return;
+      }
+      if (e.key === "1" && onTabChange) {
+        e.preventDefault();
+        onTabChange("all");
+        return;
+      }
+      if (e.key === "2" && onTabChange) {
+        e.preventDefault();
+        onTabChange("premarket");
+        return;
+      }
+      if (e.key === "3" && onTabChange) {
+        e.preventDefault();
+        onTabChange("watchlist");
+        return;
+      }
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        setMoversOnly((v) => !v);
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        setShowFilters((v) => !v);
+        return;
+      }
+      if (filtered.length === 0) return;
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.min(filtered.length - 1, i + 1));
+        setHotkeyExpanded(false);
+        return;
+      }
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.max(0, i - 1));
+        setHotkeyExpanded(false);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        setHotkeyExpanded((v) => !v);
+        return;
+      }
+      if ((e.key === "w" || e.key === "W") && filtered[focusIndex]) {
+        e.preventDefault();
+        void toggleWatchlist(filtered[focusIndex].symbol);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  useEffect(() => {
+    const row = listRef.current?.querySelector(`[data-focus-idx="${focusIndex}"]`);
+    row?.scrollIntoView({ block: "nearest" });
+  }, [focusIndex]);
+
   const isPremarket = catalysts.some((c) => c.isPremarket);
   const tabLabel =
     tab === "premarket" ? "Premarket" : tab === "watchlist" ? "Watchlist" : "News Feed";
@@ -387,8 +475,9 @@ export function LiveScanner({
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
             <input
+              ref={searchRef}
               type="text"
-              placeholder="Search ticker or headline..."
+              placeholder="Search ticker or headline... (/)"
               className="w-full pl-8 pr-3 py-1.5 rounded-md bg-zinc-800/80 border border-zinc-700/80 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               value={filters.search || ""}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -515,15 +604,18 @@ export function LiveScanner({
             </p>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {filtered.map((catalyst) => (
-              <CatalystCard
-                key={`${catalyst.id}-${catalyst.symbol}`}
-                catalyst={catalyst}
-                isNew={newSymbols.has(catalyst.symbol)}
-                inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
-                onWatchlistToggle={toggleWatchlist}
-              />
+          <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto">
+            {filtered.map((catalyst, idx) => (
+              <div key={`${catalyst.id}-${catalyst.symbol}`} data-focus-idx={idx}>
+                <CatalystCard
+                  catalyst={catalyst}
+                  isNew={newSymbols.has(catalyst.symbol)}
+                  inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
+                  onWatchlistToggle={toggleWatchlist}
+                  highlighted={idx === focusIndex}
+                  forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -531,7 +623,7 @@ export function LiveScanner({
 
       {embedded && (
         <p className="text-[9px] text-zinc-600 text-center shrink-0 px-2 pb-1">
-          Click ticker → TradingView chart · expand row for Finviz &amp; watchlist
+          j/k navigate · Enter expand · w watchlist · 1/2/3 tabs · / search · m movers
         </p>
       )}
     </div>

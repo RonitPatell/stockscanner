@@ -106,6 +106,12 @@ export default async function DashboardPage({
           <div className="flex items-center gap-2">
             {session ? (
               <>
+                <Link
+                  href="/desk"
+                  className="text-[11px] text-orange-300/90 hover:text-orange-200 hidden sm:inline"
+                >
+                  Prop Desk
+                </Link>
                 {!isSubscribed && (
                   <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
                 )}

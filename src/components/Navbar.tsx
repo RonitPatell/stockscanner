@@ -41,7 +41,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group transition-transform duration-200 active:scale-[0.98]">
           <LogoMark className="w-8 h-8 group-hover:shadow-emerald-500/50" />
-          <span className="font-bold text-lg tracking-tight">
+          <span className="font-bold text-lg tracking-tight" style={{ fontFamily: "var(--font-display), var(--font-geist-sans), system-ui, sans-serif" }}>
             Trust<span className="text-emerald-400">Ticker</span>
           </span>
         </Link>
@@ -64,7 +64,10 @@ export function Navbar() {
                 <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
               )}
               {isSubscribed && (
-                <Link href="/dashboard" className="hover:text-zinc-100 transition-colors">Scanner</Link>
+                <>
+                  <Link href="/dashboard" className="hover:text-zinc-100 transition-colors">Scanner</Link>
+                  <Link href="/desk" className="hover:text-zinc-100 transition-colors">Prop Desk</Link>
+                </>
               )}
             </>
           )}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        margin: 0;
+        padding: 12px;
+        width: 260px;
+        background: #09090b;
+        color: #e4e4e7;
+      }
+      h1 {
+        font-size: 13px;
+        margin: 0 0 8px;
+        color: #34d399;
+      }
+      button {
+        width: 100%;
+        margin-top: 6px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #27272a;
+        background: #18181b;
+        color: #fafafa;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      button:hover {
+        border-color: #34d399;
+      }
+      .muted {
+        font-size: 10px;
+        color: #71717a;
+        margin-top: 8px;
+        line-height: 1.4;
+      }
+      #sym {
+        font-family: ui-monospace, monospace;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TrustTicker Overlay</h1>
+    <div>Chart ticker: <span id="sym">—</span></div>
+    <button id="openDash">Open ticker page</button>
+    <button id="openDemo">Open scanner</button>
+    <button id="openWins">Speed wins / proof</button>
+    <div id="sympathy"></div>
+    <p class="muted">
+      Detects NASDAQ:XYZ from TradingView URL/title. Load via chrome://extensions → Load unpacked
+      → <code>extensions/trustticker-overlay</code>.
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>

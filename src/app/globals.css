@@ -75,7 +75,7 @@ body {
 @keyframes landing-fade-up-keyframes {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -84,11 +84,182 @@ body {
 }
 
 .landing-fade-up {
-  animation: landing-fade-up-keyframes 0.7s ease-out both;
+  animation: landing-fade-up-keyframes 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.landing-delay-1 { animation-delay: 0.1s; }
-.landing-delay-2 { animation-delay: 0.2s; }
-.landing-delay-3 { animation-delay: 0.3s; }
-.landing-delay-4 { animation-delay: 0.4s; }
-.landing-delay-5 { animation-delay: 0.55s; }
+.landing-delay-1 { animation-delay: 0.08s; }
+.landing-delay-2 { animation-delay: 0.16s; }
+.landing-delay-3 { animation-delay: 0.26s; }
+.landing-delay-4 { animation-delay: 0.38s; }
+.landing-delay-5 { animation-delay: 0.52s; }
+
+/* Marketing surface */
+.marketing-shell {
+  font-family: var(--font-marketing), var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.marketing-shell h1,
+.marketing-shell h2,
+.marketing-shell h3,
+.marketing-shell .display-font {
+  font-family: var(--font-display), var(--font-marketing), system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.reveal-base {
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(6px);
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+@keyframes hero-aurora {
+  0%, 100% { transform: translate(-8%, -4%) scale(1); opacity: 0.55; }
+  50% { transform: translate(6%, 6%) scale(1.12); opacity: 0.85; }
+}
+
+@keyframes hero-aurora-2 {
+  0%, 100% { transform: translate(10%, 0%) scale(1.05); opacity: 0.35; }
+  50% { transform: translate(-12%, 8%) scale(1.15); opacity: 0.6; }
+}
+
+.hero-aurora {
+  animation: hero-aurora 14s ease-in-out infinite;
+}
+
+.hero-aurora-2 {
+  animation: hero-aurora-2 18s ease-in-out infinite;
+}
+
+@keyframes hero-scanline {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 0.35; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+.hero-scanline {
+  animation: hero-scanline 7s linear infinite;
+}
+
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.hero-stage-float {
+  animation: hero-float 7s ease-in-out infinite;
+}
+
+@keyframes hero-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+  70% { box-shadow: 0 0 0 18px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.hero-stage-pulse {
+  animation: hero-pulse-ring 0.7s ease-out;
+}
+
+@keyframes hero-scan-bar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.hero-scan-bar {
+  animation: hero-scan-bar 3s linear;
+}
+
+@keyframes hero-row-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.hero-row-in {
+  animation: hero-row-in 0.45s ease-out both;
+}
+
+@keyframes shimmer-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    110deg,
+    #34d399 0%,
+    #ecfdf5 25%,
+    #34d399 50%,
+    #6ee7b7 75%,
+    #34d399 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 4.5s linear infinite;
+}
+
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.orbit-ring {
+  animation: orbit-spin 40s linear infinite;
+}
+
+@keyframes cta-glow {
+  0%, 100% { box-shadow: 0 0 24px rgba(16, 185, 129, 0.25); }
+  50% { box-shadow: 0 0 48px rgba(16, 185, 129, 0.45); }
+}
+
+.cta-glow {
+  animation: cta-glow 3s ease-in-out infinite;
+}
+
+@keyframes price-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.price-rise {
+  animation: price-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade-up,
+  .hero-aurora,
+  .hero-aurora-2,
+  .hero-scanline,
+  .hero-stage-float,
+  .hero-stage-pulse,
+  .hero-scan-bar,
+  .hero-row-in,
+  .shimmer-text,
+  .orbit-ring,
+  .cta-glow,
+  .price-rise,
+  .animate-marquee {
+    animation: none !important;
+  }
+
+  .reveal-base {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  .shimmer-text {
+    -webkit-text-fill-color: #34d399;
+    color: #34d399;
+  }
+}

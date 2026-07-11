@@ -1,76 +1,104 @@
 import Link from "next/link";
 import {
   Zap,
-  Brain,
-  Bell,
   Shield,
-  BarChart3,
-  Radio,
   ArrowRight,
   Check,
   Star,
-  Sparkles,
   Target,
   LineChart,
   Users,
   Layers,
   Newspaper,
-  BadgeCheck,
+  ShieldAlert,
+  Megaphone,
+  FlaskConical,
+  Map,
+  Keyboard,
+  Crosshair,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { TickerMarquee } from "./TickerMarquee";
 import { LiveProofStrip } from "@/components/LiveProofStrip";
+import { SpeedEdgeHeroStat } from "@/components/SpeedEdgeLedger";
+import { Reveal } from "./Reveal";
+import { HeroProductStage } from "./HeroProductStage";
+import { SUBSCRIPTION_PRICE_MO } from "@/lib/stripe";
 
 const features = [
   {
-    icon: Radio,
-    title: "Near-Real-Time Feed",
+    icon: Gauge,
+    title: "Wire-speed ingest",
     description:
-      "Wire hits ingested on ~8s cycles and pushed to your dashboard instantly via SSE. Stock-impact headlines only — no filler.",
-    accent: "from-emerald-500/20 to-cyan-500/10",
-  },
-  {
-    icon: Layers,
-    title: "Story Clustering",
-    description:
-      "The same PR on three wires becomes one clean card. See how many sources picked it up without reading duplicates.",
-    accent: "from-violet-500/20 to-fuchsia-500/10",
-  },
-  {
-    icon: Newspaper,
-    title: "Watchlist Briefs",
-    description:
-      "Morning brief and EOD recap for your tickers. Walk into the session knowing what moved overnight on your names.",
-    accent: "from-amber-500/20 to-orange-500/10",
-  },
-  {
-    icon: Bell,
-    title: "Pro Alert Rules",
-    description:
-      "Trader-grade triggers: HOD breaks, VWAP, float size, relative volume, and news urgency. Discord webhooks included.",
-    accent: "from-cyan-500/20 to-blue-500/10",
+      "Headlines land on ~2s wire cycles and push to your desk over SSE. Live-race proof: under-3-minute catches you can audit on /wins.",
   },
   {
     icon: Target,
-    title: "Setup Tags",
+    title: "Action playbooks",
     description:
-      "Gapper, sympathy, sector momentum, heavy volume — auto-tagged so you spot the play type in one glance.",
-    accent: "from-emerald-500/20 to-teal-500/10",
+      "Every catalyst expands into Long / Short / Watch / Skip with invalidation. Anti-FOMO scoring keeps you out of garbage entries.",
   },
   {
-    icon: BadgeCheck,
-    title: "Trust Signals",
+    icon: ShieldAlert,
+    title: "Dilution radar",
     description:
-      "Source tier badges, ingest latency per headline, and a live trust bar showing feed freshness.",
-    accent: "from-rose-500/20 to-pink-500/10",
+      "Offerings and ATM traps surface before you chase the green candle. Skip the move that was never yours.",
   },
   {
-    icon: Brain,
-    title: "Catalyst Playbooks",
+    icon: FlaskConical,
+    title: "Speed edge ledger",
     description:
-      "Float-bucket stats: avg 30m move, gap rate, win rate, and trader playbooks for FDA, offerings, earnings, and more.",
-    accent: "from-indigo-500/20 to-purple-500/10",
+      "Paper P&L if you acted at ingest vs +3 minutes — plus verified 1-minute candle backtests when bars are available.",
+  },
+  {
+    icon: Megaphone,
+    title: "Call board & Prop Desk",
+    description:
+      "Prop-style shared calls, watchlist-filtered alerts, and a focused /desk layout built for session intensity.",
+  },
+  {
+    icon: Map,
+    title: "Sympathy map & replay",
+    description:
+      "See linked names light up with the hub ticker, then scrub a 12-hour catalyst replay to study the tape.",
+  },
+  {
+    icon: Crosshair,
+    title: "Session plan & autopsy",
+    description:
+      "Three setups and two skips before the open. After the close, watchlist autopsy shows what you missed or overtraded.",
+  },
+  {
+    icon: Newspaper,
+    title: "Briefs with daily edge",
+    description:
+      "Morning + EOD emails for your watchlist. EOD now includes a Daily Edge Recap so Pro’s $19.99 is measurable.",
+  },
+  {
+    icon: Keyboard,
+    title: "Trader hotkeys",
+    description:
+      "j/k navigate, Enter expand, w watchlist, 1/2/3 tabs, / search — desk speed without leaving the keyboard.",
+  },
+];
+
+const loop = [
+  {
+    step: "01",
+    title: "See it first",
+    body: "Wire hits, clustering, and trust tiers land in the feed before social noise catches up.",
+  },
+  {
+    step: "02",
+    title: "Skip the traps",
+    body: "Playbooks, anti-FOMO, and dilution radar tell you when not to press the button.",
+  },
+  {
+    step: "03",
+    title: "Prove the edge",
+    body: "Paper trades, speed ledger, candle backtests, and EOD edge math show whether Pro paid for itself.",
   },
 ];
 
@@ -90,10 +118,10 @@ const testimonials = [
     role: "Small-cap specialist",
     location: "Chicago, IL",
     avatar: "SK",
-    color: "bg-violet-500/20 text-violet-300",
+    color: "bg-teal-500/20 text-teal-300",
     quote:
-      "Wire alerts + heavy volume panel replaced my morning routine. I know what's actually moving before I even open my broker. Paid for itself week one.",
-    highlight: "Paid for itself week one",
+      "Dilution radar alone saved me from two offering traps last week. The speed edge ledger made $19.99 feel obvious.",
+    highlight: "Avoided offering traps",
   },
   {
     name: "James R.",
@@ -102,7 +130,7 @@ const testimonials = [
     avatar: "JR",
     color: "bg-cyan-500/20 text-cyan-300",
     quote:
-      "Cleaner than anything I've used under $200/mo. The sentiment score stops me from FOMO-ing into headlines that sound huge but aren't tradeable.",
+      "Playbooks stop me from FOMO-ing into headlines that sound huge but aren't tradeable. Cleaner than anything I've used under $200/mo.",
     highlight: "Stops bad FOMO entries",
   },
   {
@@ -112,8 +140,8 @@ const testimonials = [
     avatar: "PM",
     color: "bg-amber-500/20 text-amber-300",
     quote:
-      "Float on every card is underrated. I stopped wasting time on catalysts that can't move the stock. My win rate on news plays went up noticeably.",
-    highlight: "Better news play win rate",
+      "Prop Desk + hotkeys feel like a real desk. Call board keeps our group synced without another Discord bot mess.",
+    highlight: "Desk-grade workflow",
   },
   {
     name: "Derek W.",
@@ -122,7 +150,7 @@ const testimonials = [
     avatar: "DW",
     color: "bg-rose-500/20 text-rose-300",
     quote:
-      "Feels like a Bloomberg news lane built for speed traders. Discord webhook to my server means my whole group sees the same catalyst at the same time.",
+      "Feels like a Bloomberg news lane built for speed traders. Sympathy map is the feature I didn't know I needed.",
     highlight: "Whole team synced",
   },
   {
@@ -130,28 +158,10 @@ const testimonials = [
     role: "Part-time trader",
     location: "Seattle, WA",
     avatar: "EV",
-    color: "bg-blue-500/20 text-blue-300",
+    color: "bg-sky-500/20 text-sky-300",
     quote:
-      "I trade after my 9–5. Premarket flags and the historical context on similar catalysts help me decide in seconds whether to size in or pass.",
-    highlight: "Perfect for after-hours traders",
-  },
-];
-
-const steps = [
-  {
-    step: "01",
-    title: "News breaks",
-    body: "GlobeNewswire, Business Wire, SEC filings, and market feeds ingested on fast wire cycles — filtered to real stock-impact headlines only.",
-  },
-  {
-    step: "02",
-    title: "We enrich it",
-    body: "AI sentiment, setup tags, story clustering, source trust, and float context attach before the headline ever hits your feed.",
-  },
-  {
-    step: "03",
-    title: "You react first",
-    body: "Live scanner, watchlist briefs, pro alert rules, and Discord pings surface what matters before the crowd catches on.",
+      "I trade after my 9–5. Session plan + EOD edge recap tell me in sixty seconds whether I earned the subscription.",
+    highlight: "Perfect after hours",
   },
 ];
 
@@ -166,78 +176,76 @@ export function MarketingLanding({
   const scannerHref = isSubscribed ? "/dashboard" : "/demo";
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      {/* Hero */}
-      <section className="relative pt-28 sm:pt-32 pb-16 sm:pb-24 px-4 sm:px-6">
-        <div className="absolute inset-0 grid-bg" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute top-40 right-0 w-[400px] h-[400px] bg-violet-600/8 rounded-full blur-[100px] pointer-events-none" />
+    <div className="marketing-shell min-h-screen overflow-x-hidden">
+      {/* Hero — one composition */}
+      <section className="relative min-h-[100svh] flex flex-col justify-center pt-24 sm:pt-28 pb-16 px-4 sm:px-6">
+        <div className="absolute inset-0 grid-bg opacity-70" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_55%)]" />
+        <div className="hero-aurora absolute top-[-10%] left-[10%] w-[55vw] h-[55vw] max-w-[640px] max-h-[640px] rounded-full bg-emerald-500/20 blur-[100px] pointer-events-none" />
+        <div className="hero-aurora-2 absolute bottom-[5%] right-[-5%] w-[45vw] h-[45vw] max-w-[520px] max-h-[520px] rounded-full bg-cyan-500/10 blur-[110px] pointer-events-none" />
+        <div className="hero-scanline absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-400/10 to-transparent pointer-events-none" />
 
-        <div className="relative max-w-6xl mx-auto">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-sm mb-8 landing-fade-up">
-              <Sparkles className="w-4 h-4" />
-              {isSignedIn
-                ? `Welcome back, ${displayName}`
-                : "Pro-grade catalyst intelligence · $19.99/mo flat"}
-            </div>
+        <div className="relative max-w-6xl mx-auto w-full grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <div className="lg:col-span-5 text-center lg:text-left">
+            <p className="display-font text-emerald-400/90 text-sm sm:text-base font-semibold tracking-[0.2em] uppercase mb-5 landing-fade-up">
+              TrustTicker
+            </p>
 
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 landing-fade-up landing-delay-1">
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] xl:text-6xl font-extrabold tracking-tight mb-5 leading-[1.05] landing-fade-up landing-delay-1">
               {isSignedIn ? (
                 <>
-                  Your scanner is
+                  Your edge is
                   <br />
-                  <span className="gradient-text">locked and loaded</span>
+                  <span className="shimmer-text">already live</span>
                 </>
               ) : (
                 <>
-                  Catch the catalyst
+                  See the catalyst.
                   <br />
-                  <span className="gradient-text">before the crowd does</span>
+                  <span className="shimmer-text">Skip the trap.</span>
                 </>
               )}
             </h1>
 
-            <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed landing-fade-up landing-delay-2">
+            <p className="text-base sm:text-lg text-zinc-400 max-w-md mx-auto lg:mx-0 mb-8 leading-relaxed landing-fade-up landing-delay-2">
               {isSignedIn ? (
                 <>
-                  Wire alerts, heavy volume, and verified catalysts are waiting. Jump into the
-                  dashboard and trade the news — not the noise.
+                  Wire feed, playbooks, dilution radar, and Prop Desk are waiting
+                  {displayName ? `, ${displayName}` : ""}.
                 </>
               ) : (
                 <>
-                  TrustTicker is a live catalyst command center — near-real-time wire ingest,
-                  story clustering, setup tags, watchlist briefs, and pro alert rules. Built for
-                  traders who need the <span className="text-zinc-200">why</span> before the crowd
-                  does.
+                  The live catalyst desk for traders who pay for speed and judgment — not another noisy screener.
                 </>
               )}
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 landing-fade-up landing-delay-3">
+            <div className="flex flex-col sm:flex-row items-center lg:items-stretch justify-center lg:justify-start gap-3 mb-5 landing-fade-up landing-delay-3">
               {isSignedIn ? (
                 <>
                   <Link href={scannerHref}>
-                    <Button size="lg" className="text-base px-8 min-w-[220px] shadow-lg shadow-emerald-500/20">
+                    <Button size="lg" className="text-base px-8 min-w-[200px] cta-glow">
                       {isSubscribed ? "Open Scanner" : "View Demo"} <ArrowRight className="w-5 h-5" />
                     </Button>
                   </Link>
-                  <Link href="/settings">
-                    <Button variant="outline" size="lg" className="text-base px-8 min-w-[200px] border-zinc-700 hover:border-zinc-500">
-                      Alert Settings
-                    </Button>
-                  </Link>
+                  {isSubscribed && (
+                    <Link href="/desk">
+                      <Button variant="outline" size="lg" className="text-base px-8 border-zinc-700">
+                        Prop Desk
+                      </Button>
+                    </Link>
+                  )}
                 </>
               ) : (
                 <>
                   <Link href="/pricing">
-                    <Button size="lg" className="text-base px-8 min-w-[220px] shadow-lg shadow-emerald-500/20">
-                      Start 7-Day Free Trial <ArrowRight className="w-5 h-5" />
+                    <Button size="lg" className="text-base px-8 min-w-[210px] cta-glow">
+                      Start free trial <ArrowRight className="w-5 h-5" />
                     </Button>
                   </Link>
                   <Link href="/demo">
-                    <Button variant="outline" size="lg" className="text-base px-8 min-w-[200px] border-zinc-700 hover:border-zinc-500">
-                      View Demo
+                    <Button variant="outline" size="lg" className="text-base px-8 border-zinc-700">
+                      View demo
                     </Button>
                   </Link>
                 </>
@@ -246,140 +254,178 @@ export function MarketingLanding({
 
             <p className="text-sm text-zinc-600 landing-fade-up landing-delay-3">
               {isSignedIn
-                ? "Manage billing & alerts anytime from Settings"
-                : "$19.99/month after trial · Cancel anytime · No contracts"}
+                ? "Billing & alerts in Settings"
+                : `${SUBSCRIPTION_PRICE_MO} after trial · Cancel anytime`}
             </p>
           </div>
 
-          <div className="mt-8 max-w-3xl mx-auto landing-fade-up landing-delay-4">
-            <LiveProofStrip />
-            <p className="text-center mt-2">
-              <Link href="/wins" className="text-xs text-emerald-500 hover:underline">
-                See all speed wins →
-              </Link>
-            </p>
-          </div>
-
-          {/* Product preview */}
-          <div className="relative mt-16 max-w-5xl mx-auto landing-fade-up landing-delay-5">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-cyan-500/10 to-violet-500/20 rounded-2xl blur-xl opacity-70" />
-            <div className="relative rounded-2xl border border-zinc-700/80 bg-zinc-900/90 backdrop-blur-xl overflow-hidden shadow-2xl">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800 bg-zinc-950/80">
-                <div className="flex gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                </div>
-                <span className="text-[10px] text-zinc-500 font-mono ml-2">trustticker.app/demo</span>
-                <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  LIVE
-                </span>
-              </div>
-
-              <div className="grid lg:grid-cols-5 gap-0 min-h-[280px]">
-                <div className="lg:col-span-2 border-b lg:border-b-0 lg:border-r border-zinc-800 p-3 space-y-2">
-                  <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold mb-2 flex items-center gap-1.5">
-                    <Radio className="w-3 h-3 text-emerald-500" /> Wire Alerts
-                  </div>
-                  <PreviewAlert sym="BJDX" msg="High of day — +33.5%" chg="+33.5%" />
-                  <PreviewAlert sym="GCTK" msg="Heavy volume — 7.1× avg" chg="+18.2%" />
-                  <PreviewAlert sym="NVDA" msg="Near HOD — +4.8% today" chg="+4.8%" />
-                </div>
-                <div className="lg:col-span-3 p-3">
-                  <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold mb-2 flex items-center gap-1.5">
-                    <BarChart3 className="w-3 h-3 text-emerald-500" /> Live Catalyst Feed
-                  </div>
-                  <div className="space-y-2">
-                    <DemoCatalyst
-                      symbol="MRNA"
-                      change="+16.94%"
-                      headline="Phase 3 data shows 94% efficacy; FDA fast track granted"
-                      sentiment={82}
-                      type="FDA / Biotech"
-                      historical="+18.5% avg"
-                      setupTag="Gapper"
-                      trust="Tier 1 wire"
-                      sources={3}
-                    />
-                    <DemoCatalyst
-                      symbol="AMD"
-                      change="+5.82%"
-                      headline="Wins $2.1B data center contract from major hyperscaler"
-                      sentiment={71}
-                      type="Contract Win"
-                      historical="+12.3% avg"
-                      setupTag="Heavy vol"
-                      trust="Verified"
-                      sources={2}
-                    />
-                    <DemoCatalyst
-                      symbol="PLTR"
-                      change="+3.41%"
-                      headline="Department of Defense extends AI analytics contract"
-                      sentiment={64}
-                      type="Gov Contract"
-                      historical="+9.1% avg"
-                      setupTag="Sector"
-                      trust="Tier 1 wire"
-                      sources={4}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="lg:col-span-7 landing-fade-up landing-delay-4">
+            <HeroProductStage />
           </div>
         </div>
       </section>
 
       <TickerMarquee />
 
-      {/* Features — bento */}
-      <section id="features" className="py-24 px-4 sm:px-6 border-t border-zinc-800/50 relative">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-emerald-400 text-sm font-medium mb-3 uppercase tracking-widest">Features</p>
+      {/* Proof — below fold */}
+      <section className="py-14 px-4 sm:px-6 border-b border-zinc-800/40">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <Reveal>
+            <p className="text-center text-emerald-400/80 text-xs font-semibold uppercase tracking-[0.2em] mb-4">
+              Live proof
+            </p>
+          </Reveal>
+          <Reveal delay={80}>
+            <LiveProofStrip />
+          </Reveal>
+          <Reveal delay={160}>
+            <SpeedEdgeHeroStat />
+          </Reveal>
+          <Reveal delay={220}>
+            <p className="text-center">
+              <Link href="/wins" className="text-xs text-emerald-500 hover:underline">
+                Audit every speed win →
+              </Link>
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Loop */}
+      <section className="py-24 px-4 sm:px-6 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/[0.03] to-transparent pointer-events-none" />
+        <div className="relative max-w-6xl mx-auto">
+          <Reveal className="text-center mb-16">
+            <p className="text-emerald-400 text-sm font-semibold mb-3 uppercase tracking-[0.2em]">
+              The loop
+            </p>
             <h2 className="text-3xl sm:text-5xl font-bold mb-4">
-              Everything a news trader actually needs
+              See → Skip → Prove
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto text-lg">
-              Everything in TrustTicker Pro — tuned for speed, filtered for signal, built to scale
-              with you.
+              Traders don&apos;t pay for charts. They pay to not miss money — and to not FOMO-lose it.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className={`rounded-2xl border border-zinc-800 bg-gradient-to-br ${feature.accent} p-6 hover:border-zinc-600 transition-all duration-300 hover:-translate-y-0.5 group`}
-              >
-                <div className="w-11 h-11 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <feature.icon className="w-5 h-5 text-emerald-400" />
+          <div className="grid md:grid-cols-3 gap-6">
+            {loop.map((s, i) => (
+              <Reveal key={s.step} delay={i * 100} as="article">
+                <div className="relative h-full rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-7 overflow-hidden group hover:border-emerald-500/30 transition-colors duration-500">
+                  <div className="absolute -right-4 -top-6 text-8xl font-black text-zinc-900 group-hover:text-emerald-950/80 transition-colors duration-500 select-none">
+                    {s.step}
+                  </div>
+                  <p className="relative text-emerald-400 font-mono text-sm mb-3">{s.step}</p>
+                  <h3 className="relative text-xl font-bold mb-2">{s.title}</h3>
+                  <p className="relative text-sm text-zinc-400 leading-relaxed">{s.body}</p>
                 </div>
-                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">{feature.description}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="py-24 px-4 sm:px-6 bg-zinc-900/40 border-y border-zinc-800/50">
+      {/* Features */}
+      <section id="features" className="py-24 px-4 sm:px-6 border-t border-zinc-800/50">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-emerald-400 text-sm font-medium mb-3 uppercase tracking-widest">How it works</p>
-            <h2 className="text-3xl sm:text-4xl font-bold">From headline to trade idea in seconds</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {steps.map((s) => (
-              <div key={s.step} className="relative">
-                <span className="text-5xl font-black text-zinc-800 font-mono">{s.step}</span>
-                <h3 className="text-xl font-semibold mt-2 mb-2">{s.title}</h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">{s.body}</p>
-              </div>
+          <Reveal className="text-center mb-16">
+            <p className="text-emerald-400 text-sm font-semibold mb-3 uppercase tracking-[0.2em]">
+              What&apos;s inside Pro
+            </p>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              Built for the full session
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto text-lg">
+              Not a news dump — a judgment stack: speed, traps, paper proof, and desk tools.
+            </p>
+          </Reveal>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map((feature, i) => (
+              <Reveal key={feature.title} delay={(i % 3) * 80} as="article">
+                <div className="h-full rounded-2xl border border-zinc-800 bg-zinc-900/20 p-6 hover:border-emerald-500/35 hover:bg-emerald-500/[0.04] transition-all duration-400 hover:-translate-y-1 group">
+                  <div className="w-11 h-11 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center mb-4 group-hover:border-emerald-500/40 group-hover:scale-105 transition-all duration-300">
+                    <feature.icon className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                  <p className="text-sm text-zinc-400 leading-relaxed">{feature.description}</p>
+                </div>
+              </Reveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Edge comparison */}
+      <section className="py-24 px-4 sm:px-6 bg-zinc-900/30 border-y border-zinc-800/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <Reveal>
+              <p className="text-emerald-400 text-sm font-semibold mb-3 uppercase tracking-[0.2em]">
+                The edge
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+                Screeners show the move.
+                <br />
+                <span className="text-zinc-500">We show whether to take it.</span>
+              </h2>
+              <ul className="space-y-3.5">
+                {[
+                  "Wire-speed feed with auditable under-3m live-race stats",
+                  "Long / Short / Watch / Skip playbooks + anti-FOMO",
+                  "Dilution radar before you chase offerings",
+                  "Speed edge ledger & candle backtests vs +3 minutes",
+                  "Call board, Prop Desk, sympathy map, catalyst replay",
+                  "Session plan, watchlist autopsy, paper trades",
+                  "EOD email with Daily Edge Recap vs $19.99",
+                  "Chrome overlay for TradingView · Discord / push / SMS",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-zinc-300">
+                    <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <span className="text-sm sm:text-[15px] leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <div className="relative">
+                <div className="orbit-ring absolute inset-6 rounded-full border border-dashed border-emerald-500/20 pointer-events-none" />
+                <div className="space-y-4 relative">
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 hover:border-emerald-500/30 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                        <Target className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">Built for catalyst traders</p>
+                        <p className="text-xs text-zinc-500">Day · swing · small-cap · prop-style</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-zinc-400 leading-relaxed">
+                      Most tools answer &ldquo;what&apos;s green?&rdquo; TrustTicker answers
+                      &ldquo;what just happened, should I skip it, and did speed pay for Pro?&rdquo;
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+                    <div className="flex items-center gap-2 text-amber-400 mb-3">
+                      <Shield className="w-5 h-5" />
+                      <span className="font-semibold">Legal & compliant</span>
+                    </div>
+                    <p className="text-sm text-zinc-400 leading-relaxed">
+                      Informational data platform only — not investment advice. Clear disclaimers
+                      on every page. Paper edge is illustrative, not a guarantee.
+                    </p>
+                    <Link
+                      href="/legal/disclaimer"
+                      className="text-sm text-emerald-400 hover:underline mt-3 inline-block"
+                    >
+                      Read full disclaimer →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -387,7 +433,7 @@ export function MarketingLanding({
       {/* Testimonials */}
       <section id="testimonials" className="py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
+          <Reveal className="text-center mb-14">
             <div className="inline-flex items-center gap-1.5 text-amber-400 mb-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star key={i} className="w-4 h-4 fill-amber-400" />
@@ -397,158 +443,100 @@ export function MarketingLanding({
             <p className="text-zinc-400 max-w-lg mx-auto">
               Real workflows from people who live in the scanner during market hours.
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {testimonials.map((t) => (
-              <div
-                key={t.name}
-                className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col hover:border-zinc-700 transition-colors"
-              >
-                <div className="flex items-center gap-1 mb-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <p className="text-sm text-zinc-300 leading-relaxed flex-1 mb-5">&ldquo;{t.quote}&rdquo;</p>
-                <span className="text-[10px] uppercase tracking-wider text-emerald-500/80 font-medium mb-4">
-                  {t.highlight}
-                </span>
-                <div className="flex items-center gap-3 pt-4 border-t border-zinc-800">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${t.color}`}
-                  >
-                    {t.avatar}
+            {testimonials.map((t, i) => (
+              <Reveal key={t.name} delay={(i % 3) * 90} as="article">
+                <div className="h-full rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col hover:border-zinc-600 hover:-translate-y-1 transition-all duration-400">
+                  <div className="flex items-center gap-1 mb-4">
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <Star key={j} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    ))}
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm">{t.name}</p>
-                    <p className="text-xs text-zinc-500">
-                      {t.role} · {t.location}
-                    </p>
+                  <p className="text-sm text-zinc-300 leading-relaxed flex-1 mb-5">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <span className="text-[10px] uppercase tracking-wider text-emerald-500/80 font-medium mb-4">
+                    {t.highlight}
+                  </span>
+                  <div className="flex items-center gap-3 pt-4 border-t border-zinc-800">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${t.color}`}
+                    >
+                      {t.avatar}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{t.name}</p>
+                      <p className="text-xs text-zinc-500">
+                        {t.role} · {t.location}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Why us */}
-      <section className="py-24 px-4 sm:px-6 bg-zinc-900/30 border-t border-zinc-800/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <p className="text-emerald-400 text-sm font-medium mb-3 uppercase tracking-widest">The edge</p>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-                Screeners show the move.
-                <br />
-                <span className="text-zinc-500">We show the catalyst.</span>
-              </h2>
-              <ul className="space-y-4">
-                {[
-                  "Stock-impact headlines only — filtered before they hit your feed",
-                  "Near-real-time wire ingest with instant SSE push to your dashboard",
-                  "Story clustering, setup tags, and source trust on every card",
-                  "Watchlist morning briefs and EOD recaps",
-                  "Pro alert rules: HOD, VWAP, float, RVol, and news triggers",
-                  "Float, cap, sentiment, and historical move context",
-                  "Discord webhooks for your trading group",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-zinc-300">
-                    <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                    <Target className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">Built for catalyst traders</p>
-                    <p className="text-xs text-zinc-500">Day traders · Swing traders · Small caps</p>
-                  </div>
-                </div>
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Most tools answer &ldquo;what&apos;s green?&rdquo; TrustTicker answers &ldquo;what just
-                  happened, how bullish is it, and can this float actually run?&rdquo;
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-                <div className="flex items-center gap-2 text-amber-400 mb-3">
-                  <Shield className="w-5 h-5" />
-                  <span className="font-semibold">Legal & compliant</span>
-                </div>
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Informational data platform only — not investment advice. Clear disclaimers on
-                  every page. Past performance warnings on historical data.
-                </p>
-                <Link href="/legal/disclaimer" className="text-sm text-emerald-400 hover:underline mt-3 inline-block">
-                  Read full disclaimer →
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Social proof bar */}
+      {/* Social proof */}
       <section className="py-12 px-4 sm:px-6 border-y border-zinc-800/50">
-        <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-8 sm:gap-16 text-center">
-          <div className="flex items-center gap-2 text-zinc-400">
+        <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-8 sm:gap-14 text-center">
+          <Reveal className="flex items-center gap-2 text-zinc-400">
             <Users className="w-5 h-5 text-emerald-500" />
             <span className="text-sm">Active trader community</span>
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </Reveal>
+          <Reveal delay={80} className="flex items-center gap-2 text-zinc-400">
             <LineChart className="w-5 h-5 text-emerald-500" />
             <span className="text-sm">Premarket through after-hours</span>
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </Reveal>
+          <Reveal delay={160} className="flex items-center gap-2 text-zinc-400">
             <Zap className="w-5 h-5 text-emerald-500" />
-            <span className="text-sm">~8s wire ingest · SSE live push</span>
-          </div>
+            <span className="text-sm">Wire ingest · SSE · under 3m proof</span>
+          </Reveal>
+          <Reveal delay={240} className="flex items-center gap-2 text-zinc-400">
+            <Layers className="w-5 h-5 text-emerald-500" />
+            <span className="text-sm">Prop Desk · call board · hotkeys</span>
+          </Reveal>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 px-4 sm:px-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
-        <div className="relative max-w-2xl mx-auto text-center">
+      <section className="py-28 px-4 sm:px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/[0.07] via-transparent to-transparent pointer-events-none" />
+        <div className="hero-aurora absolute left-1/2 top-0 -translate-x-1/2 w-[70vw] h-[40vw] max-w-[800px] bg-emerald-500/15 blur-[120px] pointer-events-none" />
+        <Reveal className="relative max-w-2xl mx-auto text-center">
           <h2 className="text-3xl sm:text-5xl font-bold mb-4">
             {isSignedIn ? (
               <>
-                The market won&apos;t wait.
+                The tape won&apos;t wait.
                 <br />
-                <span className="gradient-text">Neither should you.</span>
+                <span className="shimmer-text">Neither should you.</span>
               </>
             ) : (
               <>
-                Stop reading news.
+                Stop reading noise.
                 <br />
-                <span className="gradient-text">Start trading it.</span>
+                <span className="shimmer-text">Trade the catalyst.</span>
               </>
             )}
           </h2>
           <p className="text-zinc-400 mb-8 text-lg">
             {isSignedIn
-              ? "Your live feed, wire alerts, and volume panel are one click away."
-              : "7-day free trial. Full Pro access — clustering, briefs, alert rules, and more. Cancel anytime."}
+              ? "Scanner, Prop Desk, and edge ledger — one click away."
+              : `7-day free trial. Full Pro — playbooks, dilution radar, speed proof, Prop Desk. Then ${SUBSCRIPTION_PRICE_MO}.`}
           </p>
           <Link href={isSignedIn ? scannerHref : "/pricing"}>
-            <Button size="lg" className="text-base px-10 shadow-lg shadow-emerald-500/25">
+            <Button size="lg" className="text-base px-10 cta-glow">
               {isSignedIn
                 ? isSubscribed
                   ? "Open Scanner"
                   : "View Demo"
-                : "Start Free Trial — $19.99/mo after"}
+                : "Start free trial"}
             </Button>
           </Link>
-        </div>
+        </Reveal>
       </section>
 
       <footer className="border-t border-zinc-800 py-8 px-4 sm:px-6">
@@ -557,81 +545,22 @@ export function MarketingLanding({
           <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4 text-sm text-zinc-600">
             <span>© {new Date().getFullYear()} TrustTicker. All rights reserved.</span>
             <div className="flex gap-6">
-              <Link href="/legal/terms" className="hover:text-zinc-400">Terms</Link>
-              <Link href="/legal/privacy" className="hover:text-zinc-400">Privacy</Link>
-              <Link href="/legal/disclaimer" className="hover:text-zinc-400">Disclaimer</Link>
+              <Link href="/legal/terms" className="hover:text-zinc-400">
+                Terms
+              </Link>
+              <Link href="/legal/privacy" className="hover:text-zinc-400">
+                Privacy
+              </Link>
+              <Link href="/legal/disclaimer" className="hover:text-zinc-400">
+                Disclaimer
+              </Link>
+              <Link href="/wins" className="hover:text-zinc-400">
+                Speed wins
+              </Link>
             </div>
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PreviewAlert({
-  sym,
-  msg,
-  chg,
-}: {
-  sym: string;
-  msg: string;
-  chg: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-[11px] py-1.5 px-2 rounded bg-zinc-900/60 border border-zinc-800/80">
-      <span className="font-mono font-bold text-white w-10">{sym}</span>
-      <span className="text-zinc-500 truncate flex-1">{msg}</span>
-      <span className="font-mono text-emerald-400 shrink-0">{chg}</span>
-    </div>
-  );
-}
-
-function DemoCatalyst({
-  symbol,
-  change,
-  headline,
-  sentiment,
-  type,
-  historical,
-  setupTag,
-  trust,
-  sources,
-}: {
-  symbol: string;
-  change: string;
-  headline: string;
-  sentiment: number;
-  type: string;
-  historical: string;
-  setupTag: string;
-  trust: string;
-  sources: number;
-}) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-left">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono font-bold">{symbol}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/30">
-            {type}
-          </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-            {setupTag}
-          </span>
-        </div>
-        <span className="font-mono text-emerald-400 font-medium text-sm">{change}</span>
-      </div>
-      <p className="text-xs text-zinc-300 mb-1.5 line-clamp-1">{headline}</p>
-      <div className="flex items-center gap-3 flex-wrap text-[10px] text-zinc-500">
-        <span>
-          Sentiment <span className="text-emerald-400 font-mono">{sentiment}</span>
-        </span>
-        <span>
-          Similar <span className="text-emerald-400">{historical}</span>
-        </span>
-        <span className="text-emerald-500/80">{trust}</span>
-        <span>{sources} sources</span>
-      </div>
     </div>
   );
 }

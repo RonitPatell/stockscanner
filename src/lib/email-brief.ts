@@ -1,5 +1,7 @@
 import type { WatchlistBrief } from "@/types";
 import { sendEmail, emailShell, APP_URL } from "./email";
+import { getSpeedEdgeSummary } from "./speed-edge";
+import { getDilutionRadar } from "./dilution-radar";
 
 function fmtPct(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -37,13 +39,43 @@ function briefSectionHtml(brief: WatchlistBrief): string {
   return parts.join("");
 }
 
+async function eodEdgeHtml(): Promise<string> {
+  try {
+    const [edge, dilution] = await Promise.all([
+      getSpeedEdgeSummary(8, 24),
+      getDilutionRadar(8, 24),
+    ]);
+    const skipSaved = dilution.reduce((sum, d) => {
+      const move = Math.abs(d.changePercent ?? 0);
+      if (move < 2) return sum;
+      return sum + (move / 100) * 1000 * 0.25;
+    }, 0);
+    const total = edge.totalEdgeUsd + skipSaved;
+    const months = total > 0 ? (total / 19.99).toFixed(1) : "0";
+
+    return `
+      <div style="background:#052e1f;border:1px solid #05966955;border-radius:12px;padding:16px;margin:0 0 24px">
+        <h3 style="color:#34d399;margin:0 0 8px;font-size:14px">Daily Edge Recap</h3>
+        <p style="color:#d4d4d8;margin:0 0 8px;font-size:13px">
+          Paper speed edge <strong style="color:#34d399">$${edge.totalEdgeUsd.toFixed(0)}</strong>
+          · Dilution skips (${dilution.length}) ~<strong style="color:#fbbf24">$${skipSaved.toFixed(0)}</strong>
+          · Combined <strong style="color:#34d399">$${total.toFixed(0)}</strong> (~${months}× a $19.99 month)
+        </p>
+        <p style="color:#71717a;font-size:11px;margin:0">Illustrative on $1k notional · not financial advice</p>
+      </div>`;
+  } catch {
+    return "";
+  }
+}
+
 export async function sendDailyBriefEmail(
   to: string,
   brief: WatchlistBrief
 ): Promise<boolean> {
   const label = brief.kind === "eod" ? "EOD Recap" : "Morning Brief";
   const subject = `TrustTicker ${label} — ${brief.watchlist.slice(0, 3).join(", ")}${brief.watchlist.length > 3 ? "…" : ""}`;
-  const html = emailShell(label, briefSectionHtml(brief));
+  const edgeBlock = brief.kind === "eod" ? await eodEdgeHtml() : "";
+  const html = emailShell(label, edgeBlock + briefSectionHtml(brief));
   return sendEmail(to, subject, html);
 }
 
@@ -53,9 +85,10 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     <h2 style="color:#fafafa;margin:0 0 12px;font-size:20px">Welcome to TrustTicker Pro</h2>
     <p style="color:#a1a1aa;margin:0 0 16px">${greeting} your live catalyst scanner is ready. Here's what you get:</p>
     <ul style="color:#d4d4d8;margin:0 0 20px;padding-left:20px;line-height:1.8">
-      <li>Near-real-time wire ingest (~8s) with SSE push</li>
-      <li>Story clustering, setup tags, and catalyst playbooks</li>
-      <li>Premarket command center + morning/EOD email briefs</li>
+      <li>Near-real-time wire ingest with SSE push</li>
+      <li>Action playbooks, anti-FOMO scores, dilution radar</li>
+      <li>Speed edge ledger + verified candle backtests</li>
+      <li>Morning/EOD email briefs with daily edge recap</li>
       <li>Pro alert rules — Discord, email, SMS, and browser push</li>
     </ul>
     <p style="color:#a1a1aa;margin:0 0 16px">Set your watchlist and alert channels in Settings — takes about 60 seconds.</p>

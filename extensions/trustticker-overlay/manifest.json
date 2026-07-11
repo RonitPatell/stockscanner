@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "TrustTicker Overlay",
+  "version": "0.1.0",
+  "description": "Open TrustTicker action context for the ticker on the current TradingView chart.",
+  "action": {
+    "default_title": "TrustTicker — open ticker",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.tradingview.com/*",
+    "https://tradingview.com/*",
+    "http://localhost:3000/*",
+    "https://www.trustticker.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.tradingview.com/*",
+        "https://tradingview.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
