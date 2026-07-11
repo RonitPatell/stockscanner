@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 3;
+export const PLATFORM_GUIDE_VERSION = 6;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -28,7 +28,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "welcome",
     title: "Welcome to your desk",
     body: "This quick tour explains what each panel is for. You can reopen it anytime with the Guide button (bottom-right).",
-    tip: "Takes about 60 seconds · Esc to exit",
+    tip: "Takes about 60 seconds · Esc to exit · start in Simple mode",
   },
   {
     id: "status",
@@ -47,7 +47,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     target: "market-monitor",
     title: "Wire Alerts + High Volume",
     body: "Your core tape tools. Wire Alerts flag HOD / retests / volume events. High Volume shows relative-volume leaders. Market state and earnings sit underneath.",
-    tip: "This is the main “what’s moving right now” block",
+    tip: "This is the main “what’s moving right now” block · use Pop out on each panel for a bigger window",
   },
   {
     id: "wins-brief",

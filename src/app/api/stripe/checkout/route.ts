@@ -10,6 +10,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const body = await req.json().catch(() => ({}));
+    const plan = body?.plan === "annual" ? "annual" : "monthly";
+
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
     });
@@ -20,6 +23,13 @@ export async function POST(req: NextRequest) {
     if (!user.phoneNumber) {
       return NextResponse.json(
         { error: "Add a phone number to your account before subscribing" },
+        { status: 400 }
+      );
+    }
+
+    if (plan === "annual" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
+      return NextResponse.json(
+        { error: "Annual plan not configured yet — use monthly or set STRIPE_PRICE_ID_ANNUAL" },
         { status: 400 }
       );
     }
@@ -51,7 +61,8 @@ export async function POST(req: NextRequest) {
       customerId,
       user.id,
       user.email,
-      !user.hasUsedTrial && !phoneTrialUsed
+      !user.hasUsedTrial && !phoneTrialUsed,
+      plan
     );
 
     return NextResponse.json({ url: checkoutSession.url });

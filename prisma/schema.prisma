@@ -33,6 +33,8 @@ model User {
   welcomeEmailSent   Boolean @default(false)
   lastMorningBriefSentAt DateTime?
   lastEodBriefSentAt DateTime?
+  trialDripDay       Int       @default(0)
+  lastTrialDripAt    DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]

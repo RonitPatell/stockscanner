@@ -15,29 +15,40 @@ export function getStripe() {
 export const SUBSCRIPTION_PRICE = 19.99; // USD per month (display only — Stripe charges STRIPE_PRICE_ID)
 export const SUBSCRIPTION_PRICE_LABEL = "$19.99";
 export const SUBSCRIPTION_PRICE_MO = "$19.99/mo";
+export const SUBSCRIPTION_ANNUAL_PRICE = 149; // display — Stripe charges STRIPE_PRICE_ID_ANNUAL when set
+export const SUBSCRIPTION_ANNUAL_LABEL = "$149/yr";
+export const SUBSCRIPTION_ANNUAL_SAVE = "Save ~2 months";
+
+export type CheckoutPlan = "monthly" | "annual";
 
 export async function createCheckoutSession(
   customerId: string,
   userId: string,
   email: string,
-  allowTrial: boolean
+  allowTrial: boolean,
+  plan: CheckoutPlan = "monthly"
 ) {
+  const priceId =
+    plan === "annual" && process.env.STRIPE_PRICE_ID_ANNUAL
+      ? process.env.STRIPE_PRICE_ID_ANNUAL
+      : process.env.STRIPE_PRICE_ID!;
+
   return getStripe().checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [
       {
-        price: process.env.STRIPE_PRICE_ID!,
+        price: priceId,
         quantity: 1,
       },
     ],
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?subscribed=true`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
-    metadata: { userId },
+    metadata: { userId, plan },
     subscription_data: {
-      metadata: { userId },
-      ...(allowTrial ? { trial_period_days: 7 } : {}),
+      metadata: { userId, plan },
+      ...(allowTrial && plan === "monthly" ? { trial_period_days: 7 } : {}),
     },
     allow_promotion_codes: true,
   });

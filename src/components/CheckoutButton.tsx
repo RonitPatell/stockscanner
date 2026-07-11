@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { CheckoutPlan } from "@/lib/stripe";
 
 interface CheckoutButtonProps {
   children?: React.ReactNode;
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   showIcon?: boolean;
+  plan?: CheckoutPlan;
 }
 
 export function CheckoutButton({
@@ -17,6 +19,7 @@ export function CheckoutButton({
   size = "default",
   className,
   showIcon = true,
+  plan = "monthly",
 }: CheckoutButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -27,7 +30,11 @@ export function CheckoutButton({
     setError("");
 
     try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
       const data = await res.json();
 
       if (res.status === 401) {

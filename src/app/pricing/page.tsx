@@ -19,7 +19,12 @@ import { Button } from "@/components/ui/button";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { LogoMark } from "@/components/Logo";
-import { SUBSCRIPTION_PRICE, SUBSCRIPTION_PRICE_MO } from "@/lib/stripe";
+import {
+  SUBSCRIPTION_PRICE,
+  SUBSCRIPTION_PRICE_MO,
+  SUBSCRIPTION_ANNUAL_LABEL,
+  SUBSCRIPTION_ANNUAL_SAVE,
+} from "@/lib/stripe";
 
 const pillars = [
   {
@@ -159,9 +164,33 @@ export default async function PricingPage({
               One plan. The whole judgment stack.
             </h1>
             <p className="text-zinc-400 max-w-2xl mx-auto text-lg">
-              Speed to see it, tools to skip traps, and proof that {SUBSCRIPTION_PRICE_MO} paid for
-              itself — no upsells, no tiers.
+              Free gets you the habit. Pro gets you the live desk. Lock annual and save —
+              reinvest goes to faster wire later.
             </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-10 max-w-3xl mx-auto price-rise">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 text-left">
+              <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Free</p>
+              <ul className="space-y-2 text-sm text-zinc-400">
+                <li>· Public daily plan at /today</li>
+                <li>· Demo scanner (illustrative)</li>
+                <li>· Speed wins proof page</li>
+                <li>· Ticker SEO pages</li>
+              </ul>
+              <Link href="/today" className="inline-block mt-4 text-sm text-emerald-400 hover:underline">
+                See today’s plan →
+              </Link>
+            </div>
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5 text-left">
+              <p className="text-xs uppercase tracking-wide text-emerald-400 mb-2">Pro — $19.99/mo</p>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                <li>· Live wire feed + SSE</li>
+                <li>· Alerts (Discord / email / SMS / push)</li>
+                <li>· Dilution, playbooks, Prop Desk</li>
+                <li>· Morning/EOD briefs + trial drip coaching</li>
+              </ul>
+            </div>
           </div>
 
           {params.canceled === "true" && (
@@ -225,17 +254,32 @@ export default async function PricingPage({
                   ))}
                 </div>
 
-                <div className="relative mb-6">
+                <div className="relative mb-6 space-y-2">
                   {session ? (
-                    <CheckoutButton size="lg" className="w-full text-base cta-glow">
-                      {trialAvailable ? "Start free trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
-                    </CheckoutButton>
+                    <>
+                      <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="monthly">
+                        {trialAvailable ? "Start free trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
+                      </CheckoutButton>
+                      <CheckoutButton
+                        size="lg"
+                        className="w-full text-base border border-zinc-600 bg-transparent hover:bg-zinc-800"
+                        plan="annual"
+                        showIcon={false}
+                      >
+                        Founding annual — {SUBSCRIPTION_ANNUAL_LABEL} ({SUBSCRIPTION_ANNUAL_SAVE})
+                      </CheckoutButton>
+                    </>
                   ) : (
-                    <Link href="/login?register=true&next=checkout" className="block">
-                      <Button size="lg" className="w-full text-base cta-glow">
-                        Create account & start trial
-                      </Button>
-                    </Link>
+                    <>
+                      <Link href="/login?register=true&next=checkout" className="block">
+                        <Button size="lg" className="w-full text-base cta-glow">
+                          Create account & start trial
+                        </Button>
+                      </Link>
+                      <p className="text-[11px] text-zinc-500 text-center">
+                        After signup you can also lock {SUBSCRIPTION_ANNUAL_LABEL} at checkout
+                      </p>
+                    </>
                   )}
                 </div>
 
@@ -288,12 +332,16 @@ export default async function PricingPage({
           <div className="mt-12 max-w-2xl mx-auto text-center">
             <p className="text-zinc-500 text-sm mb-4">
               Prefer to poke around first?{" "}
+              <Link href="/today" className="text-emerald-400 hover:underline">
+                Today’s free plan
+              </Link>
+              ,{" "}
               <Link href="/demo" className="text-emerald-400 hover:underline">
-                Open the live demo
-              </Link>{" "}
-              or{" "}
+                live demo
+              </Link>
+              , or{" "}
               <Link href="/wins" className="text-emerald-400 hover:underline">
-                audit speed wins
+                speed wins
               </Link>
               .
             </p>

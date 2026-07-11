@@ -33,7 +33,24 @@ export function CatchesBoard({ className }: { className?: string }) {
       .catch(() => {});
   }, []);
 
-  if (catches.length === 0 && callers.length === 0) return null;
+  if (catches.length === 0 && callers.length === 0) {
+    return (
+      <div
+        className={cn(
+          "rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-3",
+          className
+        )}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <Trophy className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-[11px] font-semibold text-emerald-200">Catches board</span>
+        </div>
+        <p className="text-[10px] text-zinc-600">
+          Speed catches and top callers appear here as the wire fills.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

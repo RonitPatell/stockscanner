@@ -248,6 +248,9 @@ export function MarketingLanding({
                       View demo
                     </Button>
                   </Link>
+                  <Link href="/today" className="text-sm text-emerald-500 hover:underline sm:ml-2">
+                    Free daily plan →
+                  </Link>
                 </>
               )}
             </div>

@@ -52,6 +52,7 @@ export function Navbar() {
               <Link href="/#features" className="hover:text-zinc-100 transition-colors">Features</Link>
               <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
               <Link href="/wins" className="hover:text-zinc-100 transition-colors">Speed wins</Link>
+              <Link href="/today" className="hover:text-zinc-100 transition-colors">Today</Link>
               <Link href="/#testimonials" className="hover:text-zinc-100 transition-colors">Reviews</Link>
               <Link href="/pricing" className="hover:text-zinc-100 transition-colors">Pricing</Link>
             </>

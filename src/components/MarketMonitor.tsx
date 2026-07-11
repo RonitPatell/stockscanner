@@ -11,6 +11,7 @@ import {
   Zap,
   CalendarDays,
   Gauge,
+  AppWindow,
 } from "lucide-react";
 import type { EarningsEvent, MarketAlert, MarketScannerSnapshot, VolumeLeader } from "@/types";
 import { cn, formatPercent, formatPrice } from "@/lib/utils";
@@ -41,6 +42,42 @@ const MARKET_STATE_SYMBOLS = [
   "XLU",
   "XLB",
 ] as const;
+
+export type PopoutPanelId = "wire-alerts" | "volume" | "market-state" | "earnings";
+
+export const POPOUT_PANELS: Record<
+  PopoutPanelId,
+  { title: string; width: number; height: number }
+> = {
+  "wire-alerts": { title: "Wire Alerts", width: 520, height: 780 },
+  volume: { title: "Heavy Volume", width: 560, height: 780 },
+  "market-state": { title: "Market State", width: 420, height: 720 },
+  earnings: { title: "Upcoming Earnings", width: 420, height: 640 },
+};
+
+export function isPopoutPanelId(value: string): value is PopoutPanelId {
+  return value in POPOUT_PANELS;
+}
+
+export function openPanelPopout(panel: PopoutPanelId) {
+  if (typeof window === "undefined") return;
+  const meta = POPOUT_PANELS[panel];
+  const url = `${window.location.origin}/popout/${panel}`;
+  const name = `trustticker-popout-${panel}`;
+  const left = Math.max(40, window.screenX + 60);
+  const top = Math.max(40, window.screenY + 60);
+  const features = [
+    "popup=yes",
+    `width=${meta.width}`,
+    `height=${meta.height}`,
+    `left=${left}`,
+    `top=${top}`,
+    "noopener=yes",
+    "noreferrer=yes",
+  ].join(",");
+  const win = window.open(url, name, features);
+  win?.focus();
+}
 
 const EARNINGS_STORAGE_KEY = "trustticker:earnings:v1";
 
@@ -85,20 +122,28 @@ function mergeEarningsList(
   return next;
 }
 
-export function MarketMonitor({ className }: { className?: string }) {
+export function MarketMonitor({
+  className,
+  solo,
+}: {
+  className?: string;
+  /** Render a single panel full-bleed (pop-out windows). */
+  solo?: PopoutPanelId;
+}) {
   const [snapshot, setSnapshot] = useState<MarketScannerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEvent[]>([]);
   const earningsCursorRef = useRef(0);
   const fetchedEarningsRef = useRef<Set<string>>(new Set());
   const liveQuotes = useLiveQuotes();
+  const isPopout = Boolean(solo);
 
   const monitorSymbols = [
     ...(snapshot?.volumeLeaders?.map((l) => l.symbol) ?? []),
     ...(snapshot?.alerts?.map((a) => a.symbol) ?? []),
     ...MARKET_STATE_SYMBOLS,
   ];
-  useRegisterLiveSymbols("market-monitor", monitorSymbols);
+  useRegisterLiveSymbols(solo ? `market-monitor-${solo}` : "market-monitor", monitorSymbols);
 
   useEffect(() => {
     const stored = loadStoredEarnings();
@@ -125,8 +170,9 @@ export function MarketMonitor({ className }: { className?: string }) {
       if (!res.ok) return;
       const data: MarketScannerSnapshot = await res.json();
       setSnapshot(data);
-    } catch { /* ignore */ }
-    finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -135,13 +181,13 @@ export function MarketMonitor({ className }: { className?: string }) {
     let interval: ReturnType<typeof setInterval> | null = null;
     const delay = setTimeout(() => {
       fetchScanner();
-      interval = setInterval(fetchScanner, 25_000);
-    }, 500);
+      interval = setInterval(fetchScanner, isPopout ? 12_000 : 25_000);
+    }, 200);
     return () => {
       clearTimeout(delay);
       if (interval) clearInterval(interval);
     };
-  }, [fetchScanner]);
+  }, [fetchScanner, isPopout]);
 
   const fetchEarnings = useCallback(async () => {
     const syms = [
@@ -151,7 +197,6 @@ export function MarketMonitor({ className }: { className?: string }) {
     const unique = [...new Set(syms)].filter(Boolean);
     if (unique.length === 0) return;
 
-    // rotate through the list to stay under Finnhub limits
     const start = earningsCursorRef.current % unique.length;
     const batch: string[] = [];
     const max = Math.min(8, unique.length);
@@ -186,12 +231,71 @@ export function MarketMonitor({ className }: { className?: string }) {
   }, [snapshot, fetchEarnings]);
 
   const session = snapshot?.marketSession ?? "closed";
+  const hidePopout = isPopout;
+
+  if (solo === "wire-alerts") {
+    return (
+      <div className={cn("h-full min-h-0", className)}>
+        <AlertFeed
+          alerts={snapshot?.alerts ?? []}
+          loading={loading}
+          session={session}
+          liveQuotes={liveQuotes}
+          hidePopout={hidePopout}
+          expanded
+        />
+      </div>
+    );
+  }
+  if (solo === "volume") {
+    return (
+      <div className={cn("h-full min-h-0", className)}>
+        <VolumePanel
+          leaders={snapshot?.volumeLeaders ?? []}
+          loading={loading}
+          session={session}
+          liveQuotes={liveQuotes}
+          hidePopout={hidePopout}
+          expanded
+        />
+      </div>
+    );
+  }
+  if (solo === "market-state") {
+    return (
+      <div className={cn("h-full min-h-0", className)}>
+        <MarketStatePanel quotes={liveQuotes} loading={loading} hidePopout={hidePopout} expanded />
+      </div>
+    );
+  }
+  if (solo === "earnings") {
+    return (
+      <div className={cn("h-full min-h-0", className)}>
+        <EarningsPanel
+          events={earnings}
+          loading={loading && earnings.length === 0}
+          hidePopout={hidePopout}
+          expanded
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col gap-2 h-full min-h-0", className)}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[1.7] min-h-[260px] lg:min-h-0">
-        <AlertFeed alerts={snapshot?.alerts ?? []} loading={loading} session={session} liveQuotes={liveQuotes} />
-        <VolumePanel leaders={snapshot?.volumeLeaders ?? []} loading={loading} session={session} liveQuotes={liveQuotes} />
+        <AlertFeed
+          alerts={snapshot?.alerts ?? []}
+          loading={loading}
+          session={session}
+          liveQuotes={liveQuotes}
+        />
+        <VolumePanel
+          leaders={snapshot?.volumeLeaders ?? []}
+          loading={loading}
+          session={session}
+          liveQuotes={liveQuotes}
+        />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[0.9] min-h-0 max-h-44 lg:max-h-48 shrink-0">
         <MarketStatePanel quotes={liveQuotes} loading={loading} />
@@ -207,29 +311,49 @@ function PanelShell({
   badge,
   children,
   className,
+  popoutId,
+  hidePopout,
+  expanded,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   children: React.ReactNode;
   className?: string;
+  popoutId?: PopoutPanelId;
+  hidePopout?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <div
       className={cn(
         "rounded-lg border border-zinc-800 bg-zinc-950/60 overflow-hidden flex flex-col min-h-0 h-full",
+        expanded && "rounded-none border-0 bg-zinc-950",
         className
       )}
     >
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-800 bg-zinc-900/50 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <Icon className="w-3 h-3 text-emerald-500" />
-          <span className="text-[10px] font-semibold text-zinc-200 uppercase tracking-wide">{title}</span>
-        </div>
-        {badge && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">
-            {badge}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Icon className="w-3 h-3 text-emerald-500 shrink-0" />
+          <span className="text-[10px] font-semibold text-zinc-200 uppercase tracking-wide truncate">
+            {title}
           </span>
+          {badge && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium shrink-0">
+              {badge}
+            </span>
+          )}
+        </div>
+        {popoutId && !hidePopout && (
+          <button
+            type="button"
+            onClick={() => openPanelPopout(popoutId)}
+            className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors"
+            title={`Pop out ${title}`}
+          >
+            <AppWindow className="w-3 h-3" />
+            <span className="hidden sm:inline">Pop out</span>
+          </button>
         )}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
@@ -242,18 +366,24 @@ function AlertFeed({
   loading,
   session,
   liveQuotes,
+  hidePopout,
+  expanded,
 }: {
   alerts: MarketAlert[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
   liveQuotes: Record<string, LiveQuote>;
+  hidePopout?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <PanelShell
       title="Wire Alerts"
       icon={Radio}
       badge={SESSION_LABELS[session]}
-      className=""
+      popoutId="wire-alerts"
+      hidePopout={hidePopout}
+      expanded={expanded}
     >
       <div className="h-full overflow-y-auto">
         {loading && alerts.length === 0 ? (
@@ -263,41 +393,46 @@ function AlertFeed({
             ))}
           </div>
         ) : alerts.length === 0 ? (
-          <p className="text-[10px] text-zinc-600 p-3 text-center">Watching for HOD, retests &amp; volume…</p>
+          <p className="text-[10px] text-zinc-600 p-3 text-center">
+            Watching for HOD, retests &amp; volume…
+          </p>
         ) : (
           <ul>
             {alerts.map((alert) => {
               const change =
                 pickLiveField(alert.symbol, liveQuotes, "changePercent", alert.changePercent) ?? 0;
               return (
-              <li
-                key={alert.id}
-                className="flex items-center gap-1.5 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]"
-              >
-                <span className="text-[9px] text-zinc-600 font-mono shrink-0 w-11">
-                  {formatClock(alert.timestamp)}
-                </span>
-                <AlertIcon type={alert.type} />
-                <div className="min-w-0 flex-1 truncate">
-                  <a
-                    href={tradingViewUrl(alert.symbol)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono font-bold text-white mr-1 hover:text-emerald-400"
-                  >
-                    {alert.symbol}
-                  </a>
-                  <span className="text-zinc-500">{alert.message}</span>
-                </div>
-                <span
+                <li
+                  key={alert.id}
                   className={cn(
-                    "font-mono text-[10px] font-semibold shrink-0",
-                    change >= 0 ? "text-emerald-400" : "text-red-400"
+                    "flex items-center gap-1.5 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]",
+                    expanded && "py-1.5 text-[12px]"
                   )}
                 >
-                  {formatPercent(change)}
-                </span>
-              </li>
+                  <span className="text-[9px] text-zinc-600 font-mono shrink-0 w-11">
+                    {formatClock(alert.timestamp)}
+                  </span>
+                  <AlertIcon type={alert.type} />
+                  <div className="min-w-0 flex-1 truncate">
+                    <a
+                      href={tradingViewUrl(alert.symbol)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono font-bold text-white mr-1 hover:text-emerald-400"
+                    >
+                      {alert.symbol}
+                    </a>
+                    <span className="text-zinc-500">{alert.message}</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "font-mono text-[10px] font-semibold shrink-0",
+                      change >= 0 ? "text-emerald-400" : "text-red-400"
+                    )}
+                  >
+                    {formatPercent(change)}
+                  </span>
+                </li>
               );
             })}
           </ul>
@@ -312,18 +447,24 @@ function VolumePanel({
   loading,
   session,
   liveQuotes,
+  hidePopout,
+  expanded,
 }: {
   leaders: VolumeLeader[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
   liveQuotes: Record<string, LiveQuote>;
+  hidePopout?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <PanelShell
       title="Heavy Volume"
       icon={BarChart3}
       badge={`${leaders.length} stocks`}
-      className=""
+      popoutId="volume"
+      hidePopout={hidePopout}
+      expanded={expanded}
     >
       <div className="hidden sm:grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 px-2 py-1 border-b border-zinc-800/80 text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
         <span>Ticker</span>
@@ -345,7 +486,12 @@ function VolumePanel({
           </p>
         ) : (
           leaders.map((leader, i) => (
-            <VolumeRow key={`${leader.symbol}-${i}`} leader={leader} liveQuotes={liveQuotes} />
+            <VolumeRow
+              key={`${leader.symbol}-${i}`}
+              leader={leader}
+              liveQuotes={liveQuotes}
+              expanded={expanded}
+            />
           ))
         )}
       </div>
@@ -356,9 +502,11 @@ function VolumePanel({
 function VolumeRow({
   leader,
   liveQuotes,
+  expanded,
 }: {
   leader: VolumeLeader;
   liveQuotes: Record<string, LiveQuote>;
+  expanded?: boolean;
 }) {
   const price = pickLiveField(leader.symbol, liveQuotes, "price", leader.price) ?? leader.price;
   const change =
@@ -369,7 +517,12 @@ function VolumeRow({
   const warm = rVol >= 3;
 
   return (
-    <div className="grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 items-center px-2 py-1 border-b border-zinc-800/40 hover:bg-zinc-900/40 text-[11px]">
+    <div
+      className={cn(
+        "grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 items-center px-2 py-1 border-b border-zinc-800/40 hover:bg-zinc-900/40 text-[11px]",
+        expanded && "py-1.5 text-[12px]"
+      )}
+    >
       <div>
         <a
           href={tradingViewUrl(leader.symbol)}
@@ -417,16 +570,22 @@ function VolumeRow({
 function EarningsPanel({
   events,
   loading,
+  hidePopout,
+  expanded,
 }: {
   events: EarningsEvent[];
   loading: boolean;
+  hidePopout?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <PanelShell
       title="Upcoming Earnings"
       icon={CalendarDays}
       badge={events.length ? `${events.length} soon` : undefined}
-      className=""
+      popoutId="earnings"
+      hidePopout={hidePopout}
+      expanded={expanded}
     >
       <div className="h-full overflow-y-auto">
         {loading && events.length === 0 ? (
@@ -436,15 +595,16 @@ function EarningsPanel({
             ))}
           </div>
         ) : events.length === 0 ? (
-          <p className="text-[10px] text-zinc-600 p-3 text-center">
-            Loading earnings…
-          </p>
+          <p className="text-[10px] text-zinc-600 p-3 text-center">Loading earnings…</p>
         ) : (
           <ul>
-            {events.slice(0, 12).map((e) => (
+            {(expanded ? events : events.slice(0, 12)).map((e) => (
               <li
                 key={`${e.symbol}-${e.date}`}
-                className="flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]"
+                className={cn(
+                  "flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]",
+                  expanded && "py-1.5 text-[12px]"
+                )}
               >
                 <a
                   href={tradingViewUrl(e.symbol)}
@@ -471,16 +631,23 @@ function EarningsPanel({
 function MarketStatePanel({
   quotes,
   loading,
+  hidePopout,
+  expanded,
 }: {
   quotes: Record<string, { price: number; changePercent: number }>;
   loading: boolean;
+  hidePopout?: boolean;
+  expanded?: boolean;
 }) {
   const row = (sym: string, label?: string) => {
     const q = quotes[sym];
     return (
       <div
         key={sym}
-        className="flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 text-[11px]"
+        className={cn(
+          "flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 text-[11px]",
+          expanded && "py-1.5 text-[12px]"
+        )}
       >
         <span className="font-mono font-bold text-white">{label ?? sym}</span>
         <div className="flex items-center gap-2 shrink-0">
@@ -505,7 +672,9 @@ function MarketStatePanel({
       title="Market State"
       icon={Gauge}
       badge={quotes.VIX ? `VIX ${formatPercent(quotes.VIX.changePercent)}` : undefined}
-      className=""
+      popoutId="market-state"
+      hidePopout={hidePopout}
+      expanded={expanded}
     >
       <div className="h-full overflow-y-auto">
         {row("VIX", "VIX")}
