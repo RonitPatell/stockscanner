@@ -81,6 +81,9 @@ let yahooOffset = 0;
 let finnhubWs = null;
 let finnhubSubscribed = new Set();
 let finnhubReconnectMs = 2_000;
+/** In-memory quote map — avoids Redis GET on every flush (biggest command saver). */
+let localQuotes = {};
+let lastLiveTsWrite = 0;
 
 function toYahooSymbol(sym) {
   return sym === "VIX" ? "^VIX" : sym;
@@ -122,51 +125,64 @@ function repriceFromTick(existing, price) {
   };
 }
 
+let redisDisabledUntil = 0;
+
 async function flushQuotes() {
   const batch = pendingQuotes;
   pendingQuotes = {};
   const syms = Object.keys(batch);
   if (syms.length === 0) return;
 
-  try {
-    const existing = (await redis.get(QUOTES_KEY)) || {};
-    const merged = { ...existing };
-    for (const sym of syms) {
-      merged[sym] = batch[sym];
-    }
-    await Promise.all([
-      redis.set(QUOTES_KEY, merged, { ex: QUOTES_TTL_SEC }),
-      redis.set(LIVE_STREAM_TS_KEY, Date.now(), { ex: 60 }),
-    ]);
-  } catch (err) {
-    console.error(new Date().toISOString(), "redis flush error:", err.message);
+  for (const sym of syms) {
+    localQuotes[sym] = { ...(localQuotes[sym] || {}), ...batch[sym] };
   }
+
+  if (Date.now() < redisDisabledUntil) return;
+
+  try {
+    const now = Date.now();
+    const writes = [redis.set(QUOTES_KEY, localQuotes, { ex: QUOTES_TTL_SEC })];
+    if (now - lastLiveTsWrite > 2_000) {
+      lastLiveTsWrite = now;
+      writes.push(redis.set(LIVE_STREAM_TS_KEY, now, { ex: 60 }));
+    }
+    await Promise.all(writes);
+  } catch (err) {
+    const msg = String(err?.message || err);
+    if (msg.includes("max requests limit")) {
+      redisDisabledUntil = Date.now() + 6 * 60 * 60_000;
+      console.error(
+        new Date().toISOString(),
+        "Upstash free limit hit — pausing Redis writes for 6h (quotes stay in memory only)"
+      );
+      return;
+    }
+    console.error(new Date().toISOString(), "redis flush error:", msg);
+  }
+}
+
+function scheduleFlush(ms = 1_000) {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushQuotes();
+  }, ms);
 }
 
 function queueQuote(sym, quote) {
   const key = sym.toUpperCase();
-  const existing = pendingQuotes[key];
+  const existing = pendingQuotes[key] || localQuotes[key];
   pendingQuotes[key] = existing
     ? { ...existing, ...quote, price: quote.price ?? existing.price }
     : quote;
-  if (!flushTimer) {
-    flushTimer = setTimeout(() => {
-      flushTimer = null;
-      void flushQuotes();
-    }, 100);
-  }
+  scheduleFlush(1_000);
 }
 
 function queueTick(sym, price) {
   const key = sym.toUpperCase();
-  const existing = pendingQuotes[key];
+  const existing = pendingQuotes[key] || localQuotes[key];
   pendingQuotes[key] = repriceFromTick(existing, price);
-  if (!flushTimer) {
-    flushTimer = setTimeout(() => {
-      flushTimer = null;
-      void flushQuotes();
-    }, 100);
-  }
+  scheduleFlush(1_000);
 }
 
 function rowToQuote(row) {
@@ -338,6 +354,14 @@ function connectFinnhub() {
 console.log(
   `Quote stream → Redis (Yahoo${FINNHUB_KEY ? " + Finnhub WS" : ""}, poll ${POLL_MS}ms)`
 );
+
+try {
+  const existing = (await redis.get(QUOTES_KEY)) || {};
+  if (existing && typeof existing === "object") localQuotes = existing;
+} catch {
+  /* start empty */
+}
+
 void yahooPollLoop();
 setInterval(() => void yahooPollLoop(), POLL_MS);
 connectFinnhub();

@@ -17,7 +17,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-white mb-2">2. Service Description</h2>
             <p>
               TrustTicker provides informational market data, news aggregation, AI-generated analysis,
-              and alert services on a subscription basis ($40 USD/month). The service is for
+              and alert services on a subscription basis ($19.99 USD/month). The service is for
               informational purposes only and does not constitute investment advice.
             </p>
           </section>

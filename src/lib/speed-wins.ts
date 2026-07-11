@@ -108,12 +108,24 @@ export interface IngestLatencyStats {
   p90Sec: number | null;
   sampleSize: number;
   under15sRate: number | null;
+  /** Share of live catches within 60s of publish. */
+  under60sRate: number | null;
+  /** Share of live catches within 3 minutes — primary marketing metric. */
+  under3mRate: number | null;
+  /** @deprecated Use under60sRate */
   under30sRate: number | null;
   fastestSec: number | null;
 }
 
+/**
+ * Latency for marketing / Caught it.
+ * Only counts "live race" catches (ingest within 10 minutes of publish).
+ * Hours-old RSS/Finnhub backfill is excluded — it was never a fair speed race.
+ */
 export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencyStats> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const LIVE_RACE_MAX_SEC = 10 * 60;
+
   const rows = await prisma.catalyst.findMany({
     where: { createdAt: { gte: since } },
     select: { publishedAt: true, createdAt: true },
@@ -121,27 +133,38 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
     orderBy: { createdAt: "desc" },
   });
 
-  if (rows.length === 0) {
-    return {
-      avgSec: null,
-      p50Sec: null,
-      p90Sec: null,
-      sampleSize: 0,
-      under15sRate: null,
-      under30sRate: null,
-      fastestSec: null,
-    };
-  }
+  const empty: IngestLatencyStats = {
+    avgSec: null,
+    p50Sec: null,
+    p90Sec: null,
+    sampleSize: 0,
+    under15sRate: null,
+    under60sRate: null,
+    under3mRate: null,
+    under30sRate: null,
+    fastestSec: null,
+  };
 
-  const delays = rows
+  if (rows.length === 0) return empty;
+
+  const allDelays = rows
     .map((r) => Math.max(0, (r.createdAt.getTime() - r.publishedAt.getTime()) / 1000))
     .sort((a, b) => a - b);
+
+  const delays = allDelays.filter((d) => d <= LIVE_RACE_MAX_SEC);
+  if (delays.length === 0) {
+    return { ...empty, fastestSec: allDelays[0] ?? null };
+  }
 
   const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
   const p50 = delays[Math.floor(delays.length * 0.5)] ?? null;
   const p90 = delays[Math.floor(delays.length * 0.9)] ?? null;
   const under15 = delays.filter((d) => d <= 15).length / delays.length;
-  const under30 = delays.filter((d) => d <= 30).length / delays.length;
+  const under60 = delays.filter((d) => d <= 60).length / delays.length;
+  const under3m = delays.filter((d) => d <= 180).length / delays.length;
+
+  const under60sRate = Math.round(under60 * 1000) / 10;
+  const under3mRate = Math.round(under3m * 1000) / 10;
 
   return {
     avgSec: Math.round(avg * 10) / 10,
@@ -149,7 +172,9 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
     p90Sec: Math.round((p90 ?? 0) * 10) / 10,
     sampleSize: delays.length,
     under15sRate: Math.round(under15 * 1000) / 10,
-    under30sRate: Math.round(under30 * 1000) / 10,
+    under60sRate,
+    under3mRate,
+    under30sRate: under60sRate,
     fastestSec: delays[0] ?? null,
   };
 }

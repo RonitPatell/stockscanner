@@ -41,7 +41,7 @@ export default async function TickerPage({ params }: Props) {
           </span>
         </Link>
         <Link href="/pricing">
-          <Button size="sm">Get live feed — $40/mo</Button>
+          <Button size="sm">Get live feed — $19.99/mo</Button>
         </Link>
       </header>
 

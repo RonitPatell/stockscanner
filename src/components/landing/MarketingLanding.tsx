@@ -179,7 +179,7 @@ export function MarketingLanding({
               <Sparkles className="w-4 h-4" />
               {isSignedIn
                 ? `Welcome back, ${displayName}`
-                : "Pro-grade catalyst intelligence · $40/mo flat"}
+                : "Pro-grade catalyst intelligence · $19.99/mo flat"}
             </div>
 
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 landing-fade-up landing-delay-1">
@@ -247,7 +247,7 @@ export function MarketingLanding({
             <p className="text-sm text-zinc-600 landing-fade-up landing-delay-3">
               {isSignedIn
                 ? "Manage billing & alerts anytime from Settings"
-                : "$40/month after trial · Cancel anytime · No contracts"}
+                : "$19.99/month after trial · Cancel anytime · No contracts"}
             </p>
           </div>
 
@@ -545,7 +545,7 @@ export function MarketingLanding({
                 ? isSubscribed
                   ? "Open Scanner"
                   : "View Demo"
-                : "Start Free Trial — $40/mo after"}
+                : "Start Free Trial — $19.99/mo after"}
             </Button>
           </Link>
         </div>

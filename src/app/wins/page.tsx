@@ -75,7 +75,7 @@ export default async function WinsPage() {
             {[
               { label: "Avg ingest", value: `${latency.avgSec}s` },
               { label: "Median", value: `${latency.p50Sec}s` },
-              { label: "Under 30s", value: `${latency.under30sRate}%` },
+              { label: "Under 3m", value: `${latency.under3mRate ?? latency.under60sRate}%` },
               { label: "Sample (24h)", value: String(latency.sampleSize) },
             ].map((s) => (
               <div

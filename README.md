@@ -1,9 +1,9 @@
 # TrustTicker
 
-AI Stock Catalyst Scanner — **$40/month** subscription SaaS.
+AI Stock Catalyst Scanner — **$19.99/month** subscription SaaS.
 
 **You pay:** ~$12/year (domain only)  
-**Subscribers pay:** $40/month (via Stripe)
+**Subscribers pay:** $19.99/month (via Stripe)
 
 ## Quick Start
 
@@ -26,17 +26,15 @@ Full guide: [SETUP.md](./SETUP.md)
 | Yahoo RSS | $0 | News fallback |
 | Keyword engine | $0 | Sentiment analysis |
 | Discord webhooks | $0 | Alerts |
-| Stripe | $0/mo | Collects $40/subscriber |
+| Stripe | $0/mo | Collects $19.99/subscriber |
 
 ## Features
 
-- Live catalyst scanner (30s refresh + SSE stream)
+- Live catalyst scanner (wire ingest + SSE stream)
 - Sentiment scoring (-100 to +100) on every headline
 - Float, market cap, premarket detection
 - Historical similar-catalyst moves
 - Discord webhook alerts
-- Stripe $40/mo subscriptions with 7-day trial
-
-## Legal
-
-Informational only — not investment advice. See `/legal/disclaimer`.
+- Stripe $19.99/mo subscriptions with 7-day trial
+- Advanced filters (catalyst type, urgency, sentiment)
+- Watchlist briefs, playbooks, speed wins

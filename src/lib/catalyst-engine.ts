@@ -216,7 +216,7 @@ export async function ingestAndAnalyzeNews(
   const results: CatalystItem[] = [];
   const quoteCache = new Map<string, Awaited<ReturnType<typeof fetchQuote>>>();
   const cutoff = Date.now() - MAX_NEWS_AGE_MS;
-  const wireRecentCutoff = Date.now() - 45 * 60 * 1000;
+  const wireRecentCutoff = Date.now() - 8 * 60 * 1000;
   const maxNew = wireOnly ? MAX_WIRE_BURST_NEW : MAX_NEW_INGEST_PER_CYCLE;
   const concurrency = wireOnly ? 15 : 5;
 

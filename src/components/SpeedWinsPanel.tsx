@@ -32,6 +32,7 @@ export function SpeedWinsPanel({
   showViewAll?: boolean;
 }) {
   const [wins, setWins] = useState<SpeedWin[]>([]);
+  const [under3mRate, setUnder3mRate] = useState<number | null>(null);
   const liveQuotes = useLiveQuotes();
 
   useRegisterLiveSymbols("speed-wins", wins.map((w) => w.symbol));
@@ -40,7 +41,11 @@ export function SpeedWinsPanel({
     const load = () => {
       void fetch(`/api/speed-wins?limit=${limit}&sort=fastest`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d?.wins && setWins(d.wins))
+        .then((d) => {
+          if (d?.wins) setWins(d.wins);
+          if (typeof d?.under3mRate === "number") setUnder3mRate(d.under3mRate);
+          else if (typeof d?.under60sRate === "number") setUnder3mRate(d.under60sRate);
+        })
         .catch(() => {});
     };
     const delay = setTimeout(load, 400);
@@ -60,6 +65,11 @@ export function SpeedWinsPanel({
           <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
           <span className="text-[11px] font-semibold text-zinc-300">{title}</span>
           <span className="text-[9px] text-zinc-600">publish → feed → move</span>
+          {under3mRate != null && (
+            <span className="text-[9px] font-mono text-emerald-500/90">
+              {under3mRate}% under 3m
+            </span>
+          )}
         </div>
         {showViewAll && (
           <Link href="/wins" className="text-[10px] text-emerald-500 hover:underline">

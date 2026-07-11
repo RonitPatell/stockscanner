@@ -43,7 +43,7 @@ export default async function DemoPage() {
             {session ? (
               <>
                 {!isSubscribed && (
-                  <CheckoutButton size="sm">Subscribe $40/mo</CheckoutButton>
+                  <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
                 )}
                 <UserMenu />
               </>

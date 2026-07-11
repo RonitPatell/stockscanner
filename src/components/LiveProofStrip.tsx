@@ -8,7 +8,9 @@ interface PublicStats {
   latency: {
     avgSec: number | null;
     p50Sec: number | null;
-    under30sRate: number | null;
+    under60sRate?: number | null;
+    under3mRate?: number | null;
+    under30sRate?: number | null;
     sampleSize: number;
     fastestSec?: number | null;
   };
@@ -67,9 +69,12 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
               ) : null}
             </span>
           )}
-          {stats?.latency.under30sRate != null && (
+          {(stats?.latency.under3mRate ?? stats?.latency.under60sRate) != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
-              <strong className="text-emerald-400">{stats.latency.under30sRate}%</strong> under 30s
+              <strong className="text-emerald-400">
+                {stats?.latency.under3mRate ?? stats?.latency.under60sRate}%
+              </strong>{" "}
+              under 3m
             </span>
           )}
           {fastest != null && (

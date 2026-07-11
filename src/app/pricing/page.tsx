@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { LogoMark } from "@/components/Logo";
-
-const SUBSCRIPTION_PRICE = 40;
+import { SUBSCRIPTION_PRICE, SUBSCRIPTION_PRICE_MO } from "@/lib/stripe";
 
 const highlights = [
   { label: "~8s", desc: "Wire ingest cycle" },
@@ -142,7 +141,7 @@ export default async function PricingPage({
             <div className="mb-8">
               {session ? (
                 <CheckoutButton size="lg" className="w-full text-base">
-                  {trialAvailable ? "Start Free Trial" : "Subscribe — $40/mo"}
+                  {trialAvailable ? "Start Free Trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
                 </CheckoutButton>
               ) : (
                 <Link href="/login?register=true&next=checkout" className="block">

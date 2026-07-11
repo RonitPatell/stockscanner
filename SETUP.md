@@ -1,7 +1,7 @@
-# TrustTicker — $0 to Run, $40/mo Revenue
+# TrustTicker — $0 to Run, $19.99/mo Revenue
 
 **Your cost:** ~$12/year (domain only)  
-**Subscriber cost:** $40/month (paid to you via Stripe)
+**Subscriber cost:** $19.99/month (paid to you via Stripe)
 
 ---
 
@@ -19,7 +19,7 @@
 | Stripe | $0/month | Takes ~3.6% only when you earn |
 | **Total** | **~$1/mo** | Domain amortized |
 
-**Revenue per subscriber:** $40/mo − ~$1.46 Stripe fee = **~$38.54 profit**
+**Revenue per subscriber:** $19.99/mo − ~$0.88 Stripe fee = **~$19.11 profit**
 
 Break-even: **1 subscriber** covers everything.
 
@@ -56,16 +56,16 @@ Paste result into `NEXTAUTH_SECRET` and `CRON_SECRET`.
 
 Without this key, Yahoo Finance RSS is used automatically.
 
-### 5. Stripe ($40/mo subscriptions — free to set up)
+### 5. Stripe ($19.99/mo subscriptions — free to set up)
 
 1. Create account at [stripe.com](https://stripe.com)
 2. **Products** → Add product: `TrustTicker Pro`
-3. Price: **$40.00 / month / recurring**
+3. Price: **$19.99 / month / recurring**
 4. Optional: add **7-day free trial**
 5. Copy `price_...` → `STRIPE_PRICE_ID`
 6. Copy API keys → `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`
 
-Stripe costs you nothing until someone subscribes. When they do, you keep ~$38.54 of the $40.
+Stripe costs you nothing until someone subscribes. When they do, you keep ~$19.11 of the $19.99.
 
 ### 6. Run locally
 
@@ -138,7 +138,7 @@ This sends Discord alerts even when no one is on the dashboard.
 
 ---
 
-## What Subscribers Get ($40/mo)
+## What Subscribers Get ($19.99/mo)
 
 - Live catalyst scanner with 30s refresh
 - Sentiment scoring on every headline (-100 to +100)
@@ -171,7 +171,7 @@ Before accepting real money:
 [ ] All env vars set in Vercel
 [ ] npx prisma db push run against production DB
 [ ] Finnhub API key added (free)
-[ ] Stripe product at $40/mo created
+[ ] Stripe product at $19.99/mo created
 [ ] Stripe webhook configured
 [ ] Test: register → subscribe (test card 4242...) → dashboard → Discord alert
 [ ] Legal pages reviewed
@@ -263,8 +263,8 @@ curl -H "Authorization: Bearer YOUR_CRON_SECRET" "http://localhost:3000/api/cron
 
 | Subscribers | Monthly Revenue | Your Profit (after Stripe) |
 |-------------|----------------|---------------------------|
-| 1 | $40 | ~$38 |
-| 10 | $400 | ~$385 |
+| 1 | $19.99 | ~$19 |
+| 10 | $199.90 | ~$191 |
 | 25 | $1,000 | ~$964 |
 | 50 | $2,000 | ~$1,928 |
 | 100 | $4,000 | ~$3,854 |

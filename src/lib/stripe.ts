@@ -12,7 +12,9 @@ export function getStripe() {
   return _stripe;
 }
 
-export const SUBSCRIPTION_PRICE = 40; // USD per month
+export const SUBSCRIPTION_PRICE = 19.99; // USD per month (display only — Stripe charges STRIPE_PRICE_ID)
+export const SUBSCRIPTION_PRICE_LABEL = "$19.99";
+export const SUBSCRIPTION_PRICE_MO = "$19.99/mo";
 
 export async function createCheckoutSession(
   customerId: string,
