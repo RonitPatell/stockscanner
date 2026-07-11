@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
   const skips = scored
     .filter(
       ({ c, playbook }) =>
-        isDilutionCatalyst(c) || playbook.bias === "skip" || playbook.antiFomoScore >= 75
+        isDilutionCatalyst(c) ||
+        playbook.bias === "avoid" ||
+        playbook.antiFomoScore >= 75
     )
     .slice(0, 2);
 
