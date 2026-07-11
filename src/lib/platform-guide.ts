@@ -47,7 +47,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     target: "market-monitor",
     title: "Wire Alerts + High Volume",
     body: "Your core tape tools. Wire Alerts flag HOD / retests / volume events. High Volume shows relative-volume leaders. Market state and earnings sit underneath.",
-    tip: "This is the main “what’s moving right now” block · use Pop out on each panel for a bigger window",
+    tip: "This is the main “what’s moving right now” block · use Expand on a panel to enlarge it over the monitor, Minimize to shrink it back",
   },
   {
     id: "wins-brief",

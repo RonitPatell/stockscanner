@@ -11,7 +11,8 @@ import {
   Zap,
   CalendarDays,
   Gauge,
-  AppWindow,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import type { EarningsEvent, MarketAlert, MarketScannerSnapshot, VolumeLeader } from "@/types";
 import { cn, formatPercent, formatPrice } from "@/lib/utils";
@@ -57,26 +58,6 @@ export const POPOUT_PANELS: Record<
 
 export function isPopoutPanelId(value: string): value is PopoutPanelId {
   return value in POPOUT_PANELS;
-}
-
-export function openPanelPopout(panel: PopoutPanelId) {
-  if (typeof window === "undefined") return;
-  const meta = POPOUT_PANELS[panel];
-  const url = `${window.location.origin}/popout/${panel}`;
-  const name = `trustticker-popout-${panel}`;
-  const left = Math.max(40, window.screenX + 60);
-  const top = Math.max(40, window.screenY + 60);
-  const features = [
-    "popup=yes",
-    `width=${meta.width}`,
-    `height=${meta.height}`,
-    `left=${left}`,
-    `top=${top}`,
-    "noopener=yes",
-    "noreferrer=yes",
-  ].join(",");
-  const win = window.open(url, name, features);
-  win?.focus();
 }
 
 const EARNINGS_STORAGE_KEY = "trustticker:earnings:v1";
@@ -127,16 +108,26 @@ export function MarketMonitor({
   solo,
 }: {
   className?: string;
-  /** Render a single panel full-bleed (pop-out windows). */
+  /** Render a single panel full-bleed (legacy /popout route). */
   solo?: PopoutPanelId;
 }) {
   const [snapshot, setSnapshot] = useState<MarketScannerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEvent[]>([]);
+  const [expandedPanel, setExpandedPanel] = useState<PopoutPanelId | null>(null);
   const earningsCursorRef = useRef(0);
   const fetchedEarningsRef = useRef<Set<string>>(new Set());
   const liveQuotes = useLiveQuotes();
   const isPopout = Boolean(solo);
+
+  useEffect(() => {
+    if (!expandedPanel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpandedPanel(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandedPanel]);
 
   const monitorSymbols = [
     ...(snapshot?.volumeLeaders?.map((l) => l.symbol) ?? []),
@@ -231,7 +222,12 @@ export function MarketMonitor({
   }, [snapshot, fetchEarnings]);
 
   const session = snapshot?.marketSession ?? "closed";
-  const hidePopout = isPopout;
+  const expandControls = !isPopout
+    ? {
+        onExpand: (id: PopoutPanelId) => setExpandedPanel(id),
+        onMinimize: () => setExpandedPanel(null),
+      }
+    : undefined;
 
   if (solo === "wire-alerts") {
     return (
@@ -241,7 +237,6 @@ export function MarketMonitor({
           loading={loading}
           session={session}
           liveQuotes={liveQuotes}
-          hidePopout={hidePopout}
           expanded
         />
       </div>
@@ -255,7 +250,6 @@ export function MarketMonitor({
           loading={loading}
           session={session}
           liveQuotes={liveQuotes}
-          hidePopout={hidePopout}
           expanded
         />
       </div>
@@ -264,46 +258,108 @@ export function MarketMonitor({
   if (solo === "market-state") {
     return (
       <div className={cn("h-full min-h-0", className)}>
-        <MarketStatePanel quotes={liveQuotes} loading={loading} hidePopout={hidePopout} expanded />
+        <MarketStatePanel quotes={liveQuotes} loading={loading} expanded />
       </div>
     );
   }
   if (solo === "earnings") {
     return (
       <div className={cn("h-full min-h-0", className)}>
-        <EarningsPanel
-          events={earnings}
-          loading={loading && earnings.length === 0}
-          hidePopout={hidePopout}
-          expanded
-        />
+        <EarningsPanel events={earnings} loading={loading && earnings.length === 0} expanded />
       </div>
     );
   }
 
+  const expandedNode =
+    expandedPanel === "wire-alerts" ? (
+      <AlertFeed
+        alerts={snapshot?.alerts ?? []}
+        loading={loading}
+        session={session}
+        liveQuotes={liveQuotes}
+        expanded
+        {...expandControls}
+        activePanel="wire-alerts"
+      />
+    ) : expandedPanel === "volume" ? (
+      <VolumePanel
+        leaders={snapshot?.volumeLeaders ?? []}
+        loading={loading}
+        session={session}
+        liveQuotes={liveQuotes}
+        expanded
+        {...expandControls}
+        activePanel="volume"
+      />
+    ) : expandedPanel === "market-state" ? (
+      <MarketStatePanel
+        quotes={liveQuotes}
+        loading={loading}
+        expanded
+        {...expandControls}
+        activePanel="market-state"
+      />
+    ) : expandedPanel === "earnings" ? (
+      <EarningsPanel
+        events={earnings}
+        loading={loading && earnings.length === 0}
+        expanded
+        {...expandControls}
+        activePanel="earnings"
+      />
+    ) : null;
+
   return (
-    <div className={cn("flex flex-col gap-2 h-full min-h-0", className)}>
+    <div className={cn("relative flex flex-col gap-2 h-full min-h-0", className)}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[1.7] min-h-[260px] lg:min-h-0">
         <AlertFeed
           alerts={snapshot?.alerts ?? []}
           loading={loading}
           session={session}
           liveQuotes={liveQuotes}
+          {...expandControls}
+          activePanel="wire-alerts"
         />
         <VolumePanel
           leaders={snapshot?.volumeLeaders ?? []}
           loading={loading}
           session={session}
           liveQuotes={liveQuotes}
+          {...expandControls}
+          activePanel="volume"
         />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[0.9] min-h-0 max-h-44 lg:max-h-48 shrink-0">
-        <MarketStatePanel quotes={liveQuotes} loading={loading} />
-        <EarningsPanel events={earnings} loading={loading && earnings.length === 0} />
+        <MarketStatePanel
+          quotes={liveQuotes}
+          loading={loading}
+          {...expandControls}
+          activePanel="market-state"
+        />
+        <EarningsPanel
+          events={earnings}
+          loading={loading && earnings.length === 0}
+          {...expandControls}
+          activePanel="earnings"
+        />
       </div>
+
+      {expandedNode && (
+        <div className="absolute inset-0 z-30 flex flex-col rounded-lg border border-emerald-500/30 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
+          <div className="absolute inset-0 bg-zinc-950/40 pointer-events-none" aria-hidden />
+          <div className="relative flex-1 min-h-0 p-1.5 sm:p-2">{expandedNode}</div>
+        </div>
+      )}
     </div>
   );
 }
+
+type PanelExpandProps = {
+  activePanel?: PopoutPanelId;
+  onExpand?: (id: PopoutPanelId) => void;
+  onMinimize?: () => void;
+  expanded?: boolean;
+};
 
 function PanelShell({
   title,
@@ -311,8 +367,9 @@ function PanelShell({
   badge,
   children,
   className,
-  popoutId,
-  hidePopout,
+  activePanel,
+  onExpand,
+  onMinimize,
   expanded,
 }: {
   title: string;
@@ -320,15 +377,14 @@ function PanelShell({
   badge?: string;
   children: React.ReactNode;
   className?: string;
-  popoutId?: PopoutPanelId;
-  hidePopout?: boolean;
-  expanded?: boolean;
-}) {
+} & PanelExpandProps) {
+  const canToggle = Boolean(activePanel && (onExpand || onMinimize));
+
   return (
     <div
       className={cn(
         "rounded-lg border border-zinc-800 bg-zinc-950/60 overflow-hidden flex flex-col min-h-0 h-full",
-        expanded && "rounded-none border-0 bg-zinc-950",
+        expanded && "rounded-md border-zinc-700 bg-zinc-950",
         className
       )}
     >
@@ -344,15 +400,18 @@ function PanelShell({
             </span>
           )}
         </div>
-        {popoutId && !hidePopout && (
+        {canToggle && (
           <button
             type="button"
-            onClick={() => openPanelPopout(popoutId)}
+            onClick={() => {
+              if (expanded) onMinimize?.();
+              else if (activePanel) onExpand?.(activePanel);
+            }}
             className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors"
-            title={`Pop out ${title}`}
+            title={expanded ? `Minimize ${title}` : `Expand ${title}`}
           >
-            <AppWindow className="w-3 h-3" />
-            <span className="hidden sm:inline">Pop out</span>
+            {expanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+            <span className="hidden sm:inline">{expanded ? "Minimize" : "Expand"}</span>
           </button>
         )}
       </div>
@@ -366,24 +425,25 @@ function AlertFeed({
   loading,
   session,
   liveQuotes,
-  hidePopout,
   expanded,
+  activePanel,
+  onExpand,
+  onMinimize,
 }: {
   alerts: MarketAlert[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
   liveQuotes: Record<string, LiveQuote>;
-  hidePopout?: boolean;
-  expanded?: boolean;
-}) {
+} & PanelExpandProps) {
   return (
     <PanelShell
       title="Wire Alerts"
       icon={Radio}
       badge={SESSION_LABELS[session]}
-      popoutId="wire-alerts"
-      hidePopout={hidePopout}
       expanded={expanded}
+      activePanel={activePanel}
+      onExpand={onExpand}
+      onMinimize={onMinimize}
     >
       <div className="h-full overflow-y-auto">
         {loading && alerts.length === 0 ? (
@@ -447,24 +507,25 @@ function VolumePanel({
   loading,
   session,
   liveQuotes,
-  hidePopout,
   expanded,
+  activePanel,
+  onExpand,
+  onMinimize,
 }: {
   leaders: VolumeLeader[];
   loading: boolean;
   session: MarketScannerSnapshot["marketSession"];
   liveQuotes: Record<string, LiveQuote>;
-  hidePopout?: boolean;
-  expanded?: boolean;
-}) {
+} & PanelExpandProps) {
   return (
     <PanelShell
       title="Heavy Volume"
       icon={BarChart3}
       badge={`${leaders.length} stocks`}
-      popoutId="volume"
-      hidePopout={hidePopout}
       expanded={expanded}
+      activePanel={activePanel}
+      onExpand={onExpand}
+      onMinimize={onMinimize}
     >
       <div className="hidden sm:grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 px-2 py-1 border-b border-zinc-800/80 text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
         <span>Ticker</span>
@@ -570,22 +631,23 @@ function VolumeRow({
 function EarningsPanel({
   events,
   loading,
-  hidePopout,
   expanded,
+  activePanel,
+  onExpand,
+  onMinimize,
 }: {
   events: EarningsEvent[];
   loading: boolean;
-  hidePopout?: boolean;
-  expanded?: boolean;
-}) {
+} & PanelExpandProps) {
   return (
     <PanelShell
       title="Upcoming Earnings"
       icon={CalendarDays}
       badge={events.length ? `${events.length} soon` : undefined}
-      popoutId="earnings"
-      hidePopout={hidePopout}
       expanded={expanded}
+      activePanel={activePanel}
+      onExpand={onExpand}
+      onMinimize={onMinimize}
     >
       <div className="h-full overflow-y-auto">
         {loading && events.length === 0 ? (
@@ -631,14 +693,14 @@ function EarningsPanel({
 function MarketStatePanel({
   quotes,
   loading,
-  hidePopout,
   expanded,
+  activePanel,
+  onExpand,
+  onMinimize,
 }: {
   quotes: Record<string, { price: number; changePercent: number }>;
   loading: boolean;
-  hidePopout?: boolean;
-  expanded?: boolean;
-}) {
+} & PanelExpandProps) {
   const row = (sym: string, label?: string) => {
     const q = quotes[sym];
     return (
@@ -672,9 +734,10 @@ function MarketStatePanel({
       title="Market State"
       icon={Gauge}
       badge={quotes.VIX ? `VIX ${formatPercent(quotes.VIX.changePercent)}` : undefined}
-      popoutId="market-state"
-      hidePopout={hidePopout}
       expanded={expanded}
+      activePanel={activePanel}
+      onExpand={onExpand}
+      onMinimize={onMinimize}
     >
       <div className="h-full overflow-y-auto">
         {row("VIX", "VIX")}

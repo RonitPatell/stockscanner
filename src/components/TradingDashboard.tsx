@@ -136,8 +136,8 @@ export function TradingDashboard({
           </div>
           <p className="text-[10px] text-zinc-600 hidden sm:block">
             {simple
-              ? "Wire · plan · feed — less noise"
-              : "Full desk — judgment tools, proof, maps"}
+              ? "Layout: Simple (fewer panels) — you’re still on Pro"
+              : "Layout: Advanced (all panels) — same Pro access"}
           </p>
           <Link
             href="/today"

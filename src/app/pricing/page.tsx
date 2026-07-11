@@ -171,12 +171,12 @@ export default async function PricingPage({
 
           <div className="grid sm:grid-cols-2 gap-4 mb-10 max-w-3xl mx-auto price-rise">
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 text-left">
-              <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Free</p>
+              <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Free (no account needed)</p>
               <ul className="space-y-2 text-sm text-zinc-400">
                 <li>· Public daily plan at /today</li>
-                <li>· Demo scanner (illustrative)</li>
+                <li>· Demo scanner (sample data)</li>
                 <li>· Speed wins proof page</li>
-                <li>· Ticker SEO pages</li>
+                <li>· Ticker info pages</li>
               </ul>
               <Link href="/today" className="inline-block mt-4 text-sm text-emerald-400 hover:underline">
                 See today’s plan →
@@ -185,10 +185,10 @@ export default async function PricingPage({
             <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5 text-left">
               <p className="text-xs uppercase tracking-wide text-emerald-400 mb-2">Pro — $19.99/mo</p>
               <ul className="space-y-2 text-sm text-zinc-300">
-                <li>· Live wire feed + SSE</li>
-                <li>· Alerts (Discord / email / SMS / push)</li>
-                <li>· Dilution, playbooks, Prop Desk</li>
-                <li>· Morning/EOD briefs + trial drip coaching</li>
+                <li>· Live wire feed + SSE (the real product)</li>
+                <li>· Alerts, dilution, Prop Desk, briefs</li>
+                <li>· Simple &amp; Advanced are just layout toggles</li>
+                <li>· Not a second paywall — both included in Pro</li>
               </ul>
             </div>
           </div>

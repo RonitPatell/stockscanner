@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { buildSessionPlan } from "@/lib/session-plan";
 import { getIngestLatencyStats } from "@/lib/speed-wins";
 import { LogoMark } from "@/components/Logo";
@@ -19,6 +22,16 @@ export const metadata = {
 };
 
 export default async function TodayPage() {
+  const session = await auth();
+  let isSubscribed = false;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { subscriptionStatus: true, subscriptionEndsAt: true },
+    });
+    isSubscribed = hasActiveSubscription(user ?? undefined);
+  }
+
   const [plan, latency] = await Promise.all([
     buildSessionPlan(),
     getIngestLatencyStats(24),
@@ -42,26 +55,34 @@ export default async function TodayPage() {
           </span>
         </Link>
         <div className="flex gap-2">
-          <Link href="/demo">
-            <Button variant="outline" size="sm">
-              Demo
-            </Button>
-          </Link>
-          <Link href="/pricing">
-            <Button size="sm">Start free trial</Button>
-          </Link>
+          {isSubscribed ? (
+            <Link href="/dashboard">
+              <Button size="sm">Open scanner</Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/demo">
+                <Button variant="outline" size="sm">
+                  Demo
+                </Button>
+              </Link>
+              <Link href="/pricing">
+                <Button size="sm">Start free trial</Button>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-12">
         <p className="text-emerald-400 text-xs font-semibold uppercase tracking-[0.2em] mb-3">
-          Free daily plan
+          Free for everyone
         </p>
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
           Today’s 3 setups &amp; 2 skips
         </h1>
         <p className="text-zinc-400 mb-2">
-          A public habit page — what to focus on, what to avoid. Updated{" "}
+          Public daily plan — what to focus on, what to avoid. Updated{" "}
           <span className="text-zinc-300">{updated} ET</span>.
         </p>
         {latency.sampleSize > 0 && (
@@ -136,16 +157,33 @@ export default async function TodayPage() {
         <p className="text-center text-zinc-500 text-sm italic mb-8">{plan.mantra}</p>
 
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-center">
-          <h3 className="text-xl font-bold mb-2">Want this on your watchlist — live?</h3>
-          <p className="text-sm text-zinc-400 mb-4 max-w-md mx-auto">
-            Pro unlocks wire-speed feed, alerts, dilution radar, Prop Desk, and a personal session
-            plan every morning. 7-day free trial.
-          </p>
-          <Link href="/pricing">
-            <Button size="lg" className="cta-glow">
-              Start free trial — $19.99/mo after
-            </Button>
-          </Link>
+          {isSubscribed ? (
+            <>
+              <h3 className="text-xl font-bold mb-2">You’re on Pro</h3>
+              <p className="text-sm text-zinc-400 mb-4 max-w-md mx-auto">
+                This page is free for everyone to share. Your live scanner, alerts, and Prop Desk are
+                on the dashboard.
+              </p>
+              <Link href="/dashboard">
+                <Button size="lg" className="cta-glow">
+                  Back to live scanner
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-bold mb-2">Want this on your watchlist — live?</h3>
+              <p className="text-sm text-zinc-400 mb-4 max-w-md mx-auto">
+                Pro unlocks the live wire feed, alerts, dilution radar, Prop Desk, and a personal
+                session plan every morning. 7-day free trial.
+              </p>
+              <Link href="/pricing">
+                <Button size="lg" className="cta-glow">
+                  Start free trial — $19.99/mo after
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         <div className="mt-10">
