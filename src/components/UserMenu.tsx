@@ -85,7 +85,11 @@ export function UserMenu() {
           </Link>
           <button
             type="button"
-            onClick={() => signOut({ callbackUrl: "/" })}
+            onClick={() => {
+              const origin =
+                typeof window !== "undefined" ? window.location.origin : "";
+              void signOut({ callbackUrl: `${origin}/` });
+            }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-zinc-900 transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sign out

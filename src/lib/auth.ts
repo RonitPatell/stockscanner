@@ -10,6 +10,7 @@ function normalizeEmail(email: string): string {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -65,6 +66,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Prefer public app URL when NEXTAUTH_URL is wrongly set to localhost in prod
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || baseUrl).replace(/\/$/, "");
+      const effectiveBase =
+        process.env.NODE_ENV === "production" && appUrl && !appUrl.includes("localhost")
+          ? appUrl
+          : baseUrl;
+
+      if (url.startsWith("/")) return `${effectiveBase}${url}`;
+      try {
+        const target = new URL(url);
+        const allowed = new URL(effectiveBase);
+        if (target.origin === allowed.origin) return url;
+        // Block redirects to localhost from production
+        if (
+          process.env.NODE_ENV === "production" &&
+          (target.hostname === "localhost" || target.hostname === "127.0.0.1")
+        ) {
+          return effectiveBase;
+        }
+      } catch {
+        /* fall through */
+      }
+      return effectiveBase;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
