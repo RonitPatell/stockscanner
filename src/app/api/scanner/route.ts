@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { scanMarketActivity } from "@/lib/market-scanner";
 import { prisma } from "@/lib/prisma";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isKnownFalsePositive } from "@/lib/news-verifier";
+import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
+  const ip = clientIp(req);
+  const rl = await rateLimit(`scanner:${gate.user.id}:${ip}`, 30, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many scanner requests" },
+      { status: 429, headers: rateLimitHeaders(rl, 30) }
+    );
+  }
+
   try {
     let catalystHints: {
       symbol: string;

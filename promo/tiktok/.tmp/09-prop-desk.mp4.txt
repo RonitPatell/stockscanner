@@ -1,0 +1,6 @@
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_0.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_1.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_2.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_3.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_4.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/09-prop-desk_5.mp4'

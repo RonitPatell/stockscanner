@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { resolveFinnhubKey } from "@/lib/finnhub-key";
 import { fetchQuoteLive } from "@/lib/market-data";
 import { getCachedQuotes } from "@/lib/quote-cache-service";
@@ -79,6 +80,9 @@ async function refreshLiveMarketState(): Promise<MarketStatePayload> {
 }
 
 export async function GET() {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     if (last && Date.now() - last.ts < CACHE_MS) {
       return NextResponse.json(last.payload);

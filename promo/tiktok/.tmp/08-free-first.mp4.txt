@@ -1,0 +1,5 @@
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/08-free-first_0.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/08-free-first_1.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/08-free-first_2.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/08-free-first_3.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/08-free-first_4.mp4'

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const { id } = await params;
   const row = await prisma.catalyst.findUnique({
     where: { id },

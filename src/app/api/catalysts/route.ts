@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed, getFeedMeta } from "@/lib/feed-cache";
 
@@ -15,6 +16,9 @@ async function withBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";
     const cacheKey = moversOnly ? "movers" : "all";

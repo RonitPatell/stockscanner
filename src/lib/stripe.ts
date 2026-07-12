@@ -3,8 +3,12 @@ import Stripe from "stripe";
 let _stripe: Stripe | null = null;
 
 export function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || key.includes("placeholder")) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
   if (!_stripe) {
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
+    _stripe = new Stripe(key, {
       apiVersion: "2026-06-24.dahlia",
       typescript: true,
     });
@@ -35,6 +39,12 @@ export async function createCheckoutSession(
   allowTrial: boolean,
   plan: CheckoutPlan = "monthly"
 ) {
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes("placeholder")) {
+    throw new Error("Stripe is not configured");
+  }
+  if (!process.env.STRIPE_PRICE_ID) {
+    throw new Error("STRIPE_PRICE_ID is not configured");
+  }
   const priceId =
     plan === "annual" && process.env.STRIPE_PRICE_ID_ANNUAL
       ? process.env.STRIPE_PRICE_ID_ANNUAL

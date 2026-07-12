@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 /** Recent alert delivery history for the logged-in user */
 export async function GET() {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

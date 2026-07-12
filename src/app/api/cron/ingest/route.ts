@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron, cronUnauthorized } from "@/lib/api-guard";
 import { runIngestPipeline } from "@/lib/ingest-pipeline";
 import { isScaleMode } from "@/lib/redis";
 import {
@@ -14,18 +15,9 @@ import { computeAvgIngestDelaySec } from "@/lib/playbooks";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-function authorize(req: NextRequest): boolean {
-  const authHeader = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV === "development";
-  return authHeader === `Bearer ${secret}`;
-}
-
 /** Background ingest + feed cache refresh — single writer for all users. */
 async function handleCron(req: NextRequest) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!authorizeCron(req)) return cronUnauthorized();
 
   if (isPipelineInFlight()) {
     return NextResponse.json({

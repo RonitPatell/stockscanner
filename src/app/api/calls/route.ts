@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requirePro } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { getCachedQuotes } from "@/lib/quote-cache-service";
+import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const url = new URL(req.url);
   const hours = Math.min(72, Number(url.searchParams.get("hours") || 24));
   const limit = Math.min(40, Number(url.searchParams.get("limit") || 20));
@@ -14,24 +18,18 @@ export async function GET(req: Request) {
 
   let symbolFilter: string[] | undefined;
   if (watchlistOnly) {
-    const session = await auth();
-    if (session?.user?.id) {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { watchlist: true },
-      });
-      symbolFilter = (user?.watchlist ?? []).map((s) => s.toUpperCase());
-    } else {
-      symbolFilter = [];
-    }
-  }
-
-  if (watchlistOnly && symbolFilter && symbolFilter.length === 0) {
-    return NextResponse.json({
-      calls: [],
-      watchlistOnly: true,
-      generatedAt: new Date().toISOString(),
+    const user = await prisma.user.findUnique({
+      where: { id: gate.user.id },
+      select: { watchlist: true },
     });
+    symbolFilter = (user?.watchlist ?? []).map((s) => s.toUpperCase());
+    if (symbolFilter.length === 0) {
+      return NextResponse.json({
+        calls: [],
+        watchlistOnly: true,
+        generatedAt: new Date().toISOString(),
+      });
+    }
   }
 
   const calls = await prisma.traderCall.findMany({
@@ -59,7 +57,18 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
+  const ip = clientIp(req);
+  const rl = await rateLimit(`calls:post:${gate.user.id}:${ip}`, 20, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many calls — slow down" },
+      { status: 429, headers: rateLimitHeaders(rl, 20) }
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const symbol = String(body.symbol ?? "")
     .toUpperCase()
@@ -72,16 +81,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "symbol required" }, { status: 400 });
   }
 
+  const user = await prisma.user.findUnique({
+    where: { id: gate.user.id },
+    select: { name: true, email: true },
+  });
   let displayName = String(body.displayName ?? "Trader").slice(0, 32);
-  if (session?.user?.name) displayName = session.user.name.split(" ")[0] ?? displayName;
-  else if (session?.user?.email) displayName = session.user.email.split("@")[0] ?? displayName;
+  if (user?.name) displayName = user.name.split(" ")[0] ?? displayName;
+  else if (user?.email) displayName = user.email.split("@")[0] ?? displayName;
 
   const quotes = await getCachedQuotes([symbol]);
   const q = quotes[symbol];
 
   const call = await prisma.traderCall.create({
     data: {
-      userId: session?.user?.id ?? null,
+      userId: gate.user.id,
       displayName,
       symbol,
       bias,

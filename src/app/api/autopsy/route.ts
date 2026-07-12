@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getWatchlistAutopsy } from "@/lib/watchlist-autopsy";
@@ -6,6 +7,9 @@ import { getWatchlistAutopsy } from "@/lib/watchlist-autopsy";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const url = new URL(req.url);
   const hours = Math.min(72, Number(url.searchParams.get("hours") || 24));
   const limit = Math.min(30, Number(url.searchParams.get("limit") || 12));

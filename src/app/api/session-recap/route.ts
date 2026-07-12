@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCachedQuotes } from "@/lib/quote-cache-service";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 
 /** Today's watchlist session stats from ingested catalysts + live quotes */
 export async function GET() {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

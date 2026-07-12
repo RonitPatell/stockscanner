@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed } from "@/lib/feed-cache";
 
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";
   const encoder = new TextEncoder();
   let closed = false;

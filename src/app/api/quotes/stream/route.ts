@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isQuotableMarketSymbol } from "@/lib/index-quotes";
 import {
@@ -38,6 +39,9 @@ function withRvolEstimates(
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const symbols = parseSymbols(req.nextUrl.searchParams.get("symbols"));
   const encoder = new TextEncoder();
   let closed = false;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron, cronUnauthorized } from "@/lib/api-guard";
 import { runWirePipeline } from "@/lib/ingest-pipeline";
 import { isScaleMode } from "@/lib/redis";
 import {
@@ -12,17 +13,8 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorize(req: NextRequest): boolean {
-  const authHeader = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV === "development";
-  return authHeader === `Bearer ${secret}`;
-}
-
 async function handleWireCron(req: NextRequest) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!authorizeCron(req)) return cronUnauthorized();
 
   if (isWireInFlight()) {
     return NextResponse.json({

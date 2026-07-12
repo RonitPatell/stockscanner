@@ -1,0 +1,6 @@
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_0.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_1.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_2.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_3.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_4.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/10-exit-liquidity_5.mp4'

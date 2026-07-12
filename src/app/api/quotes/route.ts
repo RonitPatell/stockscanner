@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isQuotableMarketSymbol } from "@/lib/index-quotes";
 import { resolveFinnhubKey } from "@/lib/finnhub-key";
@@ -43,6 +44,9 @@ function applyInstantRvolEstimates(
 
 /** Live prices — cache-first; refreshes price, RVOL, float/mcap on demand. */
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     const raw = req.nextUrl.searchParams.get("symbols") ?? "";
     const needRvol = req.nextUrl.searchParams.get("needRvol") === "1";

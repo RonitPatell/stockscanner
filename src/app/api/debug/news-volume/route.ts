@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { authorizeCron, cronUnauthorized } from "@/lib/api-guard";
 import { fetchMarketNews } from "@/lib/market-data";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Dev probe: how many stock articles each source returns right now */
-export async function GET() {
+/** Dev/ops probe — requires CRON_SECRET (or development without secret). */
+export async function GET(req: Request) {
+  if (!authorizeCron(req)) return cronUnauthorized();
+
   const articles = await fetchMarketNews({ fast: true });
   const bySource = new Map<string, number>();
   for (const a of articles) {

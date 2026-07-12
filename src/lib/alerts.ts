@@ -1,8 +1,14 @@
+import { isAllowedDiscordWebhook } from "@/lib/discord-webhook";
+
 export async function sendDiscordWebhook(
   webhookUrl: string,
   payload: DiscordAlertPayload
 ): Promise<boolean> {
   try {
+    if (!isAllowedDiscordWebhook(webhookUrl)) {
+      console.error("Blocked non-Discord webhook URL");
+      return false;
+    }
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -23,6 +29,7 @@ export async function sendDiscordWebhook(
           },
         ],
       }),
+      signal: AbortSignal.timeout(8_000),
     });
     return res.ok;
   } catch (err) {

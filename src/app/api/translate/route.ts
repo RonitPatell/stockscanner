@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ async function translate(textRaw: string, toRaw: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     const text = req.nextUrl.searchParams.get("text") ?? "";
     const to = req.nextUrl.searchParams.get("to") ?? "en";
@@ -57,6 +61,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     const raw = await req.text();
     const body = raw ? (JSON.parse(raw) as any) : {};

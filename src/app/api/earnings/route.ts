@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import {
   fetchUpcomingEarningsBatch,
   getKnownUpcomingEarnings,
@@ -8,6 +9,9 @@ import { isValidTickerFormat } from "@/lib/ticker-utils";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   try {
     const raw = req.nextUrl.searchParams.get("symbols") ?? "";
     const sticky = req.nextUrl.searchParams.get("sticky") === "1";

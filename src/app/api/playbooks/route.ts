@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePro } from "@/lib/api-guard";
 import { getCatalystPlaybook } from "@/lib/playbooks";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const gate = await requirePro();
+  if (gate.error) return gate.error;
+
   const type = req.nextUrl.searchParams.get("type") || "other";
   const floatRaw = req.nextUrl.searchParams.get("float");
   const float = floatRaw ? Number(floatRaw) : null;

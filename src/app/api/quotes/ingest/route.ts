@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron, cronUnauthorized } from "@/lib/api-guard";
 import {
   mergeLiveQuotes,
   type CachedQuote,
@@ -6,21 +7,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function authorize(req: NextRequest): boolean {
-  const authHeader = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV === "development";
-  return authHeader === `Bearer ${secret}`;
-}
-
 /**
  * Quote stream worker posts here when Redis is unavailable (memory mode).
  * Body: { quotes: Record<symbol, CachedQuote> }
  */
 export async function POST(req: NextRequest) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!authorizeCron(req)) return cronUnauthorized();
 
   const body = await req.json().catch(() => null);
   const raw = body?.quotes;

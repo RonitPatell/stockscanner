@@ -1,0 +1,5 @@
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/07-price-math_0.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/07-price-math_1.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/07-price-math_2.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/07-price-math_3.mp4'
+file 'C:/Users/Ronpa/Desktop/stockscanner/stockscanner/promo/tiktok/.tmp/07-price-math_4.mp4'

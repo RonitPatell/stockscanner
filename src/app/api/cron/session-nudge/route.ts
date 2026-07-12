@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron, cronUnauthorized } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { buildSessionPlan } from "@/lib/session-plan";
 import { sendPushNotification } from "@/lib/web-push";
@@ -7,21 +8,12 @@ import type { PushSubscriptionJson } from "@/lib/web-push";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorize(req: NextRequest): boolean {
-  const authHeader = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV === "development";
-  return authHeader === `Bearer ${secret}`;
-}
-
 /**
  * Morning habit loop — push "3 setups / 2 skips" before the open.
  * Schedule ~7:25 ET weekdays (vercel: 25 12 * * 1-5).
  */
 export async function GET(req: NextRequest) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!authorizeCron(req)) return cronUnauthorized();
 
   const plan = await buildSessionPlan();
 
