@@ -11,7 +11,7 @@ import {
   Sparkles,
   Layers,
 } from "lucide-react";
-import type { CatalystItem, ScannerFilters } from "@/types";
+import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 import { LiveScanner, type ScannerTab } from "./LiveScanner";
 import { WatchlistBrief } from "./WatchlistBrief";
 import { TrustStatusBar } from "./TrustStatusBar";
@@ -48,10 +48,12 @@ export function TradingDashboard({
   initialCatalysts = [],
   initialWatchlist = [],
   initialFilters = null,
+  initialScanner = null,
 }: {
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
   initialFilters?: ScannerFilters | null;
+  initialScanner?: MarketScannerSnapshot | null;
 }) {
   const [tab, setTab] = useState<ScannerTab>("all");
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -78,12 +80,16 @@ export function TradingDashboard({
   }, []);
 
   useEffect(() => {
-    void fetch("/api/onboarding")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && d.onboardingCompleted === false) setShowOnboarding(true);
-      })
-      .catch(() => {});
+    // Defer so feed/scanner paint first
+    const t = setTimeout(() => {
+      void fetch("/api/onboarding")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && d.onboardingCompleted === false) setShowOnboarding(true);
+        })
+        .catch(() => {});
+    }, 1_500);
+    return () => clearTimeout(t);
   }, []);
 
   const setDashboardMode = (next: "simple" | "advanced") => {
@@ -168,7 +174,10 @@ export function TradingDashboard({
               data-guide="market-monitor"
               className="flex-[1.7] min-h-[320px] lg:min-h-0 flex flex-col"
             >
-              <MarketMonitor className="flex-1 min-h-[320px] lg:min-h-0" />
+              <MarketMonitor
+                className="flex-1 min-h-[320px] lg:min-h-0"
+                initialSnapshot={initialScanner}
+              />
             </div>
 
             {!simple && (

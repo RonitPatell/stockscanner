@@ -5,6 +5,7 @@ import {
 } from "./catalyst-engine";
 import { refreshQuoteCache } from "./quote-cache-service";
 import { getCachedFeed } from "./feed-cache";
+import { scanMarketActivity } from "./market-scanner";
 
 export interface WirePipelineResult {
   wireNew: number;
@@ -57,6 +58,9 @@ async function runIngestPipelineInner(): Promise<IngestPipelineResult> {
   const quotesUpdated = await refreshQuoteCache(symbols);
 
   await refreshPublicFeedCache();
+
+  // Keep wire-alert snapshot warm for instant dashboard SSR
+  void scanMarketActivity(symbols.slice(0, 30)).catch(() => {});
 
   const all = await getCachedFeed("all");
   const movers = await getCachedFeed("movers");

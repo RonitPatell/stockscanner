@@ -5,12 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed } from "@/lib/feed-cache";
+import { getCachedScannerSnapshot } from "@/lib/market-scanner";
 import { TradingDashboard } from "@/components/TradingDashboard";
 import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { UserMenu } from "@/components/UserMenu";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { LogoMark } from "@/components/Logo";
-import type { CatalystItem, ScannerFilters } from "@/types";
+import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 
 export default async function DashboardPage({
   searchParams,
@@ -24,6 +25,7 @@ export default async function DashboardPage({
   let initialCatalysts: CatalystItem[] = [];
   let initialWatchlist: string[] = [];
   let initialFilters: ScannerFilters | null = null;
+  let initialScanner: MarketScannerSnapshot | null = null;
 
   if (session?.user?.id) {
     try {
@@ -39,12 +41,24 @@ export default async function DashboardPage({
       isSubscribed = hasActiveSubscription(user ?? undefined);
 
       if (isSubscribed) {
-        const [catalysts, cached] = await Promise.all([
-          getCatalysts(150),
+        // Prefer warm caches so HTML paints with data immediately.
+        // Never block the page on a cold getCatalysts() — client SSE/poll fills in.
+        const [cached, scannerSnap] = await Promise.all([
           getCachedFeed("all"),
+          getCachedScannerSnapshot(),
         ]);
-        initialCatalysts =
-          catalysts.length > 0 ? catalysts : cached.items.slice(0, 150);
+        initialCatalysts = cached.items.slice(0, 150);
+        if (initialCatalysts.length === 0) {
+          try {
+            initialCatalysts = await Promise.race([
+              getCatalysts(150),
+              new Promise<CatalystItem[]>((r) => setTimeout(() => r([]), 800)),
+            ]);
+          } catch {
+            initialCatalysts = [];
+          }
+        }
+        initialScanner = scannerSnap;
         initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
         if (user?.scannerFilters && typeof user.scannerFilters === "object") {
           initialFilters = user.scannerFilters as ScannerFilters;
@@ -136,6 +150,7 @@ export default async function DashboardPage({
             initialCatalysts={initialCatalysts}
             initialWatchlist={initialWatchlist}
             initialFilters={initialFilters}
+            initialScanner={initialScanner}
           />
         ) : (
           <div className="text-center py-20 max-w-md mx-auto">

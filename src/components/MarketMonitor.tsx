@@ -106,13 +106,15 @@ function mergeEarningsList(
 export function MarketMonitor({
   className,
   solo,
+  initialSnapshot = null,
 }: {
   className?: string;
   /** Render a single panel full-bleed (legacy /popout route). */
   solo?: PopoutPanelId;
+  initialSnapshot?: MarketScannerSnapshot | null;
 }) {
-  const [snapshot, setSnapshot] = useState<MarketScannerSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [snapshot, setSnapshot] = useState<MarketScannerSnapshot | null>(initialSnapshot);
+  const [loading, setLoading] = useState(!initialSnapshot);
   const [earnings, setEarnings] = useState<EarningsEvent[]>([]);
   const [expandedPanel, setExpandedPanel] = useState<PopoutPanelId | null>(null);
   const earningsCursorRef = useRef(0);
@@ -142,17 +144,20 @@ export function MarketMonitor({
       setEarnings(stored);
       for (const e of stored) fetchedEarningsRef.current.add(e.symbol);
     }
-    void fetch("/api/earnings?sticky=1")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (Array.isArray(d?.events) && d.events.length > 0) {
-          setEarnings((prev) => mergeEarningsList(prev, d.events as EarningsEvent[]));
-          for (const e of d.events as EarningsEvent[]) {
-            fetchedEarningsRef.current.add(e.symbol);
+    const t = setTimeout(() => {
+      void fetch("/api/earnings?sticky=1")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (Array.isArray(d?.events) && d.events.length > 0) {
+            setEarnings((prev) => mergeEarningsList(prev, d.events as EarningsEvent[]));
+            for (const e of d.events as EarningsEvent[]) {
+              fetchedEarningsRef.current.add(e.symbol);
+            }
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    }, 2_000);
+    return () => clearTimeout(t);
   }, []);
 
   const fetchScanner = useCallback(async () => {
@@ -169,16 +174,21 @@ export function MarketMonitor({
   }, []);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    const delay = setTimeout(() => {
-      fetchScanner();
-      interval = setInterval(fetchScanner, isPopout ? 12_000 : 25_000);
-    }, 200);
+    // SSR seed paints immediately — delay first refetch so /api/scanner isn't
+    // competing with news SSE on open.
+    const seeded = Boolean(initialSnapshot);
+    let kickoff: ReturnType<typeof setTimeout> | null = null;
+    if (seeded) {
+      kickoff = setTimeout(() => void fetchScanner(), 3_000);
+    } else {
+      void fetchScanner();
+    }
+    const interval = setInterval(fetchScanner, isPopout ? 12_000 : 25_000);
     return () => {
-      clearTimeout(delay);
-      if (interval) clearInterval(interval);
+      if (kickoff) clearTimeout(kickoff);
+      clearInterval(interval);
     };
-  }, [fetchScanner, isPopout]);
+  }, [fetchScanner, isPopout, initialSnapshot]);
 
   const fetchEarnings = useCallback(async () => {
     const syms = [

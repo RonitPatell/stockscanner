@@ -10,6 +10,7 @@ import { seedCachedQuote } from "./quote-cache-service";
 import { isValidTickerFormat } from "./ticker-utils";
 import { isKnownFalsePositive } from "./news-verifier";
 import { getNextTickerBatch } from "./news-sources/active-tickers";
+import { getRedis } from "./redis";
 
 const MAX_LIVE_QUOTES = 3;
 const MAX_CANDLE_LOOKUPS = 4;
@@ -17,6 +18,8 @@ const VOLUME_LEADERS_SHOWN = 10;
 const SCAN_CACHE_MS = 60_000;
 const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
 const MAX_ALERTS = 80;
+const SCANNER_REDIS_KEY = "scanner:snapshot:v1";
+const SCANNER_REDIS_TTL_SEC = 120;
 
 interface SymbolTrack {
   touchedHod: boolean;
@@ -40,6 +43,44 @@ let alertFeed: MarketAlert[] = [];
 let cachedSnapshot: MarketScannerSnapshot | null = null;
 let lastScanAt = 0;
 let scanInFlight: Promise<MarketScannerSnapshot> | null = null;
+
+/** Fast path for SSR / API — memory then Redis, no Finnhub. */
+export async function getCachedScannerSnapshot(): Promise<MarketScannerSnapshot | null> {
+  if (cachedSnapshot && Date.now() - lastScanAt < SCAN_CACHE_MS * 3) {
+    return cachedSnapshot;
+  }
+  const redis = getRedis();
+  if (!redis) return cachedSnapshot;
+  try {
+    const snap = await Promise.race([
+      redis.get<MarketScannerSnapshot>(SCANNER_REDIS_KEY),
+      new Promise<null>((r) => setTimeout(() => r(null), 400)),
+    ]);
+    if (snap && Array.isArray(snap.alerts)) {
+      cachedSnapshot = snap;
+      lastScanAt = Date.now();
+      return snap;
+    }
+  } catch {
+    /* ignore */
+  }
+  return cachedSnapshot;
+}
+
+async function persistScannerSnapshot(snapshot: MarketScannerSnapshot): Promise<void> {
+  cachedSnapshot = snapshot;
+  lastScanAt = Date.now();
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await Promise.race([
+      redis.set(SCANNER_REDIS_KEY, snapshot, { ex: SCANNER_REDIS_TTL_SEC }),
+      new Promise((r) => setTimeout(r, 400)),
+    ]);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getMarketSession(): MarketScannerSnapshot["marketSession"] {
   const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
@@ -431,8 +472,7 @@ async function runFullScan(
   };
 
   if (snapshot.alerts.length > 0 || snapshot.volumeLeaders.length > 0) {
-    cachedSnapshot = snapshot;
-    lastScanAt = Date.now();
+    void persistScannerSnapshot(snapshot);
   }
 
   return snapshot;
@@ -458,11 +498,10 @@ export async function scanMarketActivity(
   }
 
   if (!cachedSnapshot) {
-    cachedSnapshot = quick;
+    void persistScannerSnapshot(quick);
     scanInFlight = runFullScan(extraSymbols, catalystHints)
-      .then((full) => {
-        cachedSnapshot = full;
-        lastScanAt = Date.now();
+      .then(async (full) => {
+        await persistScannerSnapshot(full);
         return full;
       })
       .finally(() => {
@@ -472,9 +511,8 @@ export async function scanMarketActivity(
   }
 
   scanInFlight = runFullScan(extraSymbols, catalystHints)
-    .then((full) => {
-      cachedSnapshot = full;
-      lastScanAt = Date.now();
+    .then(async (full) => {
+      await persistScannerSnapshot(full);
       return full;
     })
     .finally(() => {

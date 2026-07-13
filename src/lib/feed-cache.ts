@@ -12,7 +12,7 @@ export interface FeedMeta {
 const REDIS_TTL_SEC = 300;
 const MEMORY_TTL_MS = 60_000;
 const STALE_MEMORY_TTL_MS = 10 * 60_000;
-const REDIS_BUDGET_MS = 10_000;
+const REDIS_BUDGET_MS = 400;
 
 async function withRedisBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   return Promise.race([

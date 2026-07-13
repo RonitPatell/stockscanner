@@ -115,9 +115,14 @@ export function LiveScanner({
     loadWatchlist();
   }, [loadWatchlist]);
 
-  // Persist filters as the user tweaks them (debounced)
+  // Persist filters as the user tweaks them (debounced) — skip identical SSR seed
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filtersHydratedRef = useRef(false);
   useEffect(() => {
+    if (!filtersHydratedRef.current) {
+      filtersHydratedRef.current = true;
+      return;
+    }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       void fetch("/api/settings", {
@@ -153,9 +158,17 @@ export function LiveScanner({
     const gen = ++catalystGenRef.current;
 
     try {
-      const data = await safeJsonFetch<CatalystItem[]>(
-        `/api/catalysts?moversOnly=${moversOnly}`
+      // Cache-only first — instant when Redis/memory is warm
+      const feed = await safeJsonFetch<{ items?: CatalystItem[] }>(
+        `/api/feed?moversOnly=${moversOnly}`
       );
+      let data = Array.isArray(feed?.items) ? feed!.items! : null;
+
+      if (!data || data.length === 0) {
+        data = await safeJsonFetch<CatalystItem[]>(
+          `/api/catalysts?moversOnly=${moversOnly}`
+        );
+      }
       if (!data || gen !== catalystGenRef.current) return;
 
       const currentSymbols = new Set(data.map((c) => c.symbol));
@@ -181,14 +194,26 @@ export function LiveScanner({
   }, [soundEnabled, moversOnly, applyFeedUpdate]);
 
   useEffect(() => {
-    void fetchCatalysts();
-    const interval = setInterval(() => void fetchCatalysts(), POLL_MS);
+    // If SSR already seeded the feed, don't hammer /api/catalysts on open —
+    // SSE + a delayed poll is enough.
+    const seeded = initialCatalysts.length > 0;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let kickoff: ReturnType<typeof setTimeout> | null = null;
+
+    if (seeded) {
+      kickoff = setTimeout(() => void fetchCatalysts(), 4_000);
+      interval = setInterval(() => void fetchCatalysts(), POLL_MS);
+    } else {
+      void fetchCatalysts();
+      interval = setInterval(() => void fetchCatalysts(), POLL_MS);
+    }
 
     return () => {
-      clearInterval(interval);
+      if (kickoff) clearTimeout(kickoff);
+      if (interval) clearInterval(interval);
       catalystGenRef.current += 1;
     };
-  }, [fetchCatalysts]);
+  }, [fetchCatalysts, initialCatalysts.length]);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
