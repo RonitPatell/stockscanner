@@ -53,14 +53,12 @@ export function Navbar() {
               <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
               <Link href="/wins" className="hover:text-zinc-100 transition-colors">Speed wins</Link>
               <Link href="/today" className="hover:text-zinc-100 transition-colors">Today</Link>
-              <Link href="/#testimonials" className="hover:text-zinc-100 transition-colors">Reviews</Link>
               <Link href="/pricing" className="hover:text-zinc-100 transition-colors">Pricing</Link>
             </>
           )}
           {isLoggedIn && (
             <>
               <Link href="/#features" className="hover:text-zinc-100 transition-colors">Features</Link>
-              <Link href="/#testimonials" className="hover:text-zinc-100 transition-colors">Reviews</Link>
               {!isSubscribed && (
                 <Link href="/demo" className="hover:text-zinc-100 transition-colors">Demo</Link>
               )}
@@ -72,7 +70,9 @@ export function Navbar() {
               )}
             </>
           )}
-          <Link href="/legal/disclaimer" className="hover:text-zinc-100 transition-colors">Legal</Link>
+          <Link href="/legal/disclaimer" className="hover:text-zinc-100 transition-colors">Disclaimer</Link>
+          <Link href="/legal/privacy" className="hover:text-zinc-100 transition-colors hidden lg:inline">Privacy</Link>
+          <Link href="/legal/cookies" className="hover:text-zinc-100 transition-colors hidden lg:inline">Cookies</Link>
         </nav>
 
         <div className="flex items-center gap-3">

@@ -4,7 +4,6 @@ import {
   Shield,
   ArrowRight,
   Check,
-  Star,
   Target,
   LineChart,
   Users,
@@ -99,69 +98,6 @@ const loop = [
     step: "03",
     title: "Prove the edge",
     body: "Paper trades, speed ledger, candle backtests, and EOD edge math show whether Pro paid for itself.",
-  },
-];
-
-const testimonials = [
-  {
-    name: "Marcus T.",
-    role: "Full-time day trader",
-    location: "Austin, TX",
-    avatar: "MT",
-    color: "bg-emerald-500/20 text-emerald-300",
-    quote:
-      "I had twelve tabs open and still missed the PR that moved my watchlist 18%. TrustTicker caught it before Twitter did. That's the whole game for me.",
-    highlight: "Caught PR before Twitter",
-  },
-  {
-    name: "Sarah K.",
-    role: "Small-cap specialist",
-    location: "Chicago, IL",
-    avatar: "SK",
-    color: "bg-teal-500/20 text-teal-300",
-    quote:
-      "Dilution radar alone saved me from two offering traps last week. The speed edge ledger made $19.99 feel obvious.",
-    highlight: "Avoided offering traps",
-  },
-  {
-    name: "James R.",
-    role: "Swing trader, 8 yrs",
-    location: "Denver, CO",
-    avatar: "JR",
-    color: "bg-cyan-500/20 text-cyan-300",
-    quote:
-      "Playbooks stop me from FOMO-ing into headlines that sound huge but aren't tradeable. Cleaner than anything I've used under $200/mo.",
-    highlight: "Stops bad FOMO entries",
-  },
-  {
-    name: "Priya M.",
-    role: "Options day trader",
-    location: "Jersey City, NJ",
-    avatar: "PM",
-    color: "bg-amber-500/20 text-amber-300",
-    quote:
-      "Prop Desk + hotkeys feel like a real desk. Call board keeps our group synced without another Discord bot mess.",
-    highlight: "Desk-grade workflow",
-  },
-  {
-    name: "Derek W.",
-    role: "Former prop desk",
-    location: "Miami, FL",
-    avatar: "DW",
-    color: "bg-rose-500/20 text-rose-300",
-    quote:
-      "Feels like a Bloomberg news lane built for speed traders. Sympathy map is the feature I didn't know I needed.",
-    highlight: "Whole team synced",
-  },
-  {
-    name: "Elena V.",
-    role: "Part-time trader",
-    location: "Seattle, WA",
-    avatar: "EV",
-    color: "bg-sky-500/20 text-sky-300",
-    quote:
-      "I trade after my 9–5. Session plan + EOD edge recap tell me in sixty seconds whether I earned the subscription.",
-    highlight: "Perfect after hours",
   },
 ];
 
@@ -433,62 +369,12 @@ export function MarketingLanding({
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-24 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <Reveal className="text-center mb-14">
-            <div className="inline-flex items-center gap-1.5 text-amber-400 mb-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-amber-400" />
-              ))}
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">Traders who stopped guessing</h2>
-            <p className="text-zinc-400 max-w-lg mx-auto">
-              Real workflows from people who live in the scanner during market hours.
-            </p>
-          </Reveal>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {testimonials.map((t, i) => (
-              <Reveal key={t.name} delay={(i % 3) * 90} as="article">
-                <div className="h-full rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col hover:border-zinc-600 hover:-translate-y-1 transition-all duration-400">
-                  <div className="flex items-center gap-1 mb-4">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <Star key={j} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-sm text-zinc-300 leading-relaxed flex-1 mb-5">
-                    &ldquo;{t.quote}&rdquo;
-                  </p>
-                  <span className="text-[10px] uppercase tracking-wider text-emerald-500/80 font-medium mb-4">
-                    {t.highlight}
-                  </span>
-                  <div className="flex items-center gap-3 pt-4 border-t border-zinc-800">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${t.color}`}
-                    >
-                      {t.avatar}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-xs text-zinc-500">
-                        {t.role} · {t.location}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Social proof */}
+      {/* Product signals */}
       <section className="py-12 px-4 sm:px-6 border-y border-zinc-800/50">
         <div className="max-w-4xl mx-auto flex flex-wrap justify-center gap-8 sm:gap-14 text-center">
           <Reveal className="flex items-center gap-2 text-zinc-400">
             <Users className="w-5 h-5 text-emerald-500" />
-            <span className="text-sm">Active trader community</span>
+            <span className="text-sm">Built for solo desks</span>
           </Reveal>
           <Reveal delay={80} className="flex items-center gap-2 text-zinc-400">
             <LineChart className="w-5 h-5 text-emerald-500" />
@@ -553,6 +439,9 @@ export function MarketingLanding({
               </Link>
               <Link href="/legal/privacy" className="hover:text-zinc-400">
                 Privacy
+              </Link>
+              <Link href="/legal/cookies" className="hover:text-zinc-400">
+                Cookies
               </Link>
               <Link href="/legal/disclaimer" className="hover:text-zinc-400">
                 Disclaimer

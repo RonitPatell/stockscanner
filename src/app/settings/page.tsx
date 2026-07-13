@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { ArrowLeft, Save, CreditCard } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { ArrowLeft, Save, CreditCard, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { formatSubscriptionEnd } from "@/lib/subscription";
@@ -34,11 +34,16 @@ export default function SettingsPage() {
   const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
   const [emailBriefEnabled, setEmailBriefEnabled] = useState(true);
   const [watchlistInput, setWatchlistInput] = useState("");
-  const [billing, setBilling] = useState<Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">>({});
+  const [billing, setBilling] = useState<
+    Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">
+  >({});
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -95,19 +100,49 @@ export default function SettingsPage() {
         window.location.href = data.url;
         return;
       }
+      setDeleteError(data.error || "Could not open billing portal.");
     } finally {
       setBillingLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteError("");
+    setDeleteLoading(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: deleteConfirm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(data.error || "Could not delete account.");
+        return;
+      }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      await signOut({ callbackUrl: `${origin}/` });
+    } catch {
+      setDeleteError("Network error. Try again.");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   const accessUntil = formatSubscriptionEnd(billing.subscriptionEndsAt);
   const isSubscribed =
     billing.subscriptionStatus === "active" || billing.subscriptionStatus === "trialing";
+  const blocksDelete =
+    billing.subscriptionStatus === "active" ||
+    billing.subscriptionStatus === "trialing" ||
+    billing.subscriptionStatus === "past_due";
 
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Link href="/login"><Button>Sign In</Button></Link>
+        <Link href="/login">
+          <Button>Sign In</Button>
+        </Link>
       </div>
     );
   }
@@ -248,7 +283,8 @@ export default function SettingsPage() {
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   To cancel, open the billing portal below and choose{" "}
                   <span className="text-zinc-400">Cancel subscription</span>. You keep full scanner
-                  access until the end of your current billing period — you won&apos;t be charged again.
+                  access until the end of your current billing period — you won&apos;t be charged
+                  again.
                 </p>
                 <Button
                   variant="secondary"
@@ -262,7 +298,25 @@ export default function SettingsPage() {
               </>
             ) : (
               <>
-                <p className="text-sm text-zinc-400">No active subscription.</p>
+                <p className="text-sm text-zinc-400">
+                  {billing.subscriptionStatus === "past_due"
+                    ? "Billing is past due."
+                    : billing.subscriptionStatus === "canceled"
+                      ? "Subscription canceled."
+                      : "No active subscription."}
+                </p>
+                {(billing.subscriptionStatus === "past_due" ||
+                  billing.subscriptionStatus === "canceled") && (
+                  <Button
+                    variant="secondary"
+                    onClick={handleManageBilling}
+                    disabled={billingLoading}
+                    className="w-full"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    {billingLoading ? "Opening portal…" : "Open billing portal"}
+                  </Button>
+                )}
                 <Link href="/pricing">
                   <Button className="w-full">View plans</Button>
                 </Link>
@@ -270,6 +324,76 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-red-400/90">Danger zone</h2>
+          <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-4">
+            <div>
+              <p className="text-sm text-zinc-300 font-medium">Delete account</p>
+              <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                Permanently removes your account, watchlist, alert settings, and related personal
+                data. This cannot be undone.
+              </p>
+            </div>
+
+            {blocksDelete ? (
+              <div className="space-y-3">
+                <p className="text-sm text-amber-200/90 leading-relaxed">
+                  You still have an{" "}
+                  <span className="font-semibold capitalize">{billing.subscriptionStatus}</span>{" "}
+                  subscription. Cancel it in Manage billing first, then come back here to delete
+                  your account.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={handleManageBilling}
+                  disabled={billingLoading}
+                  className="w-full"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {billingLoading ? "Opening portal…" : "Cancel subscription first"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="text-xs text-zinc-500 block">
+                  Type <span className="text-zinc-300 font-mono">DELETE</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  autoComplete="off"
+                />
+                {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
+                <Button
+                  className="w-full bg-red-600 hover:bg-red-500 text-white"
+                  disabled={deleteLoading || deleteConfirm.trim().toUpperCase() !== "DELETE"}
+                  onClick={() => void handleDeleteAccount()}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {deleteLoading ? "Deleting…" : "Delete my account"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <p className="text-[11px] text-zinc-600 text-center">
+          <Link href="/legal/privacy" className="hover:text-zinc-400">
+            Privacy
+          </Link>
+          {" · "}
+          <Link href="/legal/cookies" className="hover:text-zinc-400">
+            Cookies
+          </Link>
+          {" · "}
+          <Link href="/legal/terms" className="hover:text-zinc-400">
+            Terms
+          </Link>
+        </p>
 
         <DisclaimerBanner compact />
       </main>
