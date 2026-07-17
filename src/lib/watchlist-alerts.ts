@@ -235,6 +235,11 @@ export async function dispatchWatchlistAlerts(catalysts: CatalystItem[]): Promis
   if (users.length === 0) return 0;
 
   const hodSymbols = hodSymbolsFromCatalysts(fresh);
+  const abovePriorCloseSymbols = new Set(
+    fresh
+      .filter((c) => (c.changePercent ?? 0) > 0)
+      .map((c) => c.symbol.toUpperCase())
+  );
   let sent = 0;
 
   for (const user of users) {
@@ -243,7 +248,7 @@ export async function dispatchWatchlistAlerts(catalysts: CatalystItem[]): Promis
     const ctx = {
       watchlist: watchSet,
       hodSymbols,
-      vwapAboveSymbols: hodSymbols,
+      abovePriorCloseSymbols,
     };
 
     const candidates =

@@ -12,8 +12,8 @@ import { isKnownFalsePositive } from "./news-verifier";
 import { getNextTickerBatch } from "./news-sources/active-tickers";
 import { getRedis } from "./redis";
 
-const MAX_LIVE_QUOTES = 3;
-const MAX_CANDLE_LOOKUPS = 4;
+const MAX_LIVE_QUOTES = 8;
+const MAX_CANDLE_LOOKUPS = 8;
 const VOLUME_LEADERS_SHOWN = 10;
 const SCAN_CACHE_MS = 60_000;
 const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
@@ -373,7 +373,8 @@ async function runFullScan(
     ...new Set([
       ...hints.map((h) => h.symbol),
       ...extraSymbols,
-      ...getNextTickerBatch(3),
+      // Rotate liquid names so Heavy Volume isn't news-only
+      ...getNextTickerBatch(12),
     ]),
   ];
 

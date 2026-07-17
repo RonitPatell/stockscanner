@@ -56,7 +56,7 @@ const included = [
   {
     group: "Speed & feed",
     items: [
-      "Up to ~2s source polling + SSE live push; publisher latency varies",
+      "Measured ingest latency varies; Pro pushes via SSE when the feed updates — speed depends on source + worker",
       "Stock-impact headlines only — noise filtered at ingest",
       "Story clustering across duplicate wires",
       "Source trust tiers + verified confidence",
@@ -91,9 +91,9 @@ const included = [
       "Prop Desk (/desk) focused trading layout",
       "Shared call board — who called it first",
       "Trader hotkeys (j/k, Enter, w, 1/2/3, /)",
-      "Pro alert rules: HOD, VWAP, float, RVol, urgency",
+      "Pro alert rules: HOD, float, RVol, urgency",
       "Discord, email, SMS, and browser push",
-      "Chrome overlay for TradingView charts",
+      "Chrome overlay (install from Settings)",
       "Premarket command center + market state panel",
     ],
   },
@@ -303,7 +303,7 @@ export default async function PricingPage({
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
                 <Bell className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                Discord · email · SMS · push · Chrome overlay
+                Discord · email · SMS · push · Chrome overlay (install from Settings)
               </div>
               {!session && (
                 <p className="text-center text-sm text-zinc-500 px-1">

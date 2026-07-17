@@ -90,12 +90,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pt-20 pointer-events-none">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pt-20">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-none"
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
         aria-hidden
       />
-      <div className="pointer-events-auto relative w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden ring-1 ring-black/40">
+      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden ring-1 ring-black/40">
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 bg-zinc-900/80">
           <div className="flex gap-1">
             {steps.map((_, i) => (

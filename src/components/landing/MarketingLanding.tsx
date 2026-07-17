@@ -29,9 +29,9 @@ import { SUBSCRIPTION_PRICE_MO } from "@/lib/stripe";
 const features = [
   {
     icon: Gauge,
-    title: "Fast source polling",
+    title: "Measured ingest latency",
     description:
-      "TrustTicker checks enabled sources on up to ~2s cycles and pushes updates over SSE. Publisher and provider latency varies; measured catches are auditable on /wins.",
+      "Measured ingest latency varies by source and worker. With a dedicated worker, polling can hit ~2s best-case; Pro pushes via SSE when the feed updates. Auditable catches on /wins.",
   },
   {
     icon: Target,
@@ -309,14 +309,14 @@ export function MarketingLanding({
               </h2>
               <ul className="space-y-3.5">
                 {[
-                  "Fast source polling with auditable publish-to-feed stats",
+                  "Measured ingest latency with auditable publish-to-feed stats",
                   "Long / Short / Watch / Skip playbooks + anti-FOMO",
                   "Dilution radar before you chase offerings",
                   "Illustrative speed scenarios + candle comparisons vs +3 minutes",
                   "Call board, Prop Desk, sympathy map, catalyst replay",
                   "Session plan, watchlist autopsy, paper trades",
                   "EOD email with Daily Edge Recap vs $19.99",
-                  "Chrome overlay for TradingView · Discord / push / SMS",
+                  "Chrome overlay (install from Settings) · Discord / push / SMS",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 text-zinc-300">
                     <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />

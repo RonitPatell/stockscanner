@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Radio,
   Filter,
@@ -9,9 +9,11 @@ import {
   Sun,
   Moon,
   Volume2,
+  VolumeX,
   Star,
   Download,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { CatalystCard } from "./CatalystCard";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { Button } from "./ui/button";
@@ -27,8 +29,9 @@ import {
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
-const POLL_MS = 8_000;
+const POLL_MS = 12_000;
 const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
+const ROW_ESTIMATE_PX = 72;
 
 async function safeJsonFetch<T>(url: string): Promise<T | null> {
   try {
@@ -94,7 +97,7 @@ export function LiveScanner({
 
   useEffect(() => {
     setMounted(true);
-    const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+    const timer = setInterval(() => setNowMs(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -104,7 +107,15 @@ export function LiveScanner({
 
   useEffect(() => {
     if (Object.keys(liveQuotes).length === 0) return;
-    setCatalysts((prev) => prev.map((c) => applyLiveQuote(c, liveQuotes)));
+    setCatalysts((prev) => {
+      let changed = false;
+      const next = prev.map((c) => {
+        const updated = applyLiveQuote(c, liveQuotes);
+        if (updated !== c) changed = true;
+        return updated;
+      });
+      return changed ? next : prev;
+    });
   }, [liveQuotes]);
 
   const loadWatchlist = useCallback(async () => {
@@ -280,16 +291,27 @@ export function LiveScanner({
     });
   }, [watchlist]);
 
-  const watchSet = new Set(watchlist);
+  const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
 
-  const filtered = catalysts
-    .filter((c) => {
-      if (nowMs - new Date(c.publishedAt).getTime() > MAX_FEED_AGE_MS) return false;
-      if (tab === "premarket" && !c.isPremarket) return false;
-      if (tab === "watchlist" && !watchSet.has(c.symbol.toUpperCase())) return false;
-      return applyFilters(c, filters);
-    })
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const filtered = useMemo(
+    () =>
+      catalysts
+        .filter((c) => {
+          if (nowMs - new Date(c.publishedAt).getTime() > MAX_FEED_AGE_MS) return false;
+          if (tab === "premarket" && !c.isPremarket) return false;
+          if (tab === "watchlist" && !watchSet.has(c.symbol.toUpperCase())) return false;
+          return applyFilters(c, filters);
+        })
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
+    [catalysts, nowMs, tab, watchSet, filters]
+  );
+
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => ROW_ESTIMATE_PX,
+    overscan: 8,
+  });
 
   useEffect(() => {
     hotkeyRef.current = {
@@ -383,7 +405,10 @@ export function LiveScanner({
   useEffect(() => {
     const row = listRef.current?.querySelector(`[data-focus-idx="${focusIndex}"]`);
     row?.scrollIntoView({ block: "nearest" });
-  }, [focusIndex]);
+    if (focusIndex >= 0 && focusIndex < filtered.length) {
+      rowVirtualizer.scrollToIndex(focusIndex, { align: "auto" });
+    }
+  }, [focusIndex, filtered.length, rowVirtualizer]);
 
   const isPremarket = catalysts.some((c) => c.isPremarket);
   const tabLabel =
@@ -486,7 +511,11 @@ export function LiveScanner({
             onClick={() => setSoundEnabled(!soundEnabled)}
             title={soundEnabled ? "Mute alerts" : "Enable sound alerts"}
           >
-            <Volume2 className={cn("w-3.5 h-3.5", soundEnabled ? "text-emerald-400" : "text-zinc-600")} />
+            {soundEnabled ? (
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5 text-zinc-600" />
+            )}
           </Button>
           <Button
             variant={moversOnly ? "default" : "secondary"}
@@ -654,18 +683,43 @@ export function LiveScanner({
           </div>
         ) : (
           <div ref={listRef} className="scanner-list flex-1 min-h-0 overflow-y-auto">
-            {filtered.map((catalyst, idx) => (
-              <div key={`${catalyst.id}-${catalyst.symbol}`} data-focus-idx={idx}>
-                <CatalystCard
-                  catalyst={catalyst}
-                  isNew={newSymbols.has(catalyst.symbol)}
-                  inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
-                  onWatchlistToggle={toggleWatchlist}
-                  highlighted={idx === focusIndex}
-                  forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
-                />
-              </div>
-            ))}
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const catalyst = filtered[virtualRow.index];
+                const idx = virtualRow.index;
+                return (
+                  <div
+                    key={`${catalyst.id}-${catalyst.symbol}`}
+                    data-focus-idx={idx}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <CatalystCard
+                      catalyst={catalyst}
+                      isNew={newSymbols.has(catalyst.symbol)}
+                      inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
+                      onWatchlistToggle={toggleWatchlist}
+                      highlighted={idx === focusIndex}
+                      forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
+                      nowMs={nowMs}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

@@ -82,6 +82,12 @@ function arrStr(v: unknown): string[] | undefined {
 export interface AlertEvalContext {
   watchlist: Set<string>;
   hodSymbols?: Set<string>;
+  /**
+   * Symbols trading green vs prior close (honest proxy — not true session VWAP).
+   * Prefer requireHod for level-based alerts.
+   */
+  abovePriorCloseSymbols?: Set<string>;
+  /** @deprecated Use abovePriorCloseSymbols */
   vwapAboveSymbols?: Set<string>;
 }
 
@@ -112,7 +118,16 @@ export function catalystMatchesRule(c: CatalystItem, rule: AlertRule, ctx: Alert
   }
 
   if (rule.requireHod && !ctx.hodSymbols?.has(sym)) return false;
-  if (rule.requireVwapAbove && !ctx.vwapAboveSymbols?.has(sym)) return false;
+
+  // Legacy flag name "requireVwapAbove" — evaluate as green vs prior close only.
+  // Never alias to HOD (that was lying to traders).
+  if (rule.requireVwapAbove) {
+    const green =
+      ctx.abovePriorCloseSymbols?.has(sym) ||
+      ctx.vwapAboveSymbols?.has(sym) ||
+      (c.changePercent != null && c.changePercent > 0);
+    if (!green) return false;
+  }
 
   return true;
 }

@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 8;
+export const PLATFORM_GUIDE_VERSION = 10;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -27,14 +27,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
     title: "Welcome to your desk",
-    body: "The catalyst feed is your main work surface. On a wide screen, market context sits beside it; on smaller screens, the feed stays first and the context panels continue below.",
-    tip: "Takes about 60 seconds · Esc to exit · Focus keeps the desk calm",
+    body: "Focus mode is the default: catalyst feed + wire/volume + dilution + skip ledger. Full mode adds premarket, wins, and the rest of the toolbox.",
+    tip: "Takes about 60 seconds · Esc to exit · stay in Focus during the open",
   },
   {
     id: "status",
     target: "trust-status",
     title: "Live status",
-    body: "Shows whether the feed is fresh, if ingest is running, and how healthy the pipeline is. Green pulse = live.",
+    body: "Shows whether the feed is fresh, measured wire cycle (how often ingest actually runs), and avg ingest delay. Trust the numbers — not marketing.",
   },
   {
     id: "news-feed",
@@ -47,40 +47,48 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "market-monitor",
     target: "market-monitor",
     title: "Wire Alerts + Heavy Volume",
-    body: "What’s moving right now. Wire flags HOD / retests / volume events. Heavy Volume ranks relative-volume leaders. Each panel keeps a usable height and can expand when you want a dedicated view.",
+    body: "What’s moving right now — news names plus a rotating liquid-ticker scan for relative volume. Each panel can expand when you want a dedicated view.",
     tip: "Use Expand on a panel to enlarge it · Minimize to shrink it back",
+  },
+  {
+    id: "dilution",
+    target: "dilution-radar",
+    title: "Dilution radar",
+    body: "Surfaces offerings / ATM / dilution headlines so you don’t FOMO-buy a spike that’s about to get sold into. Tap “I skipped” to log it.",
+  },
+  {
+    id: "skip-ledger",
+    target: "skip-ledger",
+    title: "Skip ledger",
+    body: "Your personal retention loop: dilution spikes you passed, with illustrative % / $ avoided. This is why Pro pays for itself — skip discipline, not more noise.",
   },
   {
     id: "premarket",
     target: "premarket",
     title: "Premarket center",
     body: "Before the open: overnight movers and gap context so you walk into the session with a plan. Visible in Full mode.",
+    requiresExtras: true,
   },
   {
     id: "wins-brief",
     target: "wins-brief",
     title: "Speed wins & watchlist brief",
     body: "Speed wins prove we caught catalysts fast (auditable). Watchlist brief summarizes what matters on your names.",
+    requiresExtras: true,
   },
   {
     id: "catches",
     target: "catches-board",
     title: "Catches board",
     body: "Public proof wall: fastest catches plus top call-board callers.",
+    requiresExtras: true,
   },
   {
     id: "judgment",
     target: "judgment-toggle",
     title: "Judgment tools (optional)",
-    body: "Dilution radar, call board, daily edge, sympathy map, and more live under the tape so they don’t bury the feed. Or open Prop Desk for a focused layout.",
+    body: "Call board, daily edge, sympathy map, and more live under the tape. Dilution stays in Focus so you never miss traps.",
     tip: "Prop Desk = /desk",
-  },
-  {
-    id: "dilution",
-    target: "dilution-radar",
-    title: "Dilution radar",
-    body: "Surfaces offerings / ATM / dilution headlines so you don’t FOMO-buy a spike that’s about to get sold into.",
-    requiresExtras: true,
   },
   {
     id: "call-board",
@@ -100,8 +108,8 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "done",
     title: "You’re set",
-    body: "Work the feed. Glance left for wire/volume. Open judgment tools only when you need trap filters or proof.",
-    tip: "Settings → alerts, Discord, SMS, email briefs",
+    body: "Work the feed. Skip dilution. Open judgment tools only when you need calls or proof. Check Settings for Chrome overlay + alerts.",
+    tip: "Settings → alerts, Discord, SMS, email briefs, Chrome overlay",
   },
 ];
 

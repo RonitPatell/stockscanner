@@ -85,7 +85,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     <h2 style="color:#fafafa;margin:0 0 12px;font-size:20px">Welcome to TrustTicker Pro</h2>
     <p style="color:#a1a1aa;margin:0 0 16px">${greeting} your live catalyst scanner is ready. Here's what you get:</p>
     <ul style="color:#d4d4d8;margin:0 0 20px;padding-left:20px;line-height:1.8">
-      <li>Fast source polling with SSE push and visible ingest latency</li>
+      <li>SSE push when the feed updates, with visible measured ingest latency</li>
       <li>Action playbooks, anti-FOMO scores, dilution radar</li>
       <li>Illustrative speed scenarios + candle-based comparisons</li>
       <li>Morning/EOD email briefs with daily edge recap</li>

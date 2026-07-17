@@ -32,7 +32,7 @@ export default async function PopoutPage({
 
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(`/popout/${panel}`)}`);
+    redirect(`/login?next=${encodeURIComponent(`/popout/${panel}`)}`);
   }
 
   const user = await prisma.user.findUnique({

@@ -25,6 +25,26 @@ Break-even: **1 subscriber** covers everything.
 
 ---
 
+## Production latency (required for real speed)
+
+Vercel crons alone poll the wire **once per minute**. For sub-minute desks:
+
+```bash
+# Always-on worker (Railway / Fly / a VPS) — ~2s wire cycles
+npm run ingest:worker
+
+# Optional: keep quotes fresher under load
+npm run quote:stream
+# or both:
+npm run realtime:worker
+```
+
+Also set `BENZINGA_API_KEY` when you have it. The Trust Status bar shows **measured** wire cycle — not a hardcoded marketing number.
+
+Without workers, expect ~60s wire cadence + publisher lag. Be honest with traders.
+
+---
+
 ## Quick Start (30 minutes)
 
 ### 1. Install

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Ban } from "lucide-react";
 import { cn, formatPercent } from "@/lib/utils";
 import { applyLiveQuote, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
+import { recordSkipFromDilution } from "./SkipSavingsLedger";
 
 interface DilutionItem {
   id: string;
@@ -15,6 +16,7 @@ interface DilutionItem {
 
 export function DilutionRadar({ className }: { className?: string }) {
   const [items, setItems] = useState<DilutionItem[]>([]);
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
   const liveQuotes = useLiveQuotes();
   useRegisterLiveSymbols(
     "dilution-radar",
@@ -48,10 +50,11 @@ export function DilutionRadar({ className }: { className?: string }) {
         <span className="text-[9px] text-amber-500/80">skip these spikes</span>
         <span className="ml-auto text-[9px] font-mono text-amber-400/80">{items.length}</span>
       </div>
-      <div className="max-h-40 overflow-y-auto divide-y divide-amber-500/10">
+      <div className="max-h-44 overflow-y-auto divide-y divide-amber-500/10">
         {items.map((raw) => {
           const i = applyLiveQuote(raw, liveQuotes);
           const chg = i.changePercent ?? raw.changePercent;
+          const already = skipped.has(raw.symbol.toUpperCase());
           return (
             <div key={raw.id} className="px-3 py-1.5">
               <div className="flex items-center gap-2 text-[11px]">
@@ -68,6 +71,23 @@ export function DilutionRadar({ className }: { className?: string }) {
                   </span>
                 )}
                 <span className="text-zinc-500 truncate flex-1">{raw.headline}</span>
+                <button
+                  type="button"
+                  disabled={already || chg == null}
+                  onClick={() => {
+                    if (recordSkipFromDilution(raw)) {
+                      setSkipped((prev) => new Set(prev).add(raw.symbol.toUpperCase()));
+                    }
+                  }}
+                  className={cn(
+                    "shrink-0 text-[10px] px-2 py-0.5 rounded border transition-colors",
+                    already
+                      ? "border-emerald-500/40 text-emerald-400"
+                      : "border-amber-500/40 text-amber-200 hover:bg-amber-500/10 disabled:opacity-40"
+                  )}
+                >
+                  {already ? "Skipped" : "I skipped"}
+                </button>
               </div>
               <p className="text-[9px] text-amber-500/70 pl-5 mt-0.5">{raw.why}</p>
             </div>

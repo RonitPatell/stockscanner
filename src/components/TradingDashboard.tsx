@@ -21,6 +21,7 @@ import { SessionRecap } from "./SessionRecap";
 import { SpeedWinsPanel } from "./SpeedWinsPanel";
 import { SpeedEdgeLedger } from "./SpeedEdgeLedger";
 import { DilutionRadar } from "./DilutionRadar";
+import { SkipSavingsLedger } from "./SkipSavingsLedger";
 import { WatchlistAutopsy } from "./WatchlistAutopsy";
 import { SessionPlanCard } from "./SessionPlanCard";
 import { PaperTradeLedger } from "./PaperTradeLedger";
@@ -64,7 +65,8 @@ export function TradingDashboard({
   useEffect(() => {
     try {
       const saved = localStorage.getItem(MODE_KEY);
-      if (saved === "full" || saved === "focus") setMode(saved);
+      if (saved === "full" || saved === "advanced") setMode("full");
+      else if (saved === "focus" || saved === "simple") setMode("focus");
     } catch { /* ignore */ }
   }, []);
 
@@ -107,7 +109,7 @@ export function TradingDashboard({
               type="button"
               data-active={focused}
               onClick={() => setDashboardMode("focus")}
-              title="Focus — Wire + feed only"
+              title="Focus — feed, wire, dilution, skip ledger"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Focus
@@ -156,6 +158,14 @@ export function TradingDashboard({
 
             <div data-guide="session-plan">
               <SessionPlanCard />
+            </div>
+
+            {/* High-value judgment always visible in Focus */}
+            <div data-guide="dilution-radar">
+              <DilutionRadar />
+            </div>
+            <div data-guide="skip-ledger">
+              <SkipSavingsLedger />
             </div>
 
             {!focused && (
@@ -260,7 +270,7 @@ export function TradingDashboard({
             </button>
 
             <span className="text-[12px] text-[--text-muted] hidden sm:inline">
-              Dilution · calls · edge · replay
+              Calls · edge · replay · autopsy
             </span>
           </div>
 
@@ -270,12 +280,7 @@ export function TradingDashboard({
                 <DailyEdgeRecap />
               </div>
               <SessionRecap />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--gap)]">
-                <div data-guide="dilution-radar">
-                  <DilutionRadar />
-                </div>
-                <WatchlistAutopsy symbols={initialWatchlist} />
-              </div>
+              <WatchlistAutopsy symbols={initialWatchlist} />
               <SympathyMapPanel seedSymbol={initialWatchlist[0]} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--gap)]">
                 <CatalystReplayPanel />
@@ -291,7 +296,7 @@ export function TradingDashboard({
         </div>
 
         <p className="desk-disclaimer text-[10px] text-[--text-muted] text-center shrink-0 pb-1">
-          Not financial advice · data latency shown per headline · click any ticker to open chart
+          Not financial advice · data latency shown per headline · click tickers in the feed or monitor to open a chart
         </p>
 
         <PlatformGuide surface="dashboard" onExtrasRequired={openExtras} />

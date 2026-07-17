@@ -91,7 +91,7 @@ export function TrustStatusBar({ className }: { className?: string }) {
 
       <span className="desk-pill desk-health-detail text-[12px]">
         <RadioTower className="w-3.5 h-3.5" />
-        Source poll ~{Math.round(health.wireCycleMs / 1000)}s
+        Wire cycle ~{Math.round(health.wireCycleMs / 1000)}s
       </span>
 
       <span className="desk-pill desk-health-count text-[12px]">

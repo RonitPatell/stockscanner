@@ -260,6 +260,29 @@ export default function SettingsPage() {
             <h3 className="text-sm font-semibold text-zinc-300">Recent alerts</h3>
             <AlertHistoryPanel />
           </div>
+
+          <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <h3 className="text-sm font-semibold text-zinc-300">Chrome overlay</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Floating TrustTicker chip on TradingView charts. Load the unpacked extension from the
+              repo folder <span className="font-mono text-zinc-400">extensions/trustticker-overlay</span>{" "}
+              in <span className="font-mono text-zinc-400">chrome://extensions</span> (Developer mode
+              → Load unpacked).
+            </p>
+            <ol className="text-xs text-zinc-500 list-decimal pl-4 space-y-1">
+              <li>Open Chrome → Extensions → enable Developer mode</li>
+              <li>Load unpacked → select <span className="font-mono">extensions/trustticker-overlay</span></li>
+              <li>Open a TradingView chart — the TT chip appears for the ticker</li>
+            </ol>
+            <a
+              href="https://www.trustticker.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-emerald-400 hover:underline"
+            >
+              Overlay points at trustticker.com in production
+            </a>
+          </div>
         </section>
 
         <section className="space-y-4">

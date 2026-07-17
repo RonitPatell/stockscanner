@@ -17,7 +17,7 @@ export const metadata = {
 
 export default async function DeskPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/desk");
 
   let isSubscribed = false;
   let initialCatalysts: CatalystItem[] = [];

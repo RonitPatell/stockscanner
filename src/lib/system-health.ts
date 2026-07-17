@@ -19,10 +19,14 @@ export interface SystemHealthSnapshot {
 
 export type FeedHealthStatus = "live" | "ingesting" | "stale" | "starting";
 
-export const WIRE_CYCLE_MS = 3_000;
+/** Fallback when we have not observed enough wire finishes yet. */
+export const WIRE_CYCLE_MS_FALLBACK = 60_000;
+/** @deprecated Prefer measuredWireCycleMs — kept for older imports. */
+export const WIRE_CYCLE_MS = WIRE_CYCLE_MS_FALLBACK;
 export const FEED_STALE_MS = 3 * 60_000;
-const WIRE_STALE_MS = 60_000;
+const WIRE_STALE_MS = 90_000;
 const PIPELINE_STALE_MS = 6 * 60_000;
+const MAX_WIRE_INTERVAL_SAMPLES = 12;
 
 export function classifyFeedHealth({
   feedUpdatedAt,
@@ -71,6 +75,8 @@ const globalHealth = globalThis as typeof globalThis & {
     feedUpdatedAt: string | null;
     feedItemCount: number;
     feedSource: "redis" | "memory" | "none";
+    /** Observed gaps between successful wire finishes (ms). */
+    wireIntervalsMs: number[];
   };
 };
 
@@ -89,9 +95,21 @@ function store() {
       feedUpdatedAt: null,
       feedItemCount: 0,
       feedSource: "none",
+      wireIntervalsMs: [],
     };
   }
   return globalHealth.__trustHealth;
+}
+
+/** Median of observed wire finish intervals, else fallback (Vercel cron ≈ 60s). */
+export function measuredWireCycleMs(): number {
+  const samples = store().wireIntervalsMs;
+  if (samples.length < 2) return WIRE_CYCLE_MS_FALLBACK;
+  const sorted = [...samples].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+    : sorted[mid];
 }
 
 export function markPipelineStarted(): void {
@@ -137,8 +155,19 @@ export function markWireStarted(): void {
 
 export function markWireFinished(result: Record<string, unknown>): void {
   const s = store();
+  const now = Date.now();
+  if (s.lastWireFinishedAt) {
+    const prev = new Date(s.lastWireFinishedAt).getTime();
+    if (Number.isFinite(prev) && now > prev) {
+      const gap = now - prev;
+      // Ignore absurd gaps (deploy downtime) so the median stays honest
+      if (gap >= 1_500 && gap <= 5 * 60_000) {
+        s.wireIntervalsMs = [...s.wireIntervalsMs, gap].slice(-MAX_WIRE_INTERVAL_SAMPLES);
+      }
+    }
+  }
   s.wireInFlight = false;
-  s.lastWireFinishedAt = new Date().toISOString();
+  s.lastWireFinishedAt = new Date(now).toISOString();
   s.lastWireResult = result;
 }
 
@@ -161,7 +190,7 @@ export function getSystemHealth(scaleMode: boolean): SystemHealthSnapshot {
     lastResult: s.lastResult,
     lastWireResult: s.lastWireResult,
     scaleMode,
-    wireCycleMs: WIRE_CYCLE_MS,
+    wireCycleMs: measuredWireCycleMs(),
     avgIngestDelaySec: s.avgIngestDelaySec,
     feedUpdatedAt: s.feedUpdatedAt,
     feedItemCount: s.feedItemCount,

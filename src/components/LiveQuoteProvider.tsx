@@ -229,14 +229,30 @@ export function applyLiveQuote<T extends {
 }>(item: T, quotes: Record<string, LiveQuote>): T {
   const q = quotes[item.symbol.toUpperCase()];
   if (!q) return item;
+  const nextRvol = q.rVol != null ? q.rVol : item.rVol;
+  const nextVol = q.volume ?? item.volume;
+  const nextAvg = q.avgVolume ?? item.avgVolume;
+  const nextFloat = q.floatShares ?? item.floatShares;
+  const nextMcap = q.marketCap ?? item.marketCap;
+  if (
+    item.price === q.price &&
+    item.changePercent === q.changePercent &&
+    item.rVol === nextRvol &&
+    item.volume === nextVol &&
+    item.avgVolume === nextAvg &&
+    item.floatShares === nextFloat &&
+    item.marketCap === nextMcap
+  ) {
+    return item;
+  }
   return {
     ...item,
     price: q.price,
     changePercent: q.changePercent,
-    rVol: q.rVol != null ? q.rVol : item.rVol,
-    volume: q.volume ?? item.volume,
-    avgVolume: q.avgVolume ?? item.avgVolume,
-    floatShares: q.floatShares ?? item.floatShares,
-    marketCap: q.marketCap ?? item.marketCap,
+    rVol: nextRvol,
+    volume: nextVol,
+    avgVolume: nextAvg,
+    floatShares: nextFloat,
+    marketCap: nextMcap,
   };
 }

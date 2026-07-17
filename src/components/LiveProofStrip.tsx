@@ -59,7 +59,7 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           </span>
           <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
             <Zap className="w-3 h-3 text-emerald-500" />
-            Source poll ~{stats?.sourcePollCycleSec ?? stats?.wireCycleSec ?? 3}s
+            Source poll ~{stats?.sourcePollCycleSec ?? stats?.wireCycleSec ?? 60}s
           </span>
           {avg != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">

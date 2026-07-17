@@ -43,6 +43,8 @@ interface CatalystCardProps {
   highlighted?: boolean;
   /** Controlled expand from hotkeys */
   forceExpanded?: boolean;
+  /** Shared desk clock (ms) — avoids per-card 1Hz timers */
+  nowMs?: number;
 }
 
 export function CatalystCard({
@@ -53,6 +55,7 @@ export function CatalystCard({
   demoMode = false,
   highlighted = false,
   forceExpanded,
+  nowMs,
 }: CatalystCardProps) {
   const liveQuotes = useLiveQuotesOptional();
   const price = pickLiveField(catalyst.symbol, liveQuotes, "price", catalyst.price);
@@ -86,7 +89,6 @@ export function CatalystCard({
   const [detectedLang, setDetectedLang] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [ageLabel, setAgeLabel] = useState("");
 
   useEffect(() => {
     if (forceExpanded === undefined) return;
@@ -97,13 +99,9 @@ export function CatalystCard({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-    const tick = () => setAgeLabel(timeAgo(catalyst.publishedAt));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [catalyst.publishedAt, mounted]);
+  const ageLabel = mounted
+    ? timeAgo(catalyst.publishedAt, nowMs ?? Date.now())
+    : "";
 
   const sourceTier = catalyst.sourceTier
     ? (catalyst.sourceTier as "wire" | "exchange" | "aggregator" | "other")

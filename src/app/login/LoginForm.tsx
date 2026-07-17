@@ -9,11 +9,20 @@ import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { LogoMark } from "@/components/Logo";
 
+/** Only allow same-origin relative paths (blocks open redirects). */
+function safeReturnPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (raw === "checkout") return "/subscribe";
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return null;
+  return raw;
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegister = searchParams.get("register") === "true";
-  const next = searchParams.get("next");
+  const nextParam = searchParams.get("next") ?? searchParams.get("callbackUrl");
+  const returnTo = safeReturnPath(nextParam) ?? "/dashboard";
 
   const [mode, setMode] = useState<"login" | "register">(isRegister ? "register" : "login");
   const [email, setEmail] = useState("");
@@ -55,13 +64,7 @@ export default function LoginForm() {
         return;
       }
 
-      if (next === "checkout") {
-        router.refresh();
-        router.push("/subscribe");
-        return;
-      }
-
-      router.push(next === "checkout" ? "/subscribe" : "/dashboard");
+      router.push(returnTo);
       router.refresh();
     } catch {
       setError("Something went wrong");

@@ -194,10 +194,12 @@ export function PostCallButton({
 }) {
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const post = async () => {
     if (busy || done) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/calls", {
         method: "POST",
@@ -207,23 +209,31 @@ export function PostCallButton({
       if (res.ok) {
         setDone(true);
         window.dispatchEvent(new Event("tt-call-posted"));
+        return;
       }
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error || "Could not post call");
+    } catch {
+      setError("Could not post call");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => void post()}
-      disabled={busy}
-      className={cn(
-        "text-[10px] px-2 py-1 rounded border border-orange-500/40 text-orange-300 hover:bg-orange-500/10 disabled:opacity-40",
-        className
-      )}
-    >
-      {done ? "Called ✓" : `Call ${bias}`}
-    </button>
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        onClick={() => void post()}
+        disabled={busy}
+        className={cn(
+          "text-[10px] px-2 py-1 rounded border border-orange-500/40 text-orange-300 hover:bg-orange-500/10 disabled:opacity-40",
+          className
+        )}
+      >
+        {done ? "Called ✓" : busy ? "Posting…" : `Call ${bias}`}
+      </button>
+      {error && <span className="text-[9px] text-red-400">{error}</span>}
+    </span>
   );
 }
