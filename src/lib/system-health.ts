@@ -17,9 +17,45 @@ export interface SystemHealthSnapshot {
   feedSource: "redis" | "memory" | "none";
 }
 
-const WIRE_CYCLE_MS = 3_000;
+export type FeedHealthStatus = "live" | "ingesting" | "stale" | "starting";
+
+export const WIRE_CYCLE_MS = 3_000;
+export const FEED_STALE_MS = 3 * 60_000;
 const WIRE_STALE_MS = 60_000;
 const PIPELINE_STALE_MS = 6 * 60_000;
+
+export function classifyFeedHealth({
+  feedUpdatedAt,
+  feedItemCount,
+  pipelineInFlight,
+  nowMs = Date.now(),
+}: {
+  feedUpdatedAt: string | null;
+  feedItemCount: number;
+  pipelineInFlight: boolean;
+  nowMs?: number;
+}): { status: FeedHealthStatus; feedAgeSec: number | null } {
+  if (!feedUpdatedAt) {
+    return {
+      status: pipelineInFlight ? "ingesting" : feedItemCount > 0 ? "stale" : "starting",
+      feedAgeSec: null,
+    };
+  }
+
+  const updatedMs = new Date(feedUpdatedAt).getTime();
+  if (!Number.isFinite(updatedMs)) {
+    return {
+      status: pipelineInFlight ? "ingesting" : feedItemCount > 0 ? "stale" : "starting",
+      feedAgeSec: null,
+    };
+  }
+
+  const ageMs = Math.max(0, nowMs - updatedMs);
+  return {
+    status: pipelineInFlight ? "ingesting" : ageMs <= FEED_STALE_MS ? "live" : "stale",
+    feedAgeSec: Math.floor(ageMs / 1000),
+  };
+}
 
 const globalHealth = globalThis as typeof globalThis & {
   __trustHealth?: {

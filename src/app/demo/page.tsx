@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { DemoDashboard } from "@/components/demo/DemoDashboard";
 import { UserMenu } from "@/components/UserMenu";
-import { LogoMark } from "@/components/Logo";
+import { BrandHomeLink } from "@/components/BrandHomeLink";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
@@ -26,17 +26,14 @@ export default async function DemoPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-zinc-950">
-      <header className="shrink-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
+      <header className="shrink-0 relative z-[110] border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
-          <Link href="/" prefetch className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <LogoMark className="w-7 h-7" />
-            <span className="font-bold">
-              Trust<span className="text-emerald-400">Ticker</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500 ml-1">
+          <div className="flex items-center gap-2">
+            <BrandHomeLink />
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500">
               Demo
             </span>
-          </Link>
+          </div>
 
           <div className="flex items-center gap-2">
             {session ? (

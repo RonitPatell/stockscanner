@@ -29,6 +29,7 @@ export function CallBoard({
   const [bias, setBias] = useState("long");
   const [note, setNote] = useState("");
   const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const qs = watchlistOnly
@@ -54,15 +55,24 @@ export function CallBoard({
   const post = async () => {
     if (!symbol.trim() || posting) return;
     setPosting(true);
+    setPostError(null);
     try {
-      await fetch("/api/calls", {
+      const res = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, bias, note }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setPostError(data?.error || "Could not post call — try again");
+        return;
+      }
       setSymbol("");
       setNote("");
       load();
+      window.dispatchEvent(new Event("tt-call-posted"));
+    } catch {
+      setPostError("Network error — call not saved");
     } finally {
       setPosting(false);
     }
@@ -114,6 +124,11 @@ export function CallBoard({
           <Plus className="w-3 h-3" /> Call
         </button>
       </div>
+      {postError && (
+        <p className="px-3 py-1.5 text-[10px] text-red-400 border-b border-orange-500/10">
+          {postError}
+        </p>
+      )}
 
       <div className="max-h-40 overflow-y-auto divide-y divide-orange-500/10">
         {calls.length === 0 ? (

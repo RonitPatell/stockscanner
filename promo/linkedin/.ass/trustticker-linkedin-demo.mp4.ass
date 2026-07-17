@@ -1,0 +1,25 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Segoe UI Semibold,52,&H00FFFFFF,&H000000FF,&H00101010,&H96000000,0,0,0,0,100,100,0.5,0,1,2.5,1,2,120,120,72,1
+Style: Brand,Segoe UI,30,&H00C8C8C8,&H000000FF,&H00101010,&H80000000,0,0,0,0,100,100,1,0,1,1.5,0,9,40,44,34,1
+Style: Disc,Segoe UI,26,&H009A9A9A,&H000000FF,&H00101010,&H80000000,0,0,0,0,100,100,0.5,0,1,1.5,0,2,40,40,26,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:00.00,0:00:48.40,Brand,,0,0,0,,TrustTicker
+Dialogue: 1,0:00:43.40,0:00:48.40,Disc,,0,0,0,,Informational only · Not financial advice
+Dialogue: 0,0:00:00.60,0:00:05.50,Cap,,0,0,0,,{\fad(280,280)}One workspace for market news
+Dialogue: 0,0:00:06.20,0:00:11.20,Cap,,0,0,0,,{\fad(280,280)}Your full desk, at a glance
+Dialogue: 0,0:00:11.90,0:00:17.90,Cap,,0,0,0,,{\fad(280,280)}Wire alerts, as headlines cross
+Dialogue: 0,0:00:18.60,0:00:24.60,Cap,,0,0,0,,{\fad(280,280)}A live feed with context
+Dialogue: 0,0:00:25.30,0:00:30.80,Cap,,0,0,0,,{\fad(280,280)}Market activity, monitored calmly
+Dialogue: 0,0:00:31.50,0:00:37.00,Cap,,0,0,0,,{\fad(280,280)}A free daily briefing — one short focus list
+Dialogue: 0,0:00:37.70,0:00:42.70,Cap,,0,0,0,,{\fad(280,280)}Try the free demo · Start a free trial
+Dialogue: 0,0:00:43.40,0:00:48.00,Cap,,0,0,0,,{\fad(280,280)}trustticker.com

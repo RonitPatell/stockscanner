@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "./ui/button";
 import { UserMenu } from "./UserMenu";
-import { LogoMark } from "./Logo";
+import { BrandHomeLink } from "./BrandHomeLink";
 
 import { isSubscribedFromSettings } from "@/lib/subscription-client";
 
@@ -39,12 +39,11 @@ export function Navbar() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group transition-transform duration-200 active:scale-[0.98]">
-          <LogoMark className="w-8 h-8 group-hover:shadow-emerald-500/50" />
-          <span className="font-bold text-lg tracking-tight" style={{ fontFamily: "var(--font-display), var(--font-geist-sans), system-ui, sans-serif" }}>
-            Trust<span className="text-emerald-400">Ticker</span>
-          </span>
-        </Link>
+        <BrandHomeLink
+          className="group transition-transform duration-200 active:scale-[0.98]"
+          iconClassName="w-8 h-8 group-hover:shadow-emerald-500/50"
+          textClassName="text-lg"
+        />
 
         <nav className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
           {!isLoggedIn && (

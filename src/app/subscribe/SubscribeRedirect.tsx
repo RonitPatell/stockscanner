@@ -18,7 +18,7 @@ export function SubscribeRedirect() {
 
     const result = await startCheckout();
     if (result.ok) {
-      window.location.href = result.url;
+      window.location.assign(result.url);
       return;
     }
 

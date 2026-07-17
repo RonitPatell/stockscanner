@@ -1,0 +1,27 @@
+{
+  "name": "trustticker-linkedin-epic",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion project for the TrustTicker LinkedIn epic demo video",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render EpicDemo out/trustticker-epic.mp4 --gl=angle",
+    "render:short": "remotion render EpicShort out/trustticker-epic-short.mp4 --gl=angle"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.6.1",
+    "@remotion/cli": "^4.0.489",
+    "@remotion/google-fonts": "^4.0.489",
+    "@remotion/media-utils": "^4.0.489",
+    "@remotion/renderer": "^4.0.489",
+    "@remotion/three": "^4.0.489",
+    "@remotion/transitions": "^4.0.489",
+    "@types/react": "^19.2.17",
+    "@types/three": "^0.185.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "remotion": "^4.0.489",
+    "three": "^0.185.1",
+    "typescript": "^5.9.3"
+  }
+}

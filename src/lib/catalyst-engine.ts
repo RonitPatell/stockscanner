@@ -33,10 +33,7 @@ import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
 import { getPriorityTickers } from "./priority-tickers";
 
-let lastIngestTime = 0;
 let lastPurgeTime = 0;
-let ingestInProgress = false;
-let ingestErrorStreak = 0;
 
 // Prevent feed flicker: if a poll hits a transient DB error, return last known good data
 const lastGood = new Map<"all" | "movers", { ts: number; items: CatalystItem[] }>();
@@ -490,8 +487,6 @@ export async function ingestAndAnalyzeNews(
     }
   }
 
-  lastIngestTime = Date.now();
-  ingestErrorStreak = 0;
 
   if (newItems.length > 0) {
     if (wireOnly) {

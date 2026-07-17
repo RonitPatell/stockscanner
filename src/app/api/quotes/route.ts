@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePro } from "@/lib/api-guard";
+import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isQuotableMarketSymbol } from "@/lib/index-quotes";
 import { resolveFinnhubKey } from "@/lib/finnhub-key";
@@ -46,6 +47,15 @@ function applyInstantRvolEstimates(
 export async function GET(req: NextRequest) {
   const gate = await requirePro();
   if (gate.error) return gate.error;
+
+  const ip = clientIp(req);
+  const rl = await rateLimit(`quotes:${gate.user.id}:${ip}`, 120, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many quote requests" },
+      { status: 429, headers: rateLimitHeaders(rl, 120) }
+    );
+  }
 
   try {
     const raw = req.nextUrl.searchParams.get("symbols") ?? "";

@@ -13,6 +13,7 @@ import {
   timeAgo,
   getSentimentColor,
   getChangeColor,
+  safeHttpUrl,
 } from "@/lib/utils";
 import { formatRvol } from "@/lib/volume-utils";
 import { brokerDeepLinks, tradingViewUrl } from "@/lib/chart-links";
@@ -190,14 +191,90 @@ export function CatalystCard({
   return (
     <div
       className={cn(
-        "border-b border-zinc-800/80 last:border-b-0 transition-colors",
-        isNew && "bg-emerald-500/5",
-        expanded && "bg-zinc-900/60",
-        highlighted && "ring-1 ring-inset ring-emerald-500/50 bg-emerald-500/5",
-        inWatchlist && "ring-1 ring-inset ring-amber-500/20"
+        "border-b border-[--border] last:border-b-0 transition-colors",
+        isNew && "bg-[--accent-subtle] new-row",
+        expanded && "bg-white/[0.025]",
+        highlighted && "ring-1 ring-inset ring-[--accent]/40 bg-[--accent-subtle]",
+        inWatchlist && "ring-1 ring-inset ring-amber-500/18"
       )}
     >
-      <div className="grid grid-cols-[72px_48px_52px_40px_40px_1fr_48px_24px] gap-1.5 items-center px-2.5 py-1.5 hover:bg-zinc-800/40">
+      <div className="sm:hidden px-3 py-3 hover:bg-white/[0.025]">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <a
+            href={tradingViewUrl(catalyst.symbol)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-[58px] shrink-0"
+            title="Open chart on TradingView"
+          >
+            <span className="block font-mono font-bold text-[15px] text-white">
+              {catalyst.symbol}
+            </span>
+            <span className="block text-[10px] text-[--text-tertiary] truncate mt-0.5">
+              {catalystType
+                ? catalystType.icon + " " + catalystType.label
+                : catalyst.source}
+            </span>
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="min-w-0 flex-1 text-left"
+          >
+            <span className="block text-[12px] leading-[1.4] text-[--text-primary] line-clamp-2">
+              {headlineText}
+            </span>
+            <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span
+                className={cn(
+                  "font-mono text-[11px] font-bold tabular-nums",
+                  getChangeColor(changePercent)
+                )}
+              >
+                {formatPercent(changePercent)}
+              </span>
+              <span className="font-mono text-[11px] text-[--text-secondary] tabular-nums">
+                {formatPrice(price)}
+              </span>
+              <span className={cn("font-mono text-[11px]", hotRvol ? "text-amber-400" : "text-[--text-tertiary]")}>
+                {formatRvol(rVol)} RVOL
+              </span>
+              <span className={cn("font-mono text-[11px]", getSentimentColor(catalyst.sentimentScore))}>
+                {(catalyst.sentimentScore ?? 0) >= 0 ? "+" : ""}
+                {catalyst.sentimentScore?.toFixed(0) ?? "—"} impact
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md border border-[--border] text-[--text-tertiary]"
+            aria-label={expanded ? "Collapse catalyst" : "Expand catalyst"}
+          >
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 mt-2 min-w-0">
+          <span className={cn("text-[9px] px-1.5 py-0.5 rounded border uppercase font-semibold", sourceTierBadgeClass(sourceTier))}>
+            {sourceTierLabel(sourceTier)}
+          </span>
+          {catalyst.newsCount && catalyst.newsCount > 1 ? (
+            <span className="text-[9px] text-violet-400">{catalyst.newsCount} sources</span>
+          ) : null}
+          <FomoBadge catalyst={catalyst} changePercent={changePercent} rVol={rVol} floatShares={floatShares} />
+          <span className="ml-auto text-[9px] text-[--text-muted] font-mono whitespace-nowrap">
+            {mounted ? ageLabel : "…"}
+            {catalyst.ingestDelaySec != null && catalyst.ingestDelaySec < 120
+              ? " · +" + catalyst.ingestDelaySec + "s"
+              : ""}
+          </span>
+        </div>
+      </div>
+
+      <div className="hidden sm:grid grid-cols-[80px_54px_58px_44px_44px_1fr_54px_28px] gap-2 items-center px-4 py-3 hover:bg-white/[0.025]">
         {/* Symbol — opens TradingView */}
         <div className="min-w-0">
           <a
@@ -205,18 +282,18 @@ export function CatalystCard({
             target="_blank"
             rel="noopener noreferrer"
             title="Open chart on TradingView"
-            className="group/sym flex items-center gap-1 min-w-0"
+            className="group/sym flex items-center gap-1.5 min-w-0"
           >
-            <span className="font-mono font-bold text-white text-sm group-hover/sym:text-emerald-400 transition-colors underline-offset-2 group-hover/sym:underline">
+            <span className="font-mono font-bold text-white text-[15px] group-hover/sym:text-[--accent-bright] transition-colors underline-offset-2 group-hover/sym:underline">
               {catalyst.symbol}
             </span>
-            <LineChart className="w-3 h-3 text-zinc-600 group-hover/sym:text-emerald-500 shrink-0 opacity-0 group-hover/sym:opacity-100 transition-opacity" />
+            <LineChart className="w-3.5 h-3.5 text-[--text-muted] group-hover/sym:text-[--accent] shrink-0 opacity-0 group-hover/sym:opacity-100 transition-opacity" />
             {isNew && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[--accent] shrink-0 animate-pulse" />
             )}
           </a>
           {catalystType && (
-            <span className="text-[9px] text-zinc-500 truncate block">
+            <span className="text-[11px] text-[--text-tertiary] truncate block mt-0.5">
               {catalystType.icon} {catalystType.label}
             </span>
           )}
@@ -225,11 +302,11 @@ export function CatalystCard({
         {/* Change % */}
         <div
           className={cn(
-            "font-mono text-[11px] font-semibold text-center rounded px-0.5 py-0.5 transition-colors duration-500",
+            "font-mono text-[13px] font-semibold text-center rounded-lg px-1 py-1 transition-colors duration-500 tabular-nums",
             isBigMover
               ? (changePercent ?? 0) >= 0
-                ? "bg-emerald-500/15 text-emerald-400"
-                : "bg-red-500/15 text-red-400"
+                ? "bg-[--bull-dim] text-[--bull]"
+                : "bg-[--bear-dim] text-[--bear]"
               : getChangeColor(changePercent)
           )}
         >
@@ -237,15 +314,15 @@ export function CatalystCard({
         </div>
 
         {/* Price */}
-        <div className="font-mono text-[11px] text-zinc-300 text-right tabular-nums transition-colors duration-500">
+        <div className="font-mono text-[13px] text-[--text-secondary] text-right tabular-nums transition-colors duration-500">
           {formatPrice(price)}
         </div>
 
         {/* RVOL */}
         <div
           className={cn(
-            "font-mono text-[11px] font-semibold text-center",
-            hotRvol ? "text-amber-400" : "text-zinc-400"
+            "font-mono text-[13px] font-semibold text-center tabular-nums",
+            hotRvol ? "text-amber-400" : "text-[--text-secondary]"
           )}
           title="Relative volume vs session average"
         >
@@ -256,7 +333,7 @@ export function CatalystCard({
         <div className="text-center">
           <span
             className={cn(
-              "font-mono text-[11px] font-semibold",
+              "font-mono text-[13px] font-semibold tabular-nums",
               getSentimentColor(catalyst.sentimentScore)
             )}
           >
@@ -272,18 +349,18 @@ export function CatalystCard({
             onClick={() => setExpanded(!expanded)}
             className="min-w-0 w-full text-left"
           >
-            <p className="text-[11px] sm:text-xs text-zinc-200 truncate leading-snug">
+            <p className="text-[13px] text-[--text-primary] truncate leading-snug">
               {newsCount > 1 && (
-                <span className="text-zinc-500 mr-1">{newsCount} ·</span>
+                <span className="text-[--text-tertiary] mr-1.5">{newsCount} ·</span>
               )}
               {headlineText}
               {translatedHeadline && (
-                <span className="ml-1 text-[9px] text-zinc-500">
+                <span className="ml-1.5 text-[11px] text-[--text-tertiary]">
                   · Translated{detectedLang ? ` (${detectedLang})` : ""}
                 </span>
               )}
             </p>
-            <p className="text-[9px] text-zinc-600 truncate mt-0.5 hidden sm:block">
+            <p className="text-[11px] text-[--text-tertiary] truncate mt-0.5 hidden sm:block">
               {formatFloat(floatShares)} float · {formatMarketCap(marketCap)}
               {catalyst.isPremarket && " · PM"}
               {catalyst.setupTags?.length ? (
@@ -297,22 +374,22 @@ export function CatalystCard({
               ) : null}
             </p>
           </button>
-          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
             <span
               className={cn(
-                "text-[8px] px-1 py-0 rounded border uppercase tracking-wide",
+                "text-[10px] px-1.5 py-0.5 rounded-md border uppercase tracking-wide font-semibold",
                 sourceTierBadgeClass(sourceTier)
               )}
             >
               {sourceTierLabel(sourceTier)}
             </span>
             {trustLabel && (
-              <span className="text-[8px] px-1 py-0 rounded border border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md border border-cyan-500/30 text-cyan-400 bg-cyan-500/10 font-medium">
                 {trustLabel}
               </span>
             )}
             {catalyst.newsCount && catalyst.newsCount > 1 && (
-              <span className="text-[8px] text-violet-400">
+              <span className="text-[10px] text-violet-400 font-medium">
                 {catalyst.newsCount} sources
               </span>
             )}
@@ -553,9 +630,9 @@ export function CatalystCard({
                         {mounted ? timeAgo(h.publishedAt) : "…"}
                       </span>
                     </div>
-                    {h.sourceUrl && (
+                    {safeHttpUrl(h.sourceUrl) && (
                       <a
-                        href={h.sourceUrl}
+                        href={safeHttpUrl(h.sourceUrl)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center gap-0.5 shrink-0"

@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 6;
+export const PLATFORM_GUIDE_VERSION = 8;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -27,52 +27,52 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
     title: "Welcome to your desk",
-    body: "This quick tour explains what each panel is for. You can reopen it anytime with the Guide button (bottom-right).",
-    tip: "Takes about 60 seconds · Esc to exit · start in Simple mode",
+    body: "The catalyst feed is your main work surface. On a wide screen, market context sits beside it; on smaller screens, the feed stays first and the context panels continue below.",
+    tip: "Takes about 60 seconds · Esc to exit · Focus keeps the desk calm",
   },
   {
     id: "status",
     target: "trust-status",
-    title: "Trust / live status",
+    title: "Live status",
     body: "Shows whether the feed is fresh, if ingest is running, and how healthy the pipeline is. Green pulse = live.",
+  },
+  {
+    id: "news-feed",
+    target: "news-feed",
+    title: "Catalyst feed (center of the desk)",
+    body: "Stock-impact headlines only. Expand a row for playbooks (Long/Short/Watch/Skip), charts, paper trades, and call buttons. Tabs: All · Premarket · Watchlist.",
+    tip: "Hotkeys: j/k navigate · Enter expand · w watchlist · / search · 1/2/3 tabs",
+  },
+  {
+    id: "market-monitor",
+    target: "market-monitor",
+    title: "Wire Alerts + Heavy Volume",
+    body: "What’s moving right now. Wire flags HOD / retests / volume events. Heavy Volume ranks relative-volume leaders. Each panel keeps a usable height and can expand when you want a dedicated view.",
+    tip: "Use Expand on a panel to enlarge it · Minimize to shrink it back",
   },
   {
     id: "premarket",
     target: "premarket",
     title: "Premarket center",
-    body: "Before the open: overnight movers and gap context so you walk into the session with a plan.",
-  },
-  {
-    id: "market-monitor",
-    target: "market-monitor",
-    title: "Wire Alerts + High Volume",
-    body: "Your core tape tools. Wire Alerts flag HOD / retests / volume events. High Volume shows relative-volume leaders. Market state and earnings sit underneath.",
-    tip: "This is the main “what’s moving right now” block · use Expand on a panel to enlarge it over the monitor, Minimize to shrink it back",
+    body: "Before the open: overnight movers and gap context so you walk into the session with a plan. Visible in Full mode.",
   },
   {
     id: "wins-brief",
     target: "wins-brief",
     title: "Speed wins & watchlist brief",
-    body: "Speed wins prove we caught catalysts fast (auditable). Watchlist brief summarizes what matters on your names for morning / EOD.",
+    body: "Speed wins prove we caught catalysts fast (auditable). Watchlist brief summarizes what matters on your names.",
   },
   {
     id: "catches",
     target: "catches-board",
     title: "Catches board",
-    body: "Public proof wall: fastest/impressive catches plus top call-board callers. Social proof that compounds.",
-  },
-  {
-    id: "news-feed",
-    target: "news-feed",
-    title: "Live catalyst feed",
-    body: "Stock-impact headlines only. Expand a row for playbooks (Long/Short/Watch/Skip), charts, paper trades, and call buttons. Tabs: All · Premarket · Watchlist.",
-    tip: "Hotkeys: j/k navigate · Enter expand · w watchlist · / search · 1/2/3 tabs · broker links on expand",
+    body: "Public proof wall: fastest catches plus top call-board callers.",
   },
   {
     id: "judgment",
     target: "judgment-toggle",
     title: "Judgment tools (optional)",
-    body: "Dilution radar, call board, daily edge, sympathy map, and more live here so they don’t bury Wire Alerts. Click “Show judgment tools” or use Prop Desk for a focused layout.",
+    body: "Dilution radar, call board, daily edge, sympathy map, and more live under the tape so they don’t bury the feed. Or open Prop Desk for a focused layout.",
     tip: "Prop Desk = /desk",
   },
   {
@@ -93,14 +93,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "daily-edge",
     target: "daily-edge",
     title: "Daily Edge Recap",
-    body: "Illustrative scoreboard: paper speed edge + dilution skips + paper trades, framed against your $19.99 month — did Pro pay for itself today?",
+    body: "Illustrative scoreboard: paper speed edge + dilution skips + paper trades — framed against your Pro month.",
     requiresExtras: true,
     tip: "Not real brokerage P&L · not financial advice",
   },
   {
     id: "done",
     title: "You’re set",
-    body: "Trade from Wire Alerts + the news feed. Open judgment tools when you need trap filters or proof. Reopen this Guide anytime you’re unsure.",
+    body: "Work the feed. Glance left for wire/volume. Open judgment tools only when you need trap filters or proof.",
     tip: "Settings → alerts, Discord, SMS, email briefs",
   },
 ];

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCachedFeed } from "@/lib/feed-cache";
 import { isScaleMode } from "@/lib/redis";
-import { getSystemHealth } from "@/lib/system-health";
+import { classifyFeedHealth, getSystemHealth } from "@/lib/system-health";
 import { getIngestLatencyStats, getSpeedWins } from "@/lib/speed-wins";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,11 @@ export async function GET() {
   ]);
 
   const health = getSystemHealth(isScaleMode());
+  const freshness = classifyFeedHealth({
+    ...health,
+    feedUpdatedAt: feed.meta?.updatedAt ?? null,
+    feedItemCount: feed.items.length,
+  });
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
@@ -22,9 +27,12 @@ export async function GET() {
     feed: {
       itemCount: feed.items.length,
       updatedAt: feed.meta?.updatedAt ?? null,
-      status: health.pipelineInFlight ? "ingesting" : feed.items.length > 0 ? "live" : "starting",
+      status: freshness.status,
+      ageSec: freshness.feedAgeSec,
     },
-    wireCycleSec: 8,
+    sourcePollCycleSec: Math.round(health.wireCycleMs / 1000),
+    // Backward-compatible alias for older clients.
+    wireCycleSec: Math.round(health.wireCycleMs / 1000),
     recentWins: wins,
     scaleMode: isScaleMode(),
   });

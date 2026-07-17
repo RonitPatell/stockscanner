@@ -59,9 +59,9 @@ export function SpeedEdgeLedger({
       <div className="flex items-center justify-between px-3 py-2 border-b border-emerald-500/20 bg-emerald-500/5">
         <div className="flex items-center gap-2 min-w-0">
           <DollarSign className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <span className="text-[11px] font-semibold text-emerald-200">Speed Edge</span>
+          <span className="text-[11px] font-semibold text-emerald-200">Speed Scenario</span>
           <span className="text-[9px] text-zinc-500 truncate">
-            paper P&amp;L if you acted at ingest vs +3m
+            illustrative $1k notional · ingest vs +3m
           </span>
         </div>
         <Link href="/wins" className="text-[10px] text-emerald-500 hover:underline shrink-0">
@@ -71,7 +71,7 @@ export function SpeedEdgeLedger({
 
       <div className="px-3 py-2.5 flex flex-wrap items-end gap-x-4 gap-y-1">
         <div>
-          <div className="text-[10px] text-zinc-500 uppercase tracking-wider">72h paper edge</div>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wider">72h scenario</div>
           <div className="text-xl font-bold font-mono text-emerald-400">
             ${data.totalEdgeUsd.toFixed(0)}
           </div>
@@ -147,7 +147,7 @@ export function SpeedEdgeHeroStat({ className }: { className?: string }) {
       <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0" />
       <div className="min-w-0">
         <p className="text-sm text-emerald-100 font-medium">
-          Last 72h paper speed edge:{" "}
+          Last 72h illustrative speed scenario:{" "}
           <span className="font-mono text-emerald-400">${data.totalEdgeUsd.toFixed(0)}</span>
           {data.paysForItself ? (
             <span className="text-zinc-400 font-normal">

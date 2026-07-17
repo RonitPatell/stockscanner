@@ -10,7 +10,7 @@ import { TradingDashboard } from "@/components/TradingDashboard";
 import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { UserMenu } from "@/components/UserMenu";
 import { CheckoutButton } from "@/components/CheckoutButton";
-import { LogoMark } from "@/components/Logo";
+import { BrandHomeLink } from "@/components/BrandHomeLink";
 import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 
 export default async function DashboardPage({
@@ -74,22 +74,10 @@ export default async function DashboardPage({
         return (
           <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
             <div className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 space-y-3">
-              <h1 className="text-lg font-semibold text-amber-200">Database offline</h1>
+              <h1 className="text-lg font-semibold text-amber-200">Temporarily unavailable</h1>
               <p className="text-sm text-zinc-300">
-                Neon could not be reached. Free Neon projects sleep or expire — open{" "}
-                <a
-                  href="https://console.neon.tech"
-                  className="text-emerald-400 underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  console.neon.tech
-                </a>
-                , copy a fresh connection string into <code className="text-amber-100">DATABASE_URL</code>, then run{" "}
-                <code className="text-amber-100">npx prisma db push</code>.
-              </p>
-              <p className="text-xs text-zinc-500">
-                Test locally: <code className="text-zinc-400">node --env-file=.env scripts/test-db.mjs</code>
+                We couldn’t reach the database. Please try again in a minute. If this keeps
+                happening, contact support.
               </p>
             </div>
           </div>
@@ -107,22 +95,17 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-zinc-950">
-      <header className="shrink-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
-          <Link href="/" prefetch className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <LogoMark className="w-7 h-7" />
-            <span className="font-bold">
-              Trust<span className="text-emerald-400">Ticker</span>
-            </span>
-          </Link>
+    <div className="dashboard-page desk-shell min-h-screen xl:h-screen flex flex-col overflow-y-auto xl:overflow-hidden bg-[var(--background)]">
+      <header className="shrink-0 relative z-[110] border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-xl">
+        <div className="max-w-[1680px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
+          <BrandHomeLink />
 
           <div className="flex items-center gap-2">
             {session ? (
               <>
                 <Link
                   href="/desk"
-                  className="text-[11px] text-orange-300/90 hover:text-orange-200 hidden sm:inline"
+                  className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden sm:inline transition-colors"
                 >
                   Prop Desk
                 </Link>
@@ -136,7 +119,7 @@ export default async function DashboardPage({
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 max-w-[1600px] w-full mx-auto px-3 sm:px-4 py-2 overflow-hidden">
+      <main className="dashboard-main flex-1 min-h-0 max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-3 overflow-visible xl:overflow-hidden">
         {params.subscribed === "true" && isSubscribed && (
           <div className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 shrink-0">
             Subscription active — welcome to TrustTicker Pro!

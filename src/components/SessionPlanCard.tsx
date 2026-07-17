@@ -59,15 +59,21 @@ export function SessionPlanCard({ className }: { className?: string }) {
           </div>
           {setups.map((s) => (
             <div key={s.symbol} className="rounded border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
-              <div className="flex items-center gap-2 text-[11px]">
-                <span className="font-mono font-bold text-white">{s.symbol}</span>
-                <span className="text-[9px] uppercase text-emerald-400">{s.bias}</span>
-                {s.changePercent != null && (
-                  <span className="font-mono text-zinc-400 text-[10px]">
-                    {formatPercent(s.changePercent)}
+              <div className="grid grid-cols-[auto_minmax(52px,1fr)_auto] items-center gap-2 text-[11px] min-w-0">
+                <span className="font-mono font-bold text-white shrink-0">{s.symbol}</span>
+                <span className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                  <span className="text-[9px] uppercase text-emerald-400 shrink-0">
+                    {s.bias}
                   </span>
-                )}
-                <span className="ml-auto text-[9px] text-zinc-500">{s.conviction}%</span>
+                  {s.changePercent != null && (
+                    <span className="font-mono text-zinc-400 text-[10px] truncate min-w-0">
+                      {formatPercent(s.changePercent)}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[9px] text-zinc-500 tabular-nums whitespace-nowrap justify-self-end">
+                  {Number.isFinite(s.conviction) ? s.conviction.toFixed(2) : "0.00"}%
+                </span>
               </div>
               <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">{s.action}</p>
             </div>

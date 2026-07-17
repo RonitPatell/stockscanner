@@ -76,3 +76,15 @@ export function getChangeColor(change: number | null | undefined): string {
   if (change < 0) return "text-red-400";
   return "text-zinc-400";
 }
+
+/** Only allow http(s) links from external feed sources (blocks javascript:/data: etc.). */
+export function safeHttpUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}

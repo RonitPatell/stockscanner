@@ -57,7 +57,7 @@ async function eodEdgeHtml(): Promise<string> {
       <div style="background:#052e1f;border:1px solid #05966955;border-radius:12px;padding:16px;margin:0 0 24px">
         <h3 style="color:#34d399;margin:0 0 8px;font-size:14px">Daily Edge Recap</h3>
         <p style="color:#d4d4d8;margin:0 0 8px;font-size:13px">
-          Paper speed edge <strong style="color:#34d399">$${edge.totalEdgeUsd.toFixed(0)}</strong>
+          Illustrative speed scenario <strong style="color:#34d399">$${edge.totalEdgeUsd.toFixed(0)}</strong>
           · Dilution skips (${dilution.length}) ~<strong style="color:#fbbf24">$${skipSaved.toFixed(0)}</strong>
           · Combined <strong style="color:#34d399">$${total.toFixed(0)}</strong> (~${months}× a $19.99 month)
         </p>
@@ -85,9 +85,9 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     <h2 style="color:#fafafa;margin:0 0 12px;font-size:20px">Welcome to TrustTicker Pro</h2>
     <p style="color:#a1a1aa;margin:0 0 16px">${greeting} your live catalyst scanner is ready. Here's what you get:</p>
     <ul style="color:#d4d4d8;margin:0 0 20px;padding-left:20px;line-height:1.8">
-      <li>Near-real-time wire ingest with SSE push</li>
+      <li>Fast source polling with SSE push and visible ingest latency</li>
       <li>Action playbooks, anti-FOMO scores, dilution radar</li>
-      <li>Speed edge ledger + verified candle backtests</li>
+      <li>Illustrative speed scenarios + candle-based comparisons</li>
       <li>Morning/EOD email briefs with daily edge recap</li>
       <li>Pro alert rules — Discord, email, SMS, and browser push</li>
     </ul>

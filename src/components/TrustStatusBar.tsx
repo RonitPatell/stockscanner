@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Clock, Radio, Shield, Zap } from "lucide-react";
+import { Clock3, Database, RadioTower } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HealthData {
@@ -9,6 +9,7 @@ interface HealthData {
   feedUpdatedAt: string | null;
   feedItemCount: number;
   avgIngestDelaySec: number | null;
+  feedAgeSec: number | null;
   wireCycleMs: number;
   pipelineInFlight: boolean;
   scaleMode: boolean;
@@ -24,6 +25,7 @@ function formatAgo(iso: string | null): string {
 
 export function TrustStatusBar({ className }: { className?: string }) {
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [ago, setAgo] = useState("—");
 
   useEffect(() => {
     const load = () => {
@@ -37,51 +39,71 @@ export function TrustStatusBar({ className }: { className?: string }) {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (!health?.feedUpdatedAt) return;
+    const tick = () => setAgo(formatAgo(health.feedUpdatedAt));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [health?.feedUpdatedAt]);
+
   if (!health) return null;
 
   const live = health.status === "live" || health.status === "ingesting";
+  const stale = health.status === "stale";
+  const statusLabel = health.pipelineInFlight
+    ? "Ingesting"
+    : stale
+      ? "Stale"
+      : live
+        ? "Live"
+        : "Starting";
+  const dotColor = health.pipelineInFlight
+    ? "bg-amber-400"
+    : stale
+    ? "bg-red-400"
+    : live
+    ? "bg-emerald-400"
+    : "bg-zinc-600";
 
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-x-4 gap-y-1 px-2.5 py-1.5 rounded-lg border text-[10px] shrink-0",
-        live
-          ? "border-emerald-500/25 bg-emerald-500/5"
-          : "border-zinc-800 bg-zinc-950/60",
-        className
-      )}
-    >
-      <span className="inline-flex items-center gap-1.5 font-medium text-zinc-300">
-        <span
-          className={cn(
-            "w-1.5 h-1.5 rounded-full",
-            health.pipelineInFlight ? "bg-amber-400 animate-pulse" : live ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"
-          )}
-        />
-        {health.pipelineInFlight ? "Ingesting" : live ? "Live feed" : "Starting"}
+    <div className={cn("desk-health flex items-center gap-2 min-w-0", className)}>
+      {/* Live status pill */}
+      <span
+        className={cn(
+          "desk-health-live inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-semibold border shrink-0",
+          live
+            ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+            : stale
+            ? "bg-red-500/10 border-red-500/25 text-red-300"
+            : "bg-zinc-900/80 border-zinc-700/60 text-zinc-400"
+        )}
+      >
+        <span className={cn("w-2 h-2 rounded-full shrink-0", dotColor, live && "animate-pulse")} />
+        {statusLabel}
       </span>
-      <span className="inline-flex items-center gap-1 text-zinc-500">
-        <Clock className="w-3 h-3" />
-        Updated {formatAgo(health.feedUpdatedAt)}
+
+      {/* Metrics pills */}
+      <span className="desk-pill desk-health-detail text-[12px]">
+        <Clock3 className="w-3.5 h-3.5" />
+        Updated {ago}
       </span>
-      <span className="inline-flex items-center gap-1 text-zinc-500">
-        <Zap className="w-3 h-3 text-emerald-500" />
-        Wire ~{Math.round(health.wireCycleMs / 1000)}s
+
+      <span className="desk-pill desk-health-detail text-[12px]">
+        <RadioTower className="w-3.5 h-3.5" />
+        Source poll ~{Math.round(health.wireCycleMs / 1000)}s
       </span>
-      {health.avgIngestDelaySec != null && (
-        <span className="inline-flex items-center gap-1 text-zinc-500">
-          <Radio className="w-3 h-3" />
-          Avg ingest {health.avgIngestDelaySec}s after publish
-        </span>
-      )}
-      <span className="inline-flex items-center gap-1 text-zinc-500">
-        <Activity className="w-3 h-3" />
+
+      <span className="desk-pill desk-health-count text-[12px]">
+        <Database className="w-3.5 h-3.5" />
         {health.feedItemCount} catalysts
       </span>
-      <span className="inline-flex items-center gap-1 text-zinc-600 ml-auto">
-        <Shield className="w-3 h-3" />
-        {health.scaleMode ? "Scale mode" : "Direct"}
-      </span>
+
+      {health.avgIngestDelaySec != null && (
+        <span className="desk-pill text-[12px] hidden lg:inline-flex">
+          Avg ingest {health.avgIngestDelaySec}s
+        </span>
+      )}
     </div>
   );
 }

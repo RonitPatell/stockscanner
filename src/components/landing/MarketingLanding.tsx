@@ -29,9 +29,9 @@ import { SUBSCRIPTION_PRICE_MO } from "@/lib/stripe";
 const features = [
   {
     icon: Gauge,
-    title: "Wire-speed ingest",
+    title: "Fast source polling",
     description:
-      "Headlines land on ~2s wire cycles and push to your desk over SSE. Live-race proof: under-3-minute catches you can audit on /wins.",
+      "TrustTicker checks enabled sources on up to ~2s cycles and pushes updates over SSE. Publisher and provider latency varies; measured catches are auditable on /wins.",
   },
   {
     icon: Target,
@@ -47,9 +47,9 @@ const features = [
   },
   {
     icon: FlaskConical,
-    title: "Speed edge ledger",
+    title: "Speed scenario ledger",
     description:
-      "Paper P&L if you acted at ingest vs +3 minutes — plus verified 1-minute candle backtests when bars are available.",
+      "Illustrative $1k-notional comparisons for ingest vs +3 minutes, separated from candle-based results when 1-minute bars are available.",
   },
   {
     icon: Megaphone,
@@ -96,8 +96,8 @@ const loop = [
   },
   {
     step: "03",
-    title: "Prove the edge",
-    body: "Paper trades, speed ledger, candle backtests, and EOD edge math show whether Pro paid for itself.",
+    title: "Measure the result",
+    body: "Paper trades, measured latency, candle comparisons, and EOD recaps help you judge whether Pro earns its place in your workflow.",
   },
 ];
 
@@ -309,10 +309,10 @@ export function MarketingLanding({
               </h2>
               <ul className="space-y-3.5">
                 {[
-                  "Wire-speed feed with auditable under-3m live-race stats",
+                  "Fast source polling with auditable publish-to-feed stats",
                   "Long / Short / Watch / Skip playbooks + anti-FOMO",
                   "Dilution radar before you chase offerings",
-                  "Speed edge ledger & candle backtests vs +3 minutes",
+                  "Illustrative speed scenarios + candle comparisons vs +3 minutes",
                   "Call board, Prop Desk, sympathy map, catalyst replay",
                   "Session plan, watchlist autopsy, paper trades",
                   "EOD email with Daily Edge Recap vs $19.99",

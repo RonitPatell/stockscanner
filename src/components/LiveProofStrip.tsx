@@ -15,7 +15,8 @@ interface PublicStats {
     fastestSec?: number | null;
   };
   feed: { itemCount: number; status: string };
-  wireCycleSec: number;
+  sourcePollCycleSec?: number;
+  wireCycleSec?: number;
   recentWins: {
     symbol: string;
     headline: string;
@@ -58,7 +59,7 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           </span>
           <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
             <Zap className="w-3 h-3 text-emerald-500" />
-            Wire cycle ~{stats?.wireCycleSec ?? 8}s
+            Source poll ~{stats?.sourcePollCycleSec ?? stats?.wireCycleSec ?? 3}s
           </span>
           {avg != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">

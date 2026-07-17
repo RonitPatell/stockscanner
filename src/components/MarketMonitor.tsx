@@ -320,8 +320,8 @@ export function MarketMonitor({
     ) : null;
 
   return (
-    <div className={cn("relative flex flex-col gap-2 h-full min-h-0", className)}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[1.7] min-h-[260px] lg:min-h-0">
+    <div className={cn("market-monitor relative flex flex-col gap-[var(--gap)] h-full min-h-0", className)}>
+      <div className="market-monitor-primary grid grid-cols-1 gap-[var(--gap)] min-h-[520px] shrink-0">
         <AlertFeed
           alerts={snapshot?.alerts ?? []}
           loading={loading}
@@ -339,7 +339,7 @@ export function MarketMonitor({
           activePanel="volume"
         />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 flex-[0.9] min-h-0 max-h-44 lg:max-h-48 shrink-0">
+      <div className="market-monitor-secondary grid grid-cols-1 2xl:grid-cols-2 gap-[var(--gap)] min-h-[320px] shrink-0">
         <MarketStatePanel
           quotes={liveQuotes}
           loading={loading}
@@ -355,9 +355,8 @@ export function MarketMonitor({
       </div>
 
       {expandedNode && (
-        <div className="absolute inset-0 z-30 flex flex-col rounded-lg border border-emerald-500/30 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
-          <div className="absolute inset-0 bg-zinc-950/40 pointer-events-none" aria-hidden />
-          <div className="relative flex-1 min-h-0 p-1.5 sm:p-2">{expandedNode}</div>
+        <div className="market-monitor-overlay z-30 flex flex-col desk-panel ring-1 ring-[--accent]/25 shadow-2xl shadow-black/60 overflow-hidden">
+          <div className="relative flex-1 min-h-0 p-2">{expandedNode}</div>
         </div>
       )}
     </div>
@@ -383,7 +382,7 @@ function PanelShell({
   expanded,
 }: {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   badge?: string;
   children: React.ReactNode;
   className?: string;
@@ -393,19 +392,17 @@ function PanelShell({
   return (
     <div
       className={cn(
-        "rounded-lg border border-zinc-800 bg-zinc-950/60 overflow-hidden flex flex-col min-h-0 h-full",
-        expanded && "rounded-md border-zinc-700 bg-zinc-950",
+        "desk-panel flex flex-col min-h-0 h-full",
+        expanded && "ring-1 ring-[--accent]/30",
         className
       )}
     >
-      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-800 bg-zinc-900/50 shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Icon className="w-3 h-3 text-emerald-500 shrink-0" />
-          <span className="text-[10px] font-semibold text-zinc-200 uppercase tracking-wide truncate">
-            {title}
-          </span>
+      <div className="desk-panel-header shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Icon className="w-3.5 h-3.5 text-[--accent] shrink-0" strokeWidth={2.5} />
+          <span className="desk-label truncate">{title}</span>
           {badge && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium shrink-0">
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[--bg-elevated] border border-[--border] text-[--text-secondary] font-medium shrink-0">
               {badge}
             </span>
           )}
@@ -417,11 +414,11 @@ function PanelShell({
               if (expanded) onMinimize?.();
               else if (activePanel) onExpand?.(activePanel);
             }}
-            className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-emerald-300 hover:border-emerald-500/40 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-lg border border-[--border-medium] text-[--text-secondary] hover:text-[--accent-bright] hover:border-[--accent]/30 transition-colors"
             title={expanded ? `Minimize ${title}` : `Expand ${title}`}
           >
-            {expanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-            <span className="hidden sm:inline">{expanded ? "Minimize" : "Expand"}</span>
+            {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline font-medium">{expanded ? "Minimize" : "Expand"}</span>
           </button>
         )}
       </div>
@@ -457,13 +454,13 @@ function AlertFeed({
     >
       <div className="h-full overflow-y-auto">
         {loading && alerts.length === 0 ? (
-          <div className="p-2 space-y-1.5">
+          <div className="p-4 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-6 bg-zinc-900/50 animate-pulse rounded" />
+              <div key={i} className="h-9 bg-white/[0.03] animate-pulse rounded-lg" />
             ))}
           </div>
         ) : alerts.length === 0 ? (
-          <p className="text-[10px] text-zinc-600 p-3 text-center">
+          <p className="text-[13px] text-[--text-muted] p-6 text-center">
             Watching for HOD, retests &amp; volume…
           </p>
         ) : (
@@ -474,12 +471,9 @@ function AlertFeed({
               return (
                 <li
                   key={alert.id}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]",
-                    expanded && "py-1.5 text-[12px]"
-                  )}
+                  className="desk-row gap-2"
                 >
-                  <span className="text-[9px] text-zinc-600 font-mono shrink-0 w-11">
+                  <span className="text-[11px] text-[--text-muted] font-mono shrink-0 w-12 tabular-nums">
                     {formatClock(alert.timestamp)}
                   </span>
                   <AlertIcon type={alert.type} />
@@ -488,16 +482,16 @@ function AlertFeed({
                       href={tradingViewUrl(alert.symbol)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono font-bold text-white mr-1 hover:text-emerald-400"
+                      className="font-mono font-bold text-white mr-1.5 hover:text-[--accent-bright] transition-colors"
                     >
                       {alert.symbol}
                     </a>
-                    <span className="text-zinc-500">{alert.message}</span>
+                    <span className="text-[13px] text-[--text-secondary]">{alert.message}</span>
                   </div>
                   <span
                     className={cn(
-                      "font-mono text-[10px] font-semibold shrink-0",
-                      change >= 0 ? "text-emerald-400" : "text-red-400"
+                      "font-mono text-[12px] font-semibold shrink-0 tabular-nums",
+                      change >= 0 ? "text-[--bull]" : "text-[--bear]"
                     )}
                   >
                     {formatPercent(change)}
@@ -537,22 +531,22 @@ function VolumePanel({
       onExpand={onExpand}
       onMinimize={onMinimize}
     >
-      <div className="hidden sm:grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 px-2 py-1 border-b border-zinc-800/80 text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
+      <div className="hidden sm:grid grid-cols-[70px_56px_50px_1fr_48px] gap-2 px-4 py-2 border-b border-[--border] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
         <span>Ticker</span>
         <span className="text-center">Chg</span>
         <span className="text-center">RVol</span>
         <span>Today / Avg</span>
-        <span className="text-right">·</span>
+        <span className="text-right" />
       </div>
       <div className="h-full overflow-y-auto">
         {loading && leaders.length === 0 ? (
-          <div className="p-2 space-y-1">
+          <div className="p-4 space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-6 bg-zinc-900/50 animate-pulse rounded" />
+              <div key={i} className="h-9 bg-white/[0.03] animate-pulse rounded-lg" />
             ))}
           </div>
         ) : leaders.length === 0 ? (
-          <p className="text-[10px] text-zinc-600 p-3 text-center">
+          <p className="text-[13px] text-[--text-muted] p-6 text-center">
             Scanning volume — {SESSION_LABELS[session].toLowerCase()}
           </p>
         ) : (
@@ -590,8 +584,7 @@ function VolumeRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[64px_52px_44px_1fr_40px] gap-1.5 items-center px-2 py-1 border-b border-zinc-800/40 hover:bg-zinc-900/40 text-[11px]",
-        expanded && "py-1.5 text-[12px]"
+        "grid grid-cols-[70px_56px_50px_1fr_48px] gap-2 items-center px-4 py-2.5 border-b border-[--border] hover:bg-white/[0.025] transition-colors"
       )}
     >
       <div>
@@ -599,40 +592,37 @@ function VolumeRow({
           href={tradingViewUrl(leader.symbol)}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-mono font-bold text-white hover:text-emerald-400 transition-colors"
+          className="font-mono font-bold text-[14px] text-white hover:text-[--accent-bright] transition-colors"
         >
           {leader.symbol}
         </a>
-        <div className="text-[9px] text-zinc-600">{formatPrice(price)}</div>
+        <div className="text-[11px] text-[--text-tertiary] font-mono">{formatPrice(price)}</div>
       </div>
       <span
         className={cn(
-          "font-mono text-center font-semibold text-[10px]",
-          change >= 0 ? "text-emerald-400" : "text-red-400"
+          "font-mono text-center font-semibold text-[13px] tabular-nums",
+          change >= 0 ? "text-[--bull]" : "text-[--bear]"
         )}
       >
         {formatPercent(change)}
       </span>
       <span
         className={cn(
-          "font-mono text-center font-bold text-[10px]",
-          hot ? "text-amber-400" : warm ? "text-orange-400" : "text-zinc-300"
+          "font-mono text-center font-bold text-[13px] tabular-nums",
+          hot ? "text-amber-400" : warm ? "text-orange-400" : "text-[--text-secondary]"
         )}
       >
         {rVol > 0 ? `${rVol.toFixed(1)}×` : "—"}
       </span>
-      <span className="text-zinc-400 font-mono text-[10px] truncate">
+      <span className="text-[--text-secondary] font-mono text-[12px] truncate tabular-nums">
         {leader.volume > 0 ? formatVol(leader.volume) : "—"}
-        <span className="text-zinc-600">
-          {" "}
-          / {leader.avgVolume > 0 ? formatVol(leader.avgVolume) : "—"}
-        </span>
+        <span className="text-[--text-muted]"> / {leader.avgVolume > 0 ? formatVol(leader.avgVolume) : "—"}</span>
       </span>
-      <div className="flex justify-end gap-0.5">
+      <div className="flex justify-end items-center gap-1">
         {leader.nearHod && (
-          <span className="text-[9px] px-1 rounded bg-emerald-500/15 text-emerald-400">HOD</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[--bull-dim] text-[--bull] font-bold">HOD</span>
         )}
-        {hot && <Flame className="w-3 h-3 text-amber-400" />}
+        {hot && <Flame className="w-3.5 h-3.5 text-amber-400" />}
       </div>
     </div>
   );
@@ -673,23 +663,19 @@ function EarningsPanel({
             {(expanded ? events : events.slice(0, 12)).map((e) => (
               <li
                 key={`${e.symbol}-${e.date}`}
-                className={cn(
-                  "flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 hover:bg-zinc-900/40 text-[11px]",
-                  expanded && "py-1.5 text-[12px]"
-                )}
+                className="desk-row justify-between"
               >
                 <a
                   href={tradingViewUrl(e.symbol)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono font-bold text-white hover:text-emerald-400 transition-colors"
+                  className="font-mono font-bold text-[14px] text-white hover:text-[--accent-bright] transition-colors"
                   title="Open chart"
                 >
                   {e.symbol}
                 </a>
-                <span className="text-[10px] text-zinc-500 font-mono shrink-0">
-                  {e.date.slice(5)}
-                  {e.hour ? ` ${e.hour}` : ""}
+                <span className="text-[12px] text-[--text-tertiary] font-mono tabular-nums shrink-0">
+                  {e.date.slice(5)}{e.hour ? ` ${e.hour}` : ""}
                 </span>
               </li>
             ))}
@@ -716,20 +702,17 @@ function MarketStatePanel({
     return (
       <div
         key={sym}
-        className={cn(
-          "flex items-center justify-between gap-2 px-2 py-1 border-b border-zinc-800/50 text-[11px]",
-          expanded && "py-1.5 text-[12px]"
-        )}
+        className="desk-row justify-between"
       >
-        <span className="font-mono font-bold text-white">{label ?? sym}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="font-mono text-[10px] text-zinc-400 tabular-nums">
+        <span className="font-mono font-bold text-[14px] text-white">{label ?? sym}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="font-mono text-[13px] text-[--text-secondary] tabular-nums">
             {q ? formatPrice(q.price) : loading ? "…" : "—"}
           </span>
           <span
             className={cn(
-              "font-mono text-[10px] font-semibold tabular-nums",
-              (q?.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+              "font-mono text-[13px] font-semibold tabular-nums w-14 text-right",
+              (q?.changePercent ?? 0) >= 0 ? "text-[--bull]" : "text-[--bear]"
             )}
           >
             {q ? formatPercent(q.changePercent) : loading ? "…" : "—"}
@@ -751,14 +734,14 @@ function MarketStatePanel({
     >
       <div className="h-full overflow-y-auto">
         {row("VIX", "VIX")}
-        <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
+        <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold">
           Indices
         </div>
         {row("SPY")}
         {row("QQQ")}
         {row("IWM")}
         {row("DIA")}
-        <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
+        <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold">
           Sectors
         </div>
         {row("XLK")}

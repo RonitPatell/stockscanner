@@ -33,31 +33,32 @@ export function PropDesk({
 
   return (
     <LiveQuoteProvider>
-      <div className="flex flex-col h-full min-h-0 gap-2">
+      <div className="desk-shell flex flex-col h-full min-h-0 gap-3">
         <div data-guide="trust-status">
-          <TrustStatusBar />
+          <TrustStatusBar className="desk-panel !bg-zinc-950/75 !border-[var(--border)] !rounded-[var(--desk-radius)] !px-3 !py-2" />
         </div>
         <div data-guide="daily-edge">
           <DailyEdgeRecap />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0 flex-1">
-          <div className="lg:col-span-4 min-h-0 flex flex-col gap-2 overflow-y-auto">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 min-h-0 flex-1">
+          <div className="xl:col-span-4 min-h-0 flex flex-col gap-3 overflow-y-auto">
             <div data-guide="session-plan">
               <SessionPlanCard />
             </div>
             <div data-guide="dilution-radar">
               <DilutionRadar />
             </div>
-            <div className="flex items-center gap-2 px-1">
+            <div className="desk-command">
+              <span className="desk-label mr-1">Call board</span>
               <button
                 type="button"
                 onClick={() => setWatchlistCalls(false)}
                 className={cn(
-                  "text-[10px] px-2 py-0.5 rounded border",
+                  "px-2.5 py-1 rounded-lg border transition-colors",
                   !watchlistCalls
-                    ? "border-orange-500/50 text-orange-300"
-                    : "border-zinc-700 text-zinc-500"
+                    ? "border-orange-500/60 text-orange-200 bg-orange-500/12"
+                    : "border-zinc-700 text-zinc-400 hover:text-zinc-200"
                 )}
               >
                 All calls
@@ -66,10 +67,10 @@ export function PropDesk({
                 type="button"
                 onClick={() => setWatchlistCalls(true)}
                 className={cn(
-                  "text-[10px] px-2 py-0.5 rounded border",
+                  "px-2.5 py-1 rounded-lg border transition-colors",
                   watchlistCalls
-                    ? "border-orange-500/50 text-orange-300"
-                    : "border-zinc-700 text-zinc-500"
+                    ? "border-orange-500/60 text-orange-200 bg-orange-500/12"
+                    : "border-zinc-700 text-zinc-400 hover:text-zinc-200"
                 )}
               >
                 My watchlist
@@ -83,25 +84,25 @@ export function PropDesk({
 
           <div
             data-guide="news-feed"
-            className="lg:col-span-8 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden"
+            className="xl:col-span-8 desk-panel flex flex-col min-h-0 overflow-hidden"
           >
-            <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-800 bg-zinc-900/40 shrink-0">
+            <div className="desk-panel-header shrink-0">
+              <span className="desk-label">Live feed</span>
               {TABS.map(({ id, label }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setTab(id)}
+                  data-active={tab === id}
                   className={cn(
-                    "px-2.5 py-1 rounded-md text-[11px] font-medium",
-                    tab === id
-                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                      : "text-zinc-500 hover:text-zinc-300"
+                    "desk-feed-tab",
+                    tab === id ? "" : ""
                   )}
                 >
                   {label}
                 </button>
               ))}
-              <span className="ml-auto text-[9px] text-zinc-600">
+              <span className="ml-auto text-[10px] text-zinc-600 font-mono">
                 j/k · Enter · w · 1/2/3 · /
               </span>
             </div>

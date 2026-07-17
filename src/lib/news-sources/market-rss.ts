@@ -109,7 +109,7 @@ export async function fetchYahooTickerNews(
         seen.add(key);
 
         // Prefer ticker named in headline; else map to a chunk symbol via $TICKER / (TICKER)
-        let symbol =
+        const symbol =
           resolveArticleSymbol(item.title, item.description.slice(0, 300))?.symbol ?? "";
         if (!symbol || !isValidTickerFormat(symbol)) continue;
         if (!articleIsAboutSymbol(symbol, item.title, item.description.slice(0, 300))) continue;

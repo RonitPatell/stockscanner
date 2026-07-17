@@ -30,7 +30,7 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "TrustTicker — Stock Catalyst Scanner",
   description:
-    "Live catalyst command center: wire-speed ingest, action playbooks, dilution radar, speed edge proof, and prop desk tools. Informational only — not investment advice.",
+    "Catalyst command center with fast source polling, action playbooks, dilution radar, measured ingest latency, and prop desk tools. Informational only — not investment advice.",
   keywords: [
     "stock scanner",
     "catalyst",

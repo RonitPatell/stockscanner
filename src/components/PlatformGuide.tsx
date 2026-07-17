@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { usePathname } from "next/navigation";
 import { CircleHelp, ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   DASHBOARD_GUIDE_STEPS,
@@ -53,6 +54,7 @@ export function PlatformGuide({
   onExtrasRequired?: () => void;
 }) {
   const steps = stepsFor(surface);
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [hole, setHole] = useState<DOMRect | null>(null);
@@ -226,6 +228,12 @@ export function PlatformGuide({
   }, [open, steps.length, clearHighlight]);
 
   useEffect(() => () => clearHighlight(), [clearHighlight]);
+
+  // Never trap navigation when the user leaves the desk
+  useEffect(() => {
+    clearHighlight();
+    setOpen(false);
+  }, [pathname, clearHighlight]);
 
   const start = () => {
     setIndex(0);

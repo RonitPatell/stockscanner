@@ -5,6 +5,7 @@ import { BookOpen, Check, X } from "lucide-react";
 import {
   closePaperTrade,
   listPaperTrades,
+  openPaperTrade,
   paperTradeStats,
   type PaperTrade,
 } from "@/lib/paper-trades";
@@ -123,7 +124,6 @@ export function PaperTradeButtons({
   if (price == null || price <= 0) return null;
 
   const stamp = (side: "long" | "short") => {
-    const { openPaperTrade } = require("@/lib/paper-trades") as typeof import("@/lib/paper-trades");
     openPaperTrade({
       catalystId,
       symbol,

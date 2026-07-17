@@ -7,7 +7,7 @@ import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed } from "@/lib/feed-cache";
 import { PropDesk } from "@/components/PropDesk";
 import { UserMenu } from "@/components/UserMenu";
-import { LogoMark } from "@/components/Logo";
+import { BrandHomeLink } from "@/components/BrandHomeLink";
 import type { CatalystItem, ScannerFilters } from "@/types";
 
 export const metadata = {
@@ -51,16 +51,11 @@ export default async function DeskPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-zinc-950">
-      <header className="shrink-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
+    <div className="desk-shell h-screen flex flex-col overflow-hidden bg-zinc-950">
+      <header className="shrink-0 relative z-[110] border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-xl">
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-90">
-              <LogoMark className="w-7 h-7" />
-              <span className="font-bold">
-                Trust<span className="text-emerald-400">Ticker</span>
-              </span>
-            </Link>
+            <BrandHomeLink />
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-orange-500/40 text-orange-300">
               Prop Desk
             </span>
@@ -71,7 +66,7 @@ export default async function DeskPage() {
           <UserMenu />
         </div>
       </header>
-      <main className="flex-1 min-h-0 max-w-[1600px] w-full mx-auto px-3 sm:px-4 py-2 overflow-hidden">
+      <main className="flex-1 min-h-0 max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-3 overflow-hidden">
         <PropDesk
           initialCatalysts={initialCatalysts}
           initialWatchlist={initialWatchlist}

@@ -6,10 +6,10 @@ import {
   Sun,
   Star,
   Radio,
-  ChevronDown,
   LayoutDashboard,
   Sparkles,
   Layers,
+  ChevronDown,
 } from "lucide-react";
 import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 import { LiveScanner, type ScannerTab } from "./LiveScanner";
@@ -36,10 +36,10 @@ import { MarketMonitor } from "./MarketMonitor";
 import { PlatformGuide } from "./PlatformGuide";
 import { cn } from "@/lib/utils";
 
-const TABS: { id: ScannerTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "all", label: "All News", icon: Radio },
-  { id: "premarket", label: "Premarket", icon: Sun },
-  { id: "watchlist", label: "Watchlist", icon: Star },
+const FEED_TABS: { id: ScannerTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "all",       label: "All News",   icon: Radio },
+  { id: "premarket", label: "Premarket",  icon: Sun   },
+  { id: "watchlist", label: "Watchlist",  icon: Star  },
 ];
 
 const MODE_KEY = "tt-dashboard-mode";
@@ -55,136 +55,131 @@ export function TradingDashboard({
   initialFilters?: ScannerFilters | null;
   initialScanner?: MarketScannerSnapshot | null;
 }) {
-  const [tab, setTab] = useState<ScannerTab>("all");
+  const [tab,            setTab]            = useState<ScannerTab>("all");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showExtras, setShowExtras] = useState(false);
-  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+  const [showTools,      setShowTools]      = useState(false);
+  const [mode,           setMode]           = useState<"focus" | "full">("focus");
 
-  const openExtras = useCallback(() => {
-    setShowExtras(true);
-    setMode("advanced");
-    try {
-      localStorage.setItem(MODE_KEY, "advanced");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
+  /* Persist mode */
   useEffect(() => {
     try {
       const saved = localStorage.getItem(MODE_KEY);
-      if (saved === "advanced" || saved === "simple") setMode(saved);
-    } catch {
-      /* ignore */
-    }
+      if (saved === "full" || saved === "focus") setMode(saved);
+    } catch { /* ignore */ }
   }, []);
 
+  const setDashboardMode = useCallback((next: "focus" | "full") => {
+    setMode(next);
+    if (next === "focus") setShowTools(false);
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* ignore */ }
+  }, []);
+
+  /* Onboarding */
   useEffect(() => {
-    // Defer so feed/scanner paint first
     const t = setTimeout(() => {
       void fetch("/api/onboarding")
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (d && d.onboardingCompleted === false) setShowOnboarding(true);
-        })
+        .then((d) => { if (d?.onboardingCompleted === false) setShowOnboarding(true); })
         .catch(() => {});
     }, 1_500);
     return () => clearTimeout(t);
   }, []);
 
-  const setDashboardMode = (next: "simple" | "advanced") => {
-    setMode(next);
-    try {
-      localStorage.setItem(MODE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    if (next === "simple") setShowExtras(false);
-  };
+  const openExtras = useCallback(() => {
+    setShowTools(true);
+    setMode("full");
+    try { localStorage.setItem(MODE_KEY, "full"); } catch { /* ignore */ }
+  }, []);
 
-  const simple = mode === "simple";
+  const focused = mode === "focus";
 
   return (
     <LiveQuoteProvider>
-      <div className="flex flex-col h-full min-h-0 gap-2">
-        {showOnboarding && (
-          <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
-        )}
+      <div className="dashboard-workspace desk-shell flex flex-col h-full min-h-0 gap-[var(--gap)]">
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="inline-flex rounded-lg border border-zinc-700 p-0.5 bg-zinc-950/80">
+        {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+
+        {/* ── Command bar ───────────────────────── */}
+        <div className="desk-command shrink-0">
+          {/* Mode toggle */}
+          <div className="desk-seg desk-command-mode" role="group" aria-label="Dashboard mode">
             <button
               type="button"
-              onClick={() => setDashboardMode("simple")}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-colors",
-                simple
-                  ? "bg-emerald-500 text-black"
-                  : "text-zinc-400 hover:text-zinc-200"
-              )}
+              data-active={focused}
+              onClick={() => setDashboardMode("focus")}
+              title="Focus — Wire + feed only"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Simple
+              Focus
             </button>
             <button
               type="button"
-              onClick={() => setDashboardMode("advanced")}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-colors",
-                !simple
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-400 hover:text-zinc-200"
-              )}
+              data-active={!focused}
+              onClick={() => setDashboardMode("full")}
+              title="Full — all panels"
             >
               <Layers className="w-3.5 h-3.5" />
-              Advanced
+              Full
             </button>
           </div>
-          <p className="text-[10px] text-zinc-600 hidden sm:block">
-            {simple
-              ? "Layout: Simple (fewer panels) — you’re still on Pro"
-              : "Layout: Advanced (all panels) — same Pro access"}
-          </p>
-          <Link
-            href="/today"
-            className="ml-auto text-[10px] text-emerald-500/90 hover:underline hidden sm:inline"
-          >
-            Public daily plan →
-          </Link>
+
+          {/* Status bar */}
+          <div className="desk-command-status flex-1 min-w-0" data-guide="trust-status">
+            <TrustStatusBar className="!border-0 !bg-transparent !px-0 !py-0" />
+          </div>
+
+          {/* Nav links */}
+          <div className="desk-command-actions flex items-center gap-2 shrink-0">
+            <Link
+              href="/today"
+              className="text-[12px] font-medium text-[--text-secondary] hover:text-[--accent-bright] transition-colors hidden sm:inline shrink-0"
+            >
+              Daily plan
+            </Link>
+            <Link
+              href="/desk"
+              className="desk-btn-ghost text-[12px] shrink-0"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="hidden sm:inline">Prop Desk</span>
+            </Link>
+          </div>
         </div>
 
-        <div data-guide="trust-status">
-          <TrustStatusBar />
-        </div>
         <AlertSetupNudge />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0 flex-1">
-          <div className="lg:col-span-7 min-h-0 flex flex-col gap-2 overflow-y-auto">
+        {/* ── Main grid: sidebar | catalyst feed ── */}
+        <div className="desk-main-grid grid grid-cols-1 xl:grid-cols-12 gap-[var(--gap)] min-h-0 flex-1">
+
+          {/* Left sidebar */}
+          <aside className="desk-sidebar xl:col-span-4 min-h-0 flex flex-col gap-[var(--gap)] overflow-y-auto">
+
             <div data-guide="session-plan">
               <SessionPlanCard />
             </div>
 
-            {!simple && (
+            {!focused && (
               <div data-guide="premarket">
                 <PremarketCenter />
               </div>
             )}
 
+            {/* Market Monitor */}
             <div
               data-guide="market-monitor"
-              className="flex-[1.7] min-h-[320px] lg:min-h-0 flex flex-col"
+              className="desk-market-monitor flex-1 min-h-[620px]"
             >
               <MarketMonitor
-                className="flex-1 min-h-[320px] lg:min-h-0"
+                className="h-full"
                 initialSnapshot={initialScanner}
               />
             </div>
 
-            {!simple && (
+            {!focused && (
               <>
                 <div
                   data-guide="wins-brief"
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-2 shrink-0"
+                  className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-[var(--gap)] shrink-0"
                 >
                   <SpeedWinsPanel showViewAll />
                   <WatchlistBrief />
@@ -194,95 +189,37 @@ export function TradingDashboard({
                 </div>
               </>
             )}
+          </aside>
 
-            <div
-              data-guide="judgment-toggle"
-              className="flex flex-wrap items-center gap-2 shrink-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  if (simple) setDashboardMode("advanced");
-                  setShowExtras((v) => !v);
-                }}
-                className={cn(
-                  "inline-flex items-center gap-2 text-[11px] font-semibold px-3 py-2 rounded-md border transition-colors",
-                  showExtras
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                    : "border-emerald-500/50 bg-emerald-500 text-black hover:bg-emerald-400 shadow-sm shadow-emerald-500/20"
-                )}
-              >
-                <ChevronDown
-                  className={cn(
-                    "w-3.5 h-3.5 transition-transform",
-                    showExtras && "rotate-180"
-                  )}
-                />
-                {showExtras ? "Hide judgment tools" : "Show judgment tools"}
-              </button>
-              <span className="text-[10px] text-zinc-500 hidden sm:inline">
-                Dilution · calls · edge · replay
-              </span>
-              <Link
-                href="/desk"
-                className="ml-auto inline-flex items-center gap-2 text-[11px] font-semibold px-3 py-2 rounded-md border border-orange-500/50 bg-orange-500/15 text-orange-200 hover:bg-orange-500/25 hover:border-orange-400/60 transition-colors"
-              >
-                <LayoutDashboard className="w-3.5 h-3.5" />
-                Open Prop Desk
-              </Link>
-            </div>
-
-            {showExtras && (
-              <div className="flex flex-col gap-2 shrink-0 pb-1">
-                <div data-guide="daily-edge">
-                  <DailyEdgeRecap />
-                </div>
-                <SessionRecap />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div data-guide="dilution-radar">
-                    <DilutionRadar />
-                  </div>
-                  <WatchlistAutopsy symbols={initialWatchlist} />
-                </div>
-                <SympathyMapPanel seedSymbol={initialWatchlist[0]} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <CatalystReplayPanel />
-                  <div data-guide="call-board">
-                    <CallBoard />
-                  </div>
-                </div>
-                <SpeedBacktestPanel />
-                <SpeedEdgeLedger />
-                <PaperTradeLedger />
-              </div>
-            )}
-          </div>
-
-          <div
+          {/* Catalyst feed — hero panel */}
+          <section
             data-guide="news-feed"
-            className="lg:col-span-5 flex flex-col min-h-0 border border-zinc-800 rounded-lg bg-zinc-950/40 overflow-hidden"
+            className="desk-feed-panel xl:col-span-8 desk-panel flex flex-col min-h-[520px] xl:min-h-0"
           >
-            <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-800 bg-zinc-900/40 shrink-0">
-              {TABS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
-                    tab === id
-                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                      : "text-zinc-500 hover:text-zinc-300 border border-transparent"
-                  )}
-                >
-                  <Icon className="w-3 h-3" />
-                  {label}
-                </button>
-              ))}
-              <span className="ml-auto text-[9px] text-zinc-600 hidden sm:inline">
+            {/* Panel header with tabs */}
+            <div className="desk-panel-header desk-feed-header shrink-0">
+              <span className="desk-label">Catalyst feed</span>
+
+              <div className="desk-feed-tabs flex items-center gap-1">
+                {FEED_TABS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    data-active={tab === id}
+                    className="desk-feed-tab"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <span className="ml-auto text-[12px] text-[--text-muted] hidden lg:inline font-mono tracking-wide">
                 j/k · Enter · /
               </span>
             </div>
+
             <LiveScanner
               embedded
               tab={tab}
@@ -291,11 +228,70 @@ export function TradingDashboard({
               initialWatchlist={initialWatchlist}
               initialFilters={initialFilters}
             />
-          </div>
+          </section>
         </div>
 
-        <p className="text-[9px] text-zinc-700 text-center shrink-0 leading-none pt-1 pb-0.5">
-          Not financial advice · ingest latency shown per headline · click ticker for chart
+        {/* ── Judgment tools rail ────────────────── */}
+        <div
+          data-guide="judgment-toggle"
+          className="desk-tools-rail shrink-0"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (focused) setDashboardMode("full");
+                setShowTools((v) => !v);
+              }}
+              className={cn(
+                "desk-btn-accent",
+                !showTools && "opacity-80 hover:opacity-100"
+              )}
+              style={
+                !showTools
+                  ? { background: "var(--bg-elevated)", borderColor: "var(--border-medium)", color: "var(--text-secondary)" }
+                  : undefined
+              }
+            >
+              <ChevronDown
+                className={cn("w-4 h-4 transition-transform duration-200", showTools && "rotate-180")}
+              />
+              {showTools ? "Hide tools" : "Judgment tools"}
+            </button>
+
+            <span className="text-[12px] text-[--text-muted] hidden sm:inline">
+              Dilution · calls · edge · replay
+            </span>
+          </div>
+
+          {showTools && (
+            <div className="flex flex-col gap-[var(--gap)] mt-4">
+              <div data-guide="daily-edge">
+                <DailyEdgeRecap />
+              </div>
+              <SessionRecap />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--gap)]">
+                <div data-guide="dilution-radar">
+                  <DilutionRadar />
+                </div>
+                <WatchlistAutopsy symbols={initialWatchlist} />
+              </div>
+              <SympathyMapPanel seedSymbol={initialWatchlist[0]} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--gap)]">
+                <CatalystReplayPanel />
+                <div data-guide="call-board">
+                  <CallBoard />
+                </div>
+              </div>
+              <SpeedBacktestPanel />
+              <SpeedEdgeLedger />
+              <PaperTradeLedger />
+            </div>
+          )}
+        </div>
+
+        <p className="desk-disclaimer text-[10px] text-[--text-muted] text-center shrink-0 pb-1">
+          Not financial advice · data latency shown per headline · click any ticker to open chart
         </p>
 
         <PlatformGuide surface="dashboard" onExtrasRequired={openExtras} />

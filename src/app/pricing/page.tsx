@@ -43,7 +43,7 @@ const pillars = [
   {
     icon: FlaskConical,
     title: "Proof",
-    body: "Speed edge ledger, candle backtests, EOD Daily Edge vs $19.99.",
+    body: "Measured ingest latency, candle comparisons, and transparent illustrative scenarios.",
   },
   {
     icon: Megaphone,
@@ -56,7 +56,7 @@ const included = [
   {
     group: "Speed & feed",
     items: [
-      "Near-real-time wire ingest (~2s cycles) + SSE live push",
+      "Up to ~2s source polling + SSE live push; publisher latency varies",
       "Stock-impact headlines only — noise filtered at ingest",
       "Story clustering across duplicate wires",
       "Source trust tiers + verified confidence",
@@ -72,13 +72,13 @@ const included = [
       "Dilution radar for offerings & ATM traps",
       "Session plan (3 setups / 2 skips) + watchlist autopsy",
       "Sympathy map + 12h catalyst replay",
-      "AI sentiment, setup tags, float / RVol / historical moves",
+      "Rules-based impact score, setup tags, float / RVol / historical context",
     ],
   },
   {
     group: "Proof & ROI",
     items: [
-      "Speed edge ledger — paper $ if you acted at ingest vs +3m",
+      "Illustrative speed scenarios — ingest vs +3m on $1k notional",
       "Verified 1-minute candle speed backtests when available",
       "Paper trade stamps on catalysts",
       "Morning + EOD email briefs with Daily Edge Recap",

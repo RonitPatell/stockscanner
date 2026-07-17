@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { ArrowRight, Bell, Check, ChevronRight, Star, X, Zap } from "lucide-react";
 import { Button } from "./ui/button";
 import { DEFAULT_ALERT_RULES, type AlertRule } from "@/lib/alert-rules";
@@ -13,6 +14,7 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+  const pathname = usePathname();
   const [step, setStep] = useState(0);
   const [watchlist, setWatchlist] = useState<string[]>(["NVDA", "AMD"]);
   const [discordWebhook, setDiscordWebhook] = useState("");
@@ -83,9 +85,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   const Icon = steps[step].icon;
 
+  if (pathname !== "/dashboard") {
+    return null;
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pt-20 pointer-events-none">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-none"
+        aria-hidden
+      />
+      <div className="pointer-events-auto relative w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden ring-1 ring-black/40">
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 bg-zinc-900/80">
           <div className="flex gap-1">
             {steps.map((_, i) => (

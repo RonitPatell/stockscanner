@@ -65,14 +65,7 @@ export async function getCachedFeed(
         [null, null] as [CatalystItem[] | null, FeedMeta | null]
       );
       if (items && Array.isArray(items) && items.length > 0) {
-        return {
-          items,
-          meta: meta ?? {
-            updatedAt: new Date().toISOString(),
-            count: items.length,
-            source: "redis",
-          },
-        };
+        return { items, meta };
       }
     } catch {
       /* fall through to memory */

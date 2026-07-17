@@ -77,7 +77,7 @@ export function DailyEdgeRecap({ className }: { className?: string }) {
             <div className="text-lg font-bold font-mono text-emerald-300">
               ${total.toFixed(0)}
               <span className="text-[11px] font-normal text-zinc-500 ml-1">
-                combined paper value today
+                illustrative + paper results
               </span>
             </div>
           </div>
@@ -85,7 +85,7 @@ export function DailyEdgeRecap({ className }: { className?: string }) {
 
         <div className="flex flex-wrap gap-3 text-[10px] text-zinc-400">
           <span>
-            Speed edge{" "}
+            Speed scenario{" "}
             <strong className="text-emerald-400 font-mono">${speed.toFixed(0)}</strong>
           </span>
           <span>
