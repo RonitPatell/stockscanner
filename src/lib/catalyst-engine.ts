@@ -49,13 +49,19 @@ const MAX_NEWS_AGE_MS = 24 * 60 * 60 * 1000;
 const RECENT_NEWS_MS = 45 * 60 * 1000;
 const FEED_CACHE_MS = isScaleMode() ? 1_500 : 2_500;
 
-/** Stock-impact news only — blocks lifestyle PR and false ticker matches */
-function isDisplayableCatalyst(c: CatalystItem): boolean {
+/** Structural / relevance gates (no price requirement). */
+function isFeedEligibleCatalyst(c: CatalystItem): boolean {
   if (!isValidTickerFormat(c.symbol)) return false;
   if (!isLikelyStockNews(c.headline, c.aiSummary ?? undefined)) return false;
   if (!articleIsAboutSymbol(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
   if (isKnownFalsePositive(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
   if (Date.now() - new Date(c.publishedAt).getTime() > MAX_NEWS_AGE_MS) return false;
+  return true;
+}
+
+/** Stock-impact news only — blocks lifestyle PR and false ticker matches */
+function isDisplayableCatalyst(c: CatalystItem): boolean {
+  if (!isFeedEligibleCatalyst(c)) return false;
   const hasPrice =
     c.price != null && !isPlaceholderQuote(c.price, c.changePercent);
   const isRecent =
@@ -575,7 +581,8 @@ async function buildFeedFromDatabase(
 
   if (catalysts.length === 0) return [];
 
-  let items = catalysts.map(mapCatalyst).filter(isDisplayableCatalyst);
+  // Keep price-less rows here — refreshPublicFeedCache merges quotes, then display-filters.
+  let items = catalysts.map(mapCatalyst).filter(isFeedEligibleCatalyst);
   items = attachRvol(items);
   items = items.map((c) => ({
     ...c,
@@ -698,8 +705,8 @@ export async function refreshPublicFeedCache(): Promise<void> {
     }
   }
 
-  const mergedAll = mergeQuotesIntoFeed(allItems, quotes);
-  const mergedMovers = mergeQuotesIntoFeed(moverItems, quotes);
+  const mergedAll = mergeQuotesIntoFeed(allItems, quotes).filter(isDisplayableCatalyst);
+  const mergedMovers = mergeQuotesIntoFeed(moverItems, quotes).filter(isDisplayableCatalyst);
 
   await setCachedFeed("all", mergedAll);
   await setCachedFeed("movers", mergedMovers);

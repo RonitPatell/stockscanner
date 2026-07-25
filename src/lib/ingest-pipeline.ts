@@ -26,7 +26,14 @@ export interface IngestPipelineResult {
 export async function runWirePipeline(): Promise<WirePipelineResult> {
   const wire = await ingestWireBurst();
 
-  const all = await getCachedFeed("all");
+  // Redis TTL can expire while every headline is already in DB (wireNew=0).
+  // Rebuild from DB so the public feed never stays empty in scale mode.
+  let all = await getCachedFeed("all");
+  if (all.items.length === 0) {
+    await refreshPublicFeedCache();
+    all = await getCachedFeed("all");
+  }
+
   const movers = await getCachedFeed("movers");
 
   return {

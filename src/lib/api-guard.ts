@@ -50,22 +50,38 @@ export async function requirePro(): Promise<
   return result;
 }
 
-/** Cron / worker Bearer auth — fail closed without CRON_SECRET outside development. */
-export function authorizeCron(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return process.env.NODE_ENV === "development";
-  }
-  const header = req.headers.get("authorization") || "";
-  const expected = `Bearer ${secret}`;
+function normalizeCronSecret(raw: string | undefined | null): string {
+  return (raw ?? "")
+    .trim()
+    .replace(/^['"]/, "")
+    .replace(/['"]$/, "")
+    .trim();
+}
+
+function secretsMatch(provided: string, expected: string): boolean {
+  if (!provided || !expected) return false;
   try {
-    const a = Buffer.from(header);
+    const a = Buffer.from(provided);
     const b = Buffer.from(expected);
     if (a.length !== b.length) return false;
     return timingSafeEqual(a, b);
   } catch {
     return false;
   }
+}
+
+/** Cron / worker Bearer auth — fail closed without CRON_SECRET outside development. */
+export function authorizeCron(req: Request): boolean {
+  const secret = normalizeCronSecret(process.env.CRON_SECRET);
+  if (!secret) {
+    return process.env.NODE_ENV === "development";
+  }
+
+  const auth = (req.headers.get("authorization") || "").trim();
+  const bearer = auth.replace(/^Bearer\s+/i, "").trim();
+  const alt = normalizeCronSecret(req.headers.get("x-cron-secret"));
+
+  return secretsMatch(bearer, secret) || secretsMatch(alt, secret);
 }
 
 export function cronUnauthorized(): NextResponse {

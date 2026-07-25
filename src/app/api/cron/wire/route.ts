@@ -30,8 +30,9 @@ async function handleWireCron(req: NextRequest) {
       markWireFinished({ ok: true, scaleMode: isScaleMode(), ...result });
     })
     .catch((error) => {
+      const message = error instanceof Error ? error.message : "Wire ingest failed";
       console.error("Cron wire error:", error);
-      markWireFailed("Wire ingest failed");
+      markWireFailed(message);
     });
 
   return NextResponse.json({

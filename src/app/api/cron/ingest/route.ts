@@ -36,8 +36,9 @@ async function handleCron(req: NextRequest) {
         .catch(() => {});
     })
     .catch((error) => {
+      const message = error instanceof Error ? error.message : "Ingest failed";
       console.error("Cron ingest error:", error);
-      markPipelineFailed("Ingest failed");
+      markPipelineFailed(message);
     });
 
   return NextResponse.json({

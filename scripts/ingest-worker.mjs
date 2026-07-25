@@ -30,14 +30,46 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const BASE = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const SECRET = process.env.CRON_SECRET || "";
+function normalizeBaseUrl(raw) {
+  let base = (raw || "http://localhost:3000").trim().replace(/\/+$/, "");
+  // Apex → www: Node fetch drops Authorization on host redirects → false 401s
+  try {
+    const u = new URL(base);
+    if (u.hostname === "trustticker.com") {
+      u.hostname = "www.trustticker.com";
+      base = u.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    /* keep as-is */
+  }
+  return base;
+}
+
+const BASE = normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL);
+const SECRET = (process.env.CRON_SECRET || "")
+  .trim()
+  .replace(/^['"]/, "")
+  .replace(/['"]$/, "")
+  .trim();
 const WIRE_MS = Number(process.env.INGEST_WIRE_MS || 2_000);
 const FULL_MS = Number(process.env.INGEST_FULL_MS || 90_000);
+const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
 
 if (!SECRET) {
   console.error(
-    "CRON_SECRET is missing. Add it to .env (same string Next.js uses), then re-run npm run ingest:worker"
+    "CRON_SECRET is missing. Set it in Railway Variables (same string as Vercel / local .env)."
+  );
+  process.exit(1);
+}
+
+console.log(
+  `CRON_SECRET loaded (length=${SECRET.length}, startsWithQuote=${(process.env.CRON_SECRET || "").trim().startsWith('"')})`
+);
+
+if (onRailway && /localhost|127\.0\.0\.1/i.test(BASE)) {
+  console.error(
+    `NEXT_PUBLIC_APP_URL is "${BASE}" — Railway cannot reach your PC.\n` +
+      `Set NEXT_PUBLIC_APP_URL to your live Vercel URL, e.g. https://your-app.vercel.app (no trailing slash).`
   );
   process.exit(1);
 }
@@ -45,18 +77,52 @@ if (!SECRET) {
 let wireInFlight = false;
 let fullInFlight = false;
 
+async function postCron(url) {
+  return fetch(url, {
+    method: "POST",
+    redirect: "manual",
+    headers: {
+      Authorization: `Bearer ${SECRET}`,
+      "x-cron-secret": SECRET,
+    },
+  });
+}
+
 async function callCron(path, label) {
+  let url = `${BASE}${path}`;
   try {
-    const res = await fetch(`${BASE}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SECRET}`,
-      },
-    });
-    const data = await res.json();
+    let res = await postCron(url);
+
+    // Follow one host redirect ourselves so Bearer is not stripped
+    if ([301, 302, 307, 308].includes(res.status)) {
+      const loc = res.headers.get("location");
+      if (loc) {
+        url = new URL(loc, url).toString();
+        console.warn(
+          new Date().toISOString(),
+          `${label} following redirect → ${url} (set NEXT_PUBLIC_APP_URL to the final host to avoid this)`
+        );
+        res = await postCron(url);
+      }
+    }
+
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text.slice(0, 200) };
+    }
     console.log(new Date().toISOString(), label, res.status, JSON.stringify(data));
   } catch (err) {
-    console.error(new Date().toISOString(), `${label} error:`, err.message);
+    const cause = err?.cause?.message || err?.cause?.code || "";
+    console.error(
+      new Date().toISOString(),
+      `${label} error:`,
+      err.message,
+      cause ? `(${cause})` : "",
+      `→ ${url}`
+    );
   }
 }
 

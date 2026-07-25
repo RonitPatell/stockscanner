@@ -9,10 +9,12 @@ export interface FeedMeta {
   source: "redis" | "memory";
 }
 
-const REDIS_TTL_SEC = 300;
+/** Keep feed warm between wire ticks even when no brand-new headlines land. */
+const REDIS_TTL_SEC = 30 * 60;
 const MEMORY_TTL_MS = 60_000;
 const STALE_MEMORY_TTL_MS = 10 * 60_000;
-const REDIS_BUDGET_MS = 400;
+/** Upstash REST can exceed 400ms on cold paths — don't fake an empty feed. */
+const REDIS_BUDGET_MS = 2_500;
 
 async function withRedisBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   return Promise.race([
