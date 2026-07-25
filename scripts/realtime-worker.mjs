@@ -7,10 +7,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const nodeArgs = ["--env-file=.env"];
 
 function start(script, label) {
-  const child = spawn("node", [...nodeArgs, script], {
+  // Scripts load .env themselves when present; Railway injects env vars directly.
+  const child = spawn("node", [script], {
     cwd: root,
     stdio: "inherit",
     env: process.env,

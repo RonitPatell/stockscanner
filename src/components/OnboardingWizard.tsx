@@ -68,7 +68,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const steps = [
     {
       title: "Welcome to TrustTicker Pro",
-      body: "You're getting near-real-time wire ingest, story clustering, catalyst playbooks, and pro alert rules. Let's set you up in 60 seconds.",
+      body: "Your desk grades news GO / WATCH / SKIP using the story and how the company is trading — so you take fewer bad trades. 60-second setup.",
       icon: Zap,
     },
     {

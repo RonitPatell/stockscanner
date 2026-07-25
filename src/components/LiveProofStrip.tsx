@@ -43,6 +43,11 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
   const avg = stats?.latency.avgSec;
   const fastest = stats?.latency.fastestSec;
   const recent = stats?.recentWins ?? [];
+  const formatIngest = (sec: number) =>
+    sec >= 120 ? `${Math.round(sec / 60)}m` : `${Math.round(sec)}s`;
+  const showUnder3m =
+    (stats?.latency.under3mRate ?? stats?.latency.under60sRate) != null &&
+    (stats?.latency.under3mRate ?? stats?.latency.under60sRate ?? 0) > 0;
 
   return (
     <div
@@ -64,13 +69,15 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           {avg != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
               <Clock className="w-3 h-3" />
-              Avg ingest <strong className="text-emerald-400 font-mono">{avg}s</strong> after publish
+              Avg ingest{" "}
+              <strong className="text-emerald-400 font-mono">{formatIngest(avg)}</strong> after
+              publish
               {stats?.latency.sampleSize ? (
                 <span className="text-zinc-600"> (n={stats.latency.sampleSize})</span>
               ) : null}
             </span>
           )}
-          {(stats?.latency.under3mRate ?? stats?.latency.under60sRate) != null && (
+          {showUnder3m && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
               <strong className="text-emerald-400">
                 {stats?.latency.under3mRate ?? stats?.latency.under60sRate}%
@@ -81,7 +88,8 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           {fastest != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
               <TrendingUp className="w-3 h-3 text-emerald-500" />
-              Fastest catch <strong className="text-emerald-400 font-mono">{fastest}s</strong>
+              Fastest catch{" "}
+              <strong className="text-emerald-400 font-mono">{formatIngest(fastest)}</strong>
             </span>
           )}
           {stats?.feed.itemCount ? (
@@ -89,36 +97,48 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           ) : null}
         </div>
 
-        {recent.length > 0 && !compact && (
+        {!compact && (
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider">
               <TrendingUp className="w-3 h-3 text-emerald-500" />
               Caught it — fastest ingests
             </div>
-            {recent.slice(0, 3).map((win) => (
-              <div
-                key={`${win.symbol}-${win.ingestDelaySec}-${win.headline.slice(0, 24)}`}
-                className="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2"
-              >
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-mono font-bold text-white">{win.symbol}</span>
-                  {win.changePercent != null && (
-                    <span
-                      className={cn(
-                        "font-mono text-sm",
-                        win.changePercent >= 0 ? "text-emerald-400" : "text-red-400"
+            {recent.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-1">
+                {stats
+                  ? "No catch samples in the current window yet — ingest a few headlines and this fills automatically."
+                  : "Loading live proof…"}
+              </p>
+            ) : (
+              recent.slice(0, 3).map((win) => {
+                const delayLabel =
+                  win.ingestDelaySec >= 120
+                    ? `+${Math.round(win.ingestDelaySec / 60)}m ingest`
+                    : `+${win.ingestDelaySec}s ingest`;
+                return (
+                  <div
+                    key={`${win.symbol}-${win.ingestDelaySec}-${win.headline.slice(0, 24)}`}
+                    className="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="font-mono font-bold text-white">{win.symbol}</span>
+                      {win.changePercent != null && (
+                        <span
+                          className={cn(
+                            "font-mono text-sm",
+                            win.changePercent >= 0 ? "text-emerald-400" : "text-red-400"
+                          )}
+                        >
+                          {formatPercent(win.changePercent)}
+                        </span>
                       )}
-                    >
-                      {formatPercent(win.changePercent)}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-emerald-500/90 font-mono">
-                    +{win.ingestDelaySec}s ingest
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 line-clamp-1 mt-1">{win.headline}</p>
-              </div>
-            ))}
+                      <span className="text-[10px] text-emerald-500/90 font-mono">{delayLabel}</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 line-clamp-1 mt-1">{win.headline}</p>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>

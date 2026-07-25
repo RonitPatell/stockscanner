@@ -5,7 +5,7 @@ import type { CatalystItem, ScannerFilters } from "@/types";
 import { LiveScanner, type ScannerTab } from "./LiveScanner";
 import { CallBoard } from "./CallBoard";
 import { DilutionRadar } from "./DilutionRadar";
-import { SkipSavingsLedger } from "./SkipSavingsLedger";
+import { GreenLedger } from "./GreenLedger";
 import { SessionPlanCard } from "./SessionPlanCard";
 import { DailyEdgeRecap } from "./DailyEdgeRecap";
 import { SpeedEdgeLedger } from "./SpeedEdgeLedger";
@@ -51,7 +51,7 @@ export function PropDesk({
               <DilutionRadar />
             </div>
             <div data-guide="skip-ledger">
-              <SkipSavingsLedger />
+              <GreenLedger />
             </div>
             <div className="desk-command">
               <span className="desk-label mr-1">Call board</span>

@@ -30,6 +30,44 @@ function impressiveness(
   return speedBonus * 0.45 + moveBonus * 0.35 + urgencyBonus * 0.2;
 }
 
+/** Prefer true live-race catches; fall back so the UI is never empty on free RSS. */
+const LIVE_RACE_MAX_SEC = 10 * 60;
+const DISPLAY_MAX_SEC = 90 * 60;
+
+function toWin(
+  r: {
+    id: string;
+    symbol: string;
+    headline: string;
+    source: string;
+    publishedAt: Date;
+    createdAt: Date;
+    changePercent: number | null;
+    catalystType: string | null;
+    urgencyScore: number | null;
+  },
+  delaySec: number,
+  changePercent: number | null,
+  sort: SpeedWinSort
+): SpeedWin {
+  return {
+    id: r.id,
+    symbol: r.symbol,
+    headline: r.headline,
+    source: r.source,
+    publishedAt: r.publishedAt.toISOString(),
+    ingestedAt: r.createdAt.toISOString(),
+    ingestDelaySec: delaySec,
+    changePercent,
+    catalystType: r.catalystType,
+    urgencyScore: r.urgencyScore,
+    score:
+      sort === "fastest"
+        ? Math.max(0, DISPLAY_MAX_SEC - delaySec)
+        : impressiveness(delaySec, changePercent, r.urgencyScore),
+  };
+}
+
 export async function getSpeedWins(
   limit = 12,
   hours = 168,
@@ -62,7 +100,8 @@ export async function getSpeedWins(
   ];
   const quotes = quoteSymbols.length > 0 ? await getCachedQuotes(quoteSymbols) : {};
 
-  const wins: SpeedWin[] = [];
+  const strict: SpeedWin[] = [];
+  const fallback: SpeedWin[] = [];
 
   for (const r of rows) {
     const delaySec = Math.max(
@@ -72,34 +111,31 @@ export async function getSpeedWins(
     const changePercent = r.changePercent ?? quotes[r.symbol]?.changePercent ?? null;
     const move = Math.abs(changePercent ?? 0);
 
-    if (delaySec > 600) continue;
     if ((r.verifiedConfidence ?? 15) < 15) continue;
+    if (delaySec > DISPLAY_MAX_SEC) continue;
 
-    // Fast catches (≤3 min) always qualify; slower ones need a move or urgency
-    if (delaySec > 180 && move < 2 && (r.urgencyScore ?? 0) < 35) continue;
+    const win = toWin(r, delaySec, changePercent, sort);
 
-    wins.push({
-      id: r.id,
-      symbol: r.symbol,
-      headline: r.headline,
-      source: r.source,
-      publishedAt: r.publishedAt.toISOString(),
-      ingestedAt: r.createdAt.toISOString(),
-      ingestDelaySec: delaySec,
-      changePercent,
-      catalystType: r.catalystType,
-      urgencyScore: r.urgencyScore,
-      score:
-        sort === "fastest"
-          ? Math.max(0, 600 - delaySec)
-          : impressiveness(delaySec, changePercent, r.urgencyScore),
-    });
+    // Live-race quality bar
+    if (delaySec <= LIVE_RACE_MAX_SEC) {
+      if (delaySec > 180 && move < 2 && (r.urgencyScore ?? 0) < 35) {
+        fallback.push(win);
+        continue;
+      }
+      strict.push(win);
+      continue;
+    }
+
+    // Slower RSS catches — still useful proof when wire is quiet
+    fallback.push(win);
   }
+
+  const pool = strict.length > 0 ? strict : fallback;
 
   if (sort === "fastest") {
-    return wins.sort((a, b) => a.ingestDelaySec - b.ingestDelaySec).slice(0, limit);
+    return pool.sort((a, b) => a.ingestDelaySec - b.ingestDelaySec).slice(0, limit);
   }
-  return wins.sort((a, b) => b.score - a.score).slice(0, limit);
+  return pool.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 export interface IngestLatencyStats {
@@ -124,7 +160,6 @@ export interface IngestLatencyStats {
  */
 export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencyStats> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-  const LIVE_RACE_MAX_SEC = 10 * 60;
 
   const rows = await prisma.catalyst.findMany({
     where: { createdAt: { gte: since } },
@@ -149,12 +184,14 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
 
   const allDelays = rows
     .map((r) => Math.max(0, (r.createdAt.getTime() - r.publishedAt.getTime()) / 1000))
+    .filter((d) => d <= DISPLAY_MAX_SEC)
     .sort((a, b) => a - b);
 
-  const delays = allDelays.filter((d) => d <= LIVE_RACE_MAX_SEC);
-  if (delays.length === 0) {
-    return { ...empty, fastestSec: allDelays[0] ?? null };
-  }
+  if (allDelays.length === 0) return empty;
+
+  // Prefer true live-race samples; otherwise report best available (RSS lag honesty)
+  const live = allDelays.filter((d) => d <= LIVE_RACE_MAX_SEC);
+  const delays = live.length > 0 ? live : allDelays;
 
   const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
   const p50 = delays[Math.floor(delays.length * 0.5)] ?? null;

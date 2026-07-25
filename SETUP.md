@@ -228,9 +228,31 @@ Vercel cron alone polls wire about once per minute. For ~2s cycles:
 npm run ingest:worker
 ```
 
-Run this 24/7 on a cheap VPS / Railway / Fly (or your PC while testing).
+Run this 24/7 on a cheap VPS / Railway / Fly (or your PC while testing). Free Railway/Fly tiers are enough until MRR can buy a paid wire.
 
-**True “couple seconds from publish”** needs a paid wire (free RSS cannot beat publisher lag). Cheapest realistic option: Benzinga News API trial/Essential — set `BENZINGA_API_KEY` in `.env`. Without it we still use Benzinga/MarketWatch/CNBC RSS + Finnhub (free, often tens of seconds behind).
+On Railway there is **no `.env` file** — set variables in the Railway dashboard (`CRON_SECRET`, `NEXT_PUBLIC_APP_URL`). Do not commit `.env`. Locally, `scripts/ingest-worker.mjs` still loads `.env` if it exists.
+
+### Free path to StockTitan-like news (no paid wire yet)
+
+Stock Titan’s product is mostly **official company PRs + SEC filings**, not Yahoo analyst fluff. TrustTicker’s free ultra wire matches that mix:
+
+| Source | Cost | Role |
+|--------|------|------|
+| PR Newswire / Business Wire / GlobeNewswire RSS | $0 | Same official press releases Stock Titan emphasizes |
+| SEC EDGAR Atom (8-K, Form 4, 424B5) | $0 | Near-real-time filings from the SEC itself |
+| Benzinga / MarketWatch / CNBC RSS | $0 | Fast market headlines |
+| Finnhub general news | $0 | Extra coverage (60 calls/min free) |
+| Yahoo per-ticker RSS | $0 | Background only (slower / noisier) |
+
+**What you must run:** `npm run ingest:worker` always-on. Without it you’re stuck on Vercel’s ~60s cron.
+
+**Honest latency:** free RSS often lands **tens of seconds to a few minutes** after publish. That can still feel “live” on the desk if your poll cycle is ~2s. It will **not** beat a paid low-latency API every time.
+
+**When MRR allows a paid upgrade (first dollar spent on news):**
+1. `BENZINGA_API_KEY` — Benzinga News API (often the cheapest “seconds from publish” step)
+2. Later: a dedicated press-release / news wire if you need true Stock Titan Gold-tier speed
+
+Do **not** scrape Stock Titan. Use the same free official sources they surface.
 
 ### 4. Live quotes without Redis
 

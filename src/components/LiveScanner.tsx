@@ -649,8 +649,9 @@ export function LiveScanner({
           !embedded && "desk-panel"
         )}
       >
-        <div className="hidden sm:grid grid-cols-[80px_54px_58px_44px_44px_1fr_54px_28px] gap-2 px-4 py-2.5 border-b border-[--border] bg-white/[0.018] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
+        <div className="hidden sm:grid grid-cols-[80px_48px_54px_58px_44px_44px_1fr_54px_28px] gap-2 px-4 py-2.5 border-b border-[--border] bg-white/[0.018] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
           <span>Ticker</span>
+          <span className="text-center">Grade</span>
           <span className="text-center">Chg</span>
           <span className="text-right">Price</span>
           <span className="text-center">RVol</span>

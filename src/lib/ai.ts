@@ -101,7 +101,13 @@ export async function analyzeNews(
   symbol: string,
   headline: string,
   source: string,
-  extraContext?: string
+  extraContext?: string,
+  market?: {
+    changePercent?: number | null;
+    rVol?: number | null;
+    floatShares?: number | null;
+    historicalAvgMove?: number | null;
+  }
 ): Promise<AIAnalysisResult> {
   const text = `${headline} ${extraContext || ""}`.toLowerCase();
   let score = 0;
@@ -155,11 +161,37 @@ export async function analyzeNews(
     score += Math.sign(baseline) * Math.min(Math.abs(baseline), 12);
   }
 
+  // Soft-adjust sentiment when the tape already contradicts a "chase"
+  const move = market?.changePercent;
+  if (move != null && Math.abs(move) >= 20 && score > 20) {
+    score -= 12;
+    matchedBearish.push("already extended on tape");
+  }
+  if (market?.rVol != null && market.rVol >= 3 && score > 0) {
+    score += 4;
+    matchedBullish.push("elevated relative volume");
+  }
+
   score = clamp(score, -100, 100);
 
   const urgencyScore = computeUrgency(score, catalystType, headline);
-  const summary = buildSummary(symbol, headline, catalystType, score, matchedBullish, matchedBearish);
-  const keyPoints = buildKeyPoints(symbol, catalystType, score, matchedBullish, matchedBearish);
+  const summary = buildSummary(
+    symbol,
+    headline,
+    catalystType,
+    score,
+    matchedBullish,
+    matchedBearish,
+    market
+  );
+  const keyPoints = buildKeyPoints(
+    symbol,
+    catalystType,
+    score,
+    matchedBullish,
+    matchedBearish,
+    market
+  );
 
   return {
     summary,
@@ -197,14 +229,38 @@ function buildSummary(
   type: string,
   score: number,
   bullish: string[],
-  bearish: string[]
+  bearish: string[],
+  market?: {
+    changePercent?: number | null;
+    rVol?: number | null;
+    floatShares?: number | null;
+    historicalAvgMove?: number | null;
+  }
 ): string {
-  const tone = score >= 30 ? "potentially positive" : score <= -30 ? "potentially negative" : score >= 10 ? "slightly positive" : score <= -10 ? "slightly negative" : "neutral";
+  const tone =
+    score >= 30
+      ? "potentially positive"
+      : score <= -30
+        ? "potentially negative"
+        : score >= 10
+          ? "slightly positive"
+          : score <= -10
+            ? "slightly negative"
+            : "neutral";
   const typeLabel = type.replace("_", " ");
   let summary = `${symbol}: ${headline}`;
   summary += ` This ${typeLabel} catalyst reads ${tone} (sentiment ${score > 0 ? "+" : ""}${score})`;
   if (bullish.length > 0) summary += ` — bullish: ${uniqueSignals(bullish).slice(0, 3).join(", ")}`;
   if (bearish.length > 0) summary += ` — bearish: ${uniqueSignals(bearish).slice(0, 3).join(", ")}`;
+  if (market?.changePercent != null) {
+    summary += ` · stock ${market.changePercent >= 0 ? "+" : ""}${market.changePercent.toFixed(1)}% today`;
+  }
+  if (market?.rVol != null && market.rVol > 0) {
+    summary += ` · RVol ${market.rVol.toFixed(1)}×`;
+  }
+  if (market?.historicalAvgMove != null) {
+    summary += ` · hist avg move ~${market.historicalAvgMove.toFixed(1)}%`;
+  }
   summary += ". Informational only — not investment advice.";
   return summary;
 }
@@ -214,13 +270,31 @@ function buildKeyPoints(
   type: string,
   score: number,
   bullish: string[],
-  bearish: string[]
+  bearish: string[],
+  market?: {
+    changePercent?: number | null;
+    rVol?: number | null;
+    floatShares?: number | null;
+    historicalAvgMove?: number | null;
+  }
 ): string[] {
   const points: string[] = [];
   points.push(`${symbol} — ${type.replace("_", " ")} catalyst`);
   if (bullish.length > 0) points.push(`Bullish signals: ${uniqueSignals(bullish).slice(0, 4).join(", ")}`);
   if (bearish.length > 0) points.push(`Bearish signals: ${uniqueSignals(bearish).slice(0, 4).join(", ")}`);
   points.push(`Sentiment score: ${score}/100`);
+  if (market?.changePercent != null) {
+    points.push(`Today's move: ${market.changePercent >= 0 ? "+" : ""}${market.changePercent.toFixed(1)}%`);
+  }
+  if (market?.rVol != null && market.rVol > 0) {
+    points.push(`Relative volume: ${market.rVol.toFixed(1)}×`);
+  }
+  if (market?.floatShares != null && market.floatShares > 0) {
+    points.push(`Float: ${(market.floatShares / 1e6).toFixed(1)}M shares`);
+  }
+  if (market?.historicalAvgMove != null) {
+    points.push(`Historical avg move for similar news: ${market.historicalAvgMove.toFixed(1)}%`);
+  }
   return points;
 }
 

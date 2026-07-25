@@ -294,10 +294,21 @@ export async function ingestAndAnalyzeNews(
       symbol,
       article.headline,
       article.source,
-      article.summary
+      article.summary,
+      {
+        changePercent: quote?.changePercent ?? null,
+        floatShares: quote?.floatShares ?? null,
+      }
     );
 
     const historical = estimateHistoricalMove(analysis.catalystType);
+    if (historical.avgMove != null) {
+      analysis.keyPoints = [
+        ...analysis.keyPoints,
+        `Historical avg move for similar news: ${historical.avgMove.toFixed(1)}% (n=${historical.sampleSize})`,
+      ];
+      analysis.summary += ` · hist avg move ~${historical.avgMove.toFixed(1)}%`;
+    }
     const catalystType =
       relatedSymbols.length >= 2 ? "macro" : analysis.catalystType;
     const clusterId = storyClusterKey(article.headline);

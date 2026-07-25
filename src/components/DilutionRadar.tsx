@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Ban } from "lucide-react";
 import { cn, formatPercent } from "@/lib/utils";
 import { applyLiveQuote, useLiveQuotes, useRegisterLiveSymbols } from "./LiveQuoteProvider";
-import { recordSkipFromDilution } from "./SkipSavingsLedger";
+import { recordSkipFromDilution } from "./GreenLedger";
 
 interface DilutionItem {
   id: string;

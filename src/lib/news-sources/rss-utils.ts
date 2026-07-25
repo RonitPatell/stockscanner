@@ -60,7 +60,18 @@ export function hashStr(s: string): string {
   return Math.abs(h).toString(36);
 }
 
-export async function fetchRssXml(url: string, timeoutMs = 4_000): Promise<string | null> {
+/** Short in-process cache — wire ticks every ~2s; publishers rarely update faster. */
+const rssXmlCache = new Map<string, { xml: string; ts: number }>();
+const RSS_XML_CACHE_MS = 8_000;
+
+export async function fetchRssXml(
+  url: string,
+  timeoutMs = 4_000,
+  cacheMs = RSS_XML_CACHE_MS
+): Promise<string | null> {
+  const cached = rssXmlCache.get(url);
+  if (cached && Date.now() - cached.ts < cacheMs) return cached.xml;
+
   try {
     const res = await fetch(url, {
       cache: "no-store",
@@ -73,8 +84,10 @@ export async function fetchRssXml(url: string, timeoutMs = 4_000): Promise<strin
       },
     });
     if (!res.ok) return null;
-    return await res.text();
+    const xml = await res.text();
+    rssXmlCache.set(url, { xml, ts: Date.now() });
+    return xml;
   } catch {
-    return null;
+    return cached?.xml ?? null;
   }
 }

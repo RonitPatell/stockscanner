@@ -26,11 +26,13 @@ import {
 } from "@/lib/source-trust";
 import { setupTagMeta } from "@/lib/setup-tags";
 import { CatalystPlaybookPanel } from "./CatalystPlaybookPanel";
-import { ActionPlaybookCard } from "./ActionPlaybookCard";
+import { TradeGradeBadge, TradeJudgmentPanel } from "./TradeJudgmentPanel";
 import { PaperTradeButtons } from "./PaperTradeLedger";
 import { PostCallButton } from "./CallBoard";
 import { pickLiveField, useLiveQuotesOptional } from "./LiveQuoteProvider";
+import { recordGreenLedgerEntry } from "./GreenLedger";
 import { antiFomoClass, buildActionPlaybook } from "@/lib/action-playbook";
+import { buildTradeJudgment } from "@/lib/trade-judgment";
 
 interface CatalystCardProps {
   catalyst: CatalystItem;
@@ -224,6 +226,16 @@ export function CatalystCard({
               {headlineText}
             </span>
             <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <TradeGradeBadge
+                catalyst={{
+                  ...catalyst,
+                  price,
+                  changePercent,
+                  rVol,
+                  floatShares,
+                  marketCap,
+                }}
+              />
               <span
                 className={cn(
                   "font-mono text-[11px] font-bold tabular-nums",
@@ -272,7 +284,7 @@ export function CatalystCard({
         </div>
       </div>
 
-      <div className="hidden sm:grid grid-cols-[80px_54px_58px_44px_44px_1fr_54px_28px] gap-2 items-center px-4 py-3 hover:bg-white/[0.025]">
+      <div className="hidden sm:grid grid-cols-[80px_48px_54px_58px_44px_44px_1fr_54px_28px] gap-2 items-center px-4 py-3 hover:bg-white/[0.025]">
         {/* Symbol — opens TradingView */}
         <div className="min-w-0">
           <a
@@ -296,6 +308,17 @@ export function CatalystCard({
             </span>
           )}
         </div>
+
+        <TradeGradeBadge
+          catalyst={{
+            ...catalyst,
+            price,
+            changePercent,
+            rVol,
+            floatShares,
+            marketCap,
+          }}
+        />
 
         {/* Change % */}
         <div
@@ -492,7 +515,7 @@ export function CatalystCard({
             )}
           </div>
 
-          <ActionPlaybookCard
+          <TradeJudgmentPanel
             catalyst={{
               ...catalyst,
               price,
@@ -502,6 +525,38 @@ export function CatalystCard({
               marketCap,
             }}
             className="mb-2"
+            onSkip={() => {
+              const j = buildTradeJudgment({
+                ...catalyst,
+                changePercent,
+                rVol,
+                floatShares,
+              });
+              recordGreenLedgerEntry({
+                kind: "skipped",
+                symbol: catalyst.symbol,
+                headline: catalyst.headline,
+                changePercent,
+                why: j.summary,
+                grade: j.label,
+              });
+            }}
+            onTake={() => {
+              const j = buildTradeJudgment({
+                ...catalyst,
+                changePercent,
+                rVol,
+                floatShares,
+              });
+              recordGreenLedgerEntry({
+                kind: "taken",
+                symbol: catalyst.symbol,
+                headline: catalyst.headline,
+                changePercent,
+                why: j.summary,
+                grade: j.label,
+              });
+            }}
           />
 
           <CatalystPlaybookPanel
