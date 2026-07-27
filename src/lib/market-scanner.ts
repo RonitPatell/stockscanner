@@ -187,6 +187,15 @@ function detectAlerts(quote: StockQuote, rVol: number) {
       price,
       rVol,
     });
+    void import("./coverage/coverage-service")
+      .then(({ promoteTemporaryCoverage }) =>
+        promoteTemporaryCoverage({
+          symbol: quote.symbol,
+          reason: "UNUSUAL_VOLUME",
+          note: `rvol=${rVol.toFixed(1)}`,
+        })
+      )
+      .catch(() => {});
   }
 
   if (change >= 5) {
@@ -198,6 +207,15 @@ function detectAlerts(quote: StockQuote, rVol: number) {
       price,
       rVol: rVol > 0 ? rVol : undefined,
     });
+    void import("./coverage/coverage-service")
+      .then(({ promoteTemporaryCoverage }) =>
+        promoteTemporaryCoverage({
+          symbol: quote.symbol,
+          reason: "ACTIVE_GAINER",
+          note: `change=${change.toFixed(1)}%`,
+        })
+      )
+      .catch(() => {});
   } else if (change <= -5) {
     pushAlert({
       symbol: quote.symbol,

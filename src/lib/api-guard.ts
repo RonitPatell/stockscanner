@@ -93,3 +93,32 @@ export function authorizeCron(req: Request): boolean {
 export function cronUnauthorized(): NextResponse {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
+
+/** Comma-separated admin emails in ADMIN_EMAILS (case-insensitive). */
+export function getAdminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const allow = getAdminEmails();
+  if (allow.length === 0) return false;
+  return allow.includes(email.trim().toLowerCase());
+}
+
+/** Authenticated admin gate — email must be in ADMIN_EMAILS. */
+export async function requireAdmin(): Promise<
+  { user: AuthedUser; error?: undefined } | { user?: undefined; error: NextResponse }
+> {
+  const result = await requireUser();
+  if (result.error) return result;
+  if (!isAdminEmail(result.user.email)) {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+  return result;
+}

@@ -15,13 +15,16 @@ import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/type
 import { LiveScanner, type ScannerTab } from "./LiveScanner";
 import { WatchlistBrief } from "./WatchlistBrief";
 import { TrustStatusBar } from "./TrustStatusBar";
+import { LiveConnectionStatus } from "./LiveConnectionStatus";
 import { PremarketCenter } from "./PremarketCenter";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { OnboardingChecklist } from "./OnboardingChecklist";
 import { SessionRecap } from "./SessionRecap";
 import { SpeedWinsPanel } from "./SpeedWinsPanel";
 import { SpeedEdgeLedger } from "./SpeedEdgeLedger";
 import { DilutionRadar } from "./DilutionRadar";
 import { GreenLedger } from "./GreenLedger";
+import { TraderFeedbackPanel } from "./trader-feedback/TraderFeedbackPanel";
 import { WatchlistAutopsy } from "./WatchlistAutopsy";
 import { SessionPlanCard } from "./SessionPlanCard";
 import { PaperTradeLedger } from "./PaperTradeLedger";
@@ -59,6 +62,7 @@ export function TradingDashboard({
 }) {
   const [tab, setTab] = useState<ScannerTab>("all");
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [mode, setMode] = useState<"focus" | "full">("focus");
 
@@ -70,6 +74,49 @@ export function TradingDashboard({
     } catch {
       /* ignore */
     }
+
+    // Notification action deep-links from service worker
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("focus") === "1") {
+        setMode("focus");
+        try {
+          localStorage.setItem(MODE_KEY, "focus");
+        } catch {
+          /* ignore */
+        }
+      }
+      const muteSym = params.get("mute");
+      if (muteSym && /^[A-Za-z]{1,5}$/.test(muteSym)) {
+        const key = "tt-muted-symbols-v1";
+        const prev = JSON.parse(localStorage.getItem(key) || "[]") as string[];
+        const next = [...new Set([...prev, muteSym.toUpperCase()])];
+        localStorage.setItem(key, JSON.stringify(next));
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const onMsg = (ev: MessageEvent) => {
+      const data = ev.data;
+      if (!data || data.type !== "tt-notification-action") return;
+      if (data.action === "mute" && typeof data.symbol === "string") {
+        try {
+          const key = "tt-muted-symbols-v1";
+          const prev = JSON.parse(localStorage.getItem(key) || "[]") as string[];
+          localStorage.setItem(
+            key,
+            JSON.stringify([
+              ...new Set([...prev, String(data.symbol).toUpperCase()]),
+            ])
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMsg);
   }, []);
 
   const setDashboardMode = useCallback((next: "focus" | "full") => {
@@ -87,7 +134,8 @@ export function TradingDashboard({
       void fetch("/api/onboarding")
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
-          if (d?.onboardingCompleted === false) setShowOnboarding(true);
+          if (d?.showWizard) setShowOnboarding(true);
+          if (d?.showChecklist) setShowChecklist(true);
         })
         .catch(() => {});
     }, 1_500);
@@ -109,7 +157,24 @@ export function TradingDashboard({
   return (
     <LiveQuoteProvider>
       <div className="dashboard-workspace desk-shell flex flex-col h-full min-h-0 gap-[var(--gap)]">
-        {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+        {showOnboarding && (
+          <OnboardingWizard
+            onComplete={() => {
+              setShowOnboarding(false);
+              setShowChecklist(true);
+            }}
+            onSkipped={() => setShowChecklist(true)}
+          />
+        )}
+        {!showOnboarding && (
+          <OnboardingChecklist
+            forceShow={showChecklist}
+            onResume={() => {
+              setShowOnboarding(true);
+              setShowChecklist(false);
+            }}
+          />
+        )}
 
         <div className="desk-command shrink-0">
           <div className="desk-seg desk-command-mode" role="group" aria-label="Dashboard mode">
@@ -139,6 +204,7 @@ export function TradingDashboard({
 
           <div className="desk-command-status flex-1 min-w-0" data-guide="trust-status">
             <TrustStatusBar className="!border-0 !bg-transparent !px-0 !py-0" />
+            <LiveConnectionStatus />
           </div>
 
           <div className="desk-command-actions flex items-center gap-2 shrink-0">
@@ -187,6 +253,8 @@ export function TradingDashboard({
             <div data-guide="skip-ledger">
               <GreenLedger />
             </div>
+
+            <TraderFeedbackPanel />
 
             <div data-guide="wins-brief" className="shrink-0">
               <SpeedWinsPanel showViewAll title="Speed wins" />
@@ -247,7 +315,7 @@ export function TradingDashboard({
                 ))}
               </div>
               <span className="ml-auto text-[12px] text-[--text-muted] hidden lg:inline font-mono">
-                j/k · Enter · /
+                j/k · Enter · O/T/W/U/E · /
               </span>
             </div>
 
@@ -258,6 +326,7 @@ export function TradingDashboard({
               initialCatalysts={initialCatalysts}
               initialWatchlist={initialWatchlist}
               initialFilters={initialFilters}
+              focusCompact={focused}
             />
           </section>
         </div>

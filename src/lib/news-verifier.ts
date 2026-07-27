@@ -132,6 +132,7 @@ export interface VerifyResult {
   symbol: string;
   confidence: number;
   reason?: string;
+  method?: string;
   /** Other verified tickers from the same article (roundups) */
   relatedSymbols?: string[];
   isRoundup?: boolean;
@@ -331,6 +332,25 @@ function scoreCandidate(symbol: string, headline: string, summary?: string): num
   return score;
 }
 
+/** Best-effort match method label for transparency. */
+export function matchMethodForSymbol(
+  symbol: string,
+  headline: string,
+  summary?: string
+): string {
+  const text = normalizeText(headline, summary);
+  if (new RegExp(`\\$${symbol}\\b`).test(text)) return "cashtag";
+  if (new RegExp(`\\((?:NASDAQ|NYSE|AMEX|OTC)[:\\s]+${symbol}\\)`, "i").test(text)) {
+    return "exchange_tag";
+  }
+  if (new RegExp(`\\(\\s*${symbol}\\s*\\)`).test(text)) return "paren_ticker";
+  if (new RegExp(`\\b${symbol}\\s+(stock|shares?)\\b`, "i").test(text)) return "ticker_stock_phrase";
+  if (companyNamesForTicker(symbol).some((n) => new RegExp(`\\b${n}\\b`, "i").test(text))) {
+    return "company_name";
+  }
+  return "headline_parse";
+}
+
 export function resolveArticleSymbol(
   headline: string,
   summary?: string,
@@ -373,7 +393,11 @@ export function resolveAllArticleSymbols(
     const score = scoreCandidate(symbol, headline, summary);
     if (score < 10) continue;
     if (isFalsePositive(symbol, text)) continue;
-    scored.push({ symbol, confidence: score, method: "headline_parse" });
+    scored.push({
+      symbol,
+      confidence: score,
+      method: matchMethodForSymbol(symbol, headline, summary),
+    });
   }
 
   scored.sort((a, b) => b.confidence - a.confidence);
@@ -444,6 +468,7 @@ export async function verifyNewsArticle(
     valid: true,
     symbol: primary.symbol,
     confidence: primary.confidence,
+    method: primary.method,
     relatedSymbols: [],
     isRoundup: false,
   };

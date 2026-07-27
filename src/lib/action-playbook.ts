@@ -31,14 +31,24 @@ const BULL_TYPES = new Set([
 const BEAR_TYPES = new Set(["downgrade", "lawsuit", "investigation", "bankruptcy"]);
 
 const DILUTION_RE =
-  /\b(offering|dilut|atm offering|registered direct|public offering|secondary offering|bought deal|share issuance)\b/i;
+  /\b(offering|dilut|atm offering|registered direct|public offering|secondary offering|bought deal|share issuance|prospectus\s+supplement|424\s*b\s*5|424b5|shelf\s+registration|form\s*s-1|form\s*s-3|s-1\/a|s-3\/a|equity\s+purchase\s+agreement|convertible\s+(note|preferred|debenture)|warrant\s+reprice|reverse\s+split|at[\s-]?the[\s-]?market)\b/i;
 
 export function isDilutionCatalyst(
   c: Pick<CatalystItem, "catalystType" | "headline">
 ): boolean {
   const type = (c.catalystType ?? "").toLowerCase();
   if (OFFERING_TYPES.has(type)) return true;
-  return DILUTION_RE.test(c.headline ?? "");
+  const headline = c.headline ?? "";
+  if (DILUTION_RE.test(headline)) return true;
+  // SEC capital-form headlines even when catalystType was forced to sec_filing
+  if (
+    /\b(424B5 prospectus|S-1 registration|S-3 shelf|S-1\/A amendment|S-3\/A amendment)\b/i.test(
+      headline
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function hasTag(tags: string[] | undefined, needle: string): boolean {

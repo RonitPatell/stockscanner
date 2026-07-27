@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePro } from "@/lib/api-guard";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed, getFeedMeta } from "@/lib/feed-cache";
+import { markTracesFirstDelivery } from "@/lib/latency-trace";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -35,6 +36,10 @@ export async function GET(req: NextRequest) {
         : cached.items.length > 0
           ? cached.items.slice(0, 150)
           : [];
+
+    if (items.length > 0) {
+      void markTracesFirstDelivery(items.map((c) => c.id)).catch(() => {});
+    }
 
     return NextResponse.json(items, {
       headers: {

@@ -140,23 +140,23 @@ export function SpeedEdgeHeroStat({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 flex items-center gap-3",
+        "border mk-hairline bg-emerald-500/[0.06] px-4 py-3.5 flex items-center gap-3",
         className
       )}
     >
       <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0" />
       <div className="min-w-0">
-        <p className="text-sm text-emerald-100 font-medium">
+        <p className="text-sm text-zinc-200 font-medium tracking-tight">
           Last 72h illustrative speed scenario:{" "}
           <span className="font-mono text-emerald-400">${data.totalEdgeUsd.toFixed(0)}</span>
           {data.paysForItself ? (
-            <span className="text-zinc-400 font-normal">
+            <span className="text-zinc-500 font-normal">
               {" "}
-              — that&apos;s {data.monthsCovered}× a $19.99 month on $1k notional
+              — {data.monthsCovered}× a $19.99 month on $1k notional
             </span>
           ) : null}
         </p>
-        <p className="text-[10px] text-zinc-500 mt-0.5">
+        <p className="text-[10px] text-zinc-600 mt-0.5">
           Illustrative · ingest vs +3 minutes · not financial advice
         </p>
       </div>

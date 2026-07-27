@@ -11,8 +11,31 @@ import { finnhubFetch, finnhubFetchLive } from "./finnhub-queue";
 import { resolveFinnhubKey } from "./finnhub-key";
 import { isLikelyStockNews, resolveArticleSymbol, articleIsAboutSymbol } from "./news-verifier";
 import { getPriorityTickers } from "./priority-tickers";
+import {
+  annotateFetchedArticles,
+  stampFromUnixSeconds,
+} from "./latency-trace";
 
 export { TICKER_BLACKLIST, isValidTickerFormat, extractSymbolFromHeadline };
+
+function withFinnhubStamp(
+  article: Omit<NewsArticle, "publishedAt" | "trace"> & { datetime: number }
+): NewsArticle {
+  const stamp = stampFromUnixSeconds(article.datetime);
+  return {
+    id: article.id,
+    symbol: article.symbol,
+    headline: article.headline,
+    source: article.source,
+    url: article.url,
+    summary: article.summary,
+    publishedAt: stamp.publishedAt,
+    trace: {
+      ...stamp.trace,
+      providerItemId: article.id,
+    },
+  };
+}
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const MAX_NEWS_ARTICLES = 400;
@@ -110,6 +133,7 @@ async function fetchIntradayVolumeSum(symbol: string): Promise<number | null> {
 }
 
 export async function fetchMarketNews(options: { fast?: boolean } = {}): Promise<NewsArticle[]> {
+  const firstFetchedAt = new Date();
   const key = resolveFinnhubKey();
   const articles: NewsArticle[] = [];
   const fast = options.fast === true;
@@ -160,7 +184,7 @@ export async function fetchMarketNews(options: { fast?: boolean } = {}): Promise
 
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const seen = new Set<string>();
-  return articles
+  const filtered = articles
     .filter((a) => {
       if (!a.symbol || !isValidTickerFormat(a.symbol)) return false;
       if (!isLikelyStockNews(a.headline, a.summary)) return false;
@@ -172,6 +196,11 @@ export async function fetchMarketNews(options: { fast?: boolean } = {}): Promise
     })
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
     .slice(0, MAX_NEWS_ARTICLES);
+
+  return annotateFetchedArticles(filtered, {
+    firstFetchedAt,
+    fetchCompletedAt: new Date(),
+  });
 }
 
 /** Fast wire + RSS poll — no SEC/merger/rotating scans (runs every few seconds) */
@@ -207,6 +236,7 @@ function dedupeWireArticles(articles: NewsArticle[], maxAgeMs: number): NewsArti
 export async function fetchUltraFastWireNews(
   _priorityTickers: string[]
 ): Promise<NewsArticle[]> {
+  const firstFetchedAt = new Date();
   const key = resolveFinnhubKey();
   const [
     benzingaApi,
@@ -226,24 +256,28 @@ export async function fetchUltraFastWireNews(
     key ? fetchFinnhubMarketNews(key) : Promise.resolve([]),
   ]);
 
-  return dedupeWireArticles(
-    [
-      ...benzingaApi,
-      ...prnPRs,
-      ...businessWirePRs,
-      ...globePRs,
-      ...secFilings,
-      ...marketRss,
-      ...marketNews,
-    ],
-    2 * 60 * 60 * 1000
-  ).slice(0, 180);
+  return annotateFetchedArticles(
+    dedupeWireArticles(
+      [
+        ...benzingaApi,
+        ...prnPRs,
+        ...businessWirePRs,
+        ...globePRs,
+        ...secFilings,
+        ...marketRss,
+        ...marketNews,
+      ],
+      2 * 60 * 60 * 1000
+    ).slice(0, 180),
+    { firstFetchedAt, fetchCompletedAt: new Date() }
+  );
 }
 
 /** Yahoo + slow RSS + per-symbol Finnhub — background; PRs/SEC already on ultra */
 export async function fetchExtendedWireNews(
   priorityTickers: string[]
 ): Promise<NewsArticle[]> {
+  const firstFetchedAt = new Date();
   const key = resolveFinnhubKey();
   const [yahooNews, slowRss, companyNews] = await Promise.all([
     fetchYahooTickerNews(40, priorityTickers),
@@ -253,24 +287,32 @@ export async function fetchExtendedWireNews(
       : Promise.resolve([]),
   ]);
 
-  return dedupeWireArticles(
-    [...yahooNews, ...slowRss, ...companyNews],
-    6 * 60 * 60 * 1000
-  ).slice(0, 160);
+  return annotateFetchedArticles(
+    dedupeWireArticles(
+      [...yahooNews, ...slowRss, ...companyNews],
+      6 * 60 * 60 * 1000
+    ).slice(0, 160),
+    { firstFetchedAt, fetchCompletedAt: new Date() }
+  );
 }
 
 export async function fetchFastWireNews(): Promise<NewsArticle[]> {
+  const firstFetchedAt = new Date();
   const priorityTickers = await getPriorityTickers();
   const [ultra, extended] = await Promise.all([
     fetchUltraFastWireNews(priorityTickers),
     fetchExtendedWireNews(priorityTickers),
   ]);
   const seen = new Set<string>();
-  return [...ultra, ...extended].filter((a) => {
+  const merged = [...ultra, ...extended].filter((a) => {
     const key = `${a.symbol}|${a.headline.slice(0, 80)}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  });
+  return annotateFetchedArticles(merged, {
+    firstFetchedAt,
+    fetchCompletedAt: new Date(),
   });
 }
 
@@ -323,15 +365,17 @@ async function fetchFinnhubCompanyNewsForSymbols(
         for (const item of data.slice(0, 6)) {
           const resolved = resolveFinnhubSymbol(item, symbol);
           if (!resolved) continue;
-          articles.push({
-            id: `fh-${resolved}-${item.id}`,
-            symbol: resolved,
-            headline: item.headline,
-            source: item.source,
-            url: item.url,
-            publishedAt: new Date(item.datetime * 1000),
-            summary: item.summary,
-          });
+          articles.push(
+            withFinnhubStamp({
+              id: `fh-${resolved}-${item.id}`,
+              symbol: resolved,
+              headline: item.headline,
+              source: item.source,
+              url: item.url,
+              summary: item.summary,
+              datetime: item.datetime,
+            })
+          );
         }
       } catch {
         /* skip symbol */
@@ -365,15 +409,17 @@ async function fetchFinnhubCompanyNews(
       for (const item of data.slice(0, limit)) {
         const resolved = resolveFinnhubSymbol(item, symbol);
         if (!resolved) continue;
-        articles.push({
-          id: `fh-${resolved}-${item.id}`,
-          symbol: resolved,
-          headline: item.headline,
-          source: item.source,
-          url: item.url,
-          publishedAt: new Date(item.datetime * 1000),
-          summary: item.summary,
-        });
+        articles.push(
+          withFinnhubStamp({
+            id: `fh-${resolved}-${item.id}`,
+            symbol: resolved,
+            headline: item.headline,
+            source: item.source,
+            url: item.url,
+            summary: item.summary,
+            datetime: item.datetime,
+          })
+        );
       }
     } catch { /* skip */ }
   }
@@ -390,20 +436,42 @@ async function fetchFinnhubMarketNews(key: string): Promise<NewsArticle[]> {
     for (const item of data.slice(0, 60)) {
       const symbol = resolveFinnhubSymbol(item, "");
       if (!symbol) continue;
-      articles.push({
-        id: `fh-mkt-${item.id}`,
-        symbol,
-        headline: item.headline,
-        source: item.source,
-        url: item.url,
-        publishedAt: new Date(item.datetime * 1000),
-        summary: item.summary,
-      });
+      articles.push(
+        withFinnhubStamp({
+          id: `fh-mkt-${item.id}`,
+          symbol,
+          headline: item.headline,
+          source: item.source,
+          url: item.url,
+          summary: item.summary,
+          datetime: item.datetime,
+        })
+      );
     }
     return articles;
   } catch {
     return [];
   }
+}
+
+/** Priority-ingest Tier 1 — Finnhub general wire only. */
+export async function fetchFinnhubMarketNewsForIngest(): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
+  if (!key) return [];
+  return fetchFinnhubMarketNews(key);
+}
+
+/** Priority-ingest Tier 1 — Finnhub company news for priority tickers. */
+export async function fetchFinnhubCompanyNewsForIngest(
+  symbols?: string[]
+): Promise<NewsArticle[]> {
+  const key = resolveFinnhubKey();
+  if (!key) return [];
+  const list =
+    symbols && symbols.length > 0
+      ? symbols
+      : (await getPriorityTickers()).slice(0, 40);
+  return fetchFinnhubCompanyNewsForSymbols(key, list);
 }
 
 function resolveFinnhubSymbol(item: FinnhubNewsItem, _fallback: string): string {
@@ -419,15 +487,17 @@ async function fetchMergerNews(key: string): Promise<NewsArticle[]> {
   for (const item of data) {
     const symbol = resolveFinnhubSymbol(item, "");
     if (!symbol) continue;
-    articles.push({
-      id: `fh-mrg-${item.id}`,
-      symbol,
-      headline: item.headline,
-      source: item.source,
-      url: item.url,
-      publishedAt: new Date(item.datetime * 1000),
-      summary: item.summary,
-    });
+    articles.push(
+      withFinnhubStamp({
+        id: `fh-mrg-${item.id}`,
+        symbol,
+        headline: item.headline,
+        source: item.source,
+        url: item.url,
+        summary: item.summary,
+        datetime: item.datetime,
+      })
+    );
   }
   return articles;
 }

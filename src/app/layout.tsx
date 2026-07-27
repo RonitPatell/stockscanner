@@ -1,28 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Syne, DM_Sans } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/Providers";
 import { CookieNotice } from "@/components/CookieNotice";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/**
+ * Clean fintech stack:
+ * - Inter — neutral grotesk used across Brex / high-converting SaaS
+ * - JetBrains Mono — tabular market data only
+ */
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const syne = Syne({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-});
-
-const dmSans = DM_Sans({
-  variable: "--font-marketing",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -53,10 +48,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} ${dmSans.variable} h-full antialiased dark`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100" suppressHydrationWarning>
+      <body
+        className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text-primary)]"
+        suppressHydrationWarning
+      >
         <Providers>{children}</Providers>
         <CookieNotice />
         <Analytics />

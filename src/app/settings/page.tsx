@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { formatSubscriptionEnd } from "@/lib/subscription";
 import { LogoMark } from "@/components/Logo";
 import { AlertRulesPanel } from "@/components/AlertRulesPanel";
+import { AlertStrategyBuilder } from "@/components/AlertStrategyBuilder";
 import { PushNotifyToggle } from "@/components/PushNotifyToggle";
 import { AlertHistoryPanel } from "@/components/AlertHistoryPanel";
 import type { AlertRule } from "@/lib/alert-rules";
@@ -19,6 +20,7 @@ interface SettingsData {
   discordWebhookMasked?: string | null;
   discordAlertsEnabled?: boolean;
   smsAlertsEnabled?: boolean;
+  phoneNumber?: string | null;
   emailAlertsEnabled?: boolean;
   emailBriefEnabled?: boolean;
   watchlist?: string[];
@@ -35,14 +37,17 @@ export default function SettingsPage() {
   const [discordAlertsEnabled, setDiscordAlertsEnabled] = useState(false);
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
   const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [emailBriefEnabled, setEmailBriefEnabled] = useState(true);
   const [watchlistInput, setWatchlistInput] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [billing, setBilling] = useState<
     Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">
   >({});
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
@@ -59,6 +64,7 @@ export default function SettingsPage() {
           setDiscordWebhookMasked(data.discordWebhookMasked ?? null);
           setDiscordAlertsEnabled(data.discordAlertsEnabled || false);
           setSmsAlertsEnabled(data.smsAlertsEnabled || false);
+          setPhoneNumber(data.phoneNumber || "");
           setEmailAlertsEnabled(data.emailAlertsEnabled || false);
           setEmailBriefEnabled(data.emailBriefEnabled !== false);
           setWatchlistInput((data.watchlist ?? []).join(", "));
@@ -75,10 +81,16 @@ export default function SettingsPage() {
   }, [session]);
 
   const handleSave = async () => {
+    setSaveError("");
     const watchlist = watchlistInput
       .split(/[,\s]+/)
       .map((s) => s.trim().toUpperCase())
       .filter((s) => /^[A-Z]{1,5}$/.test(s));
+
+    if (smsAlertsEnabled && !phoneNumber.trim()) {
+      setSaveError("Add a phone number to enable SMS alerts.");
+      return;
+    }
 
     const payload: Record<string, unknown> = {
       discordAlertsEnabled,
@@ -88,6 +100,9 @@ export default function SettingsPage() {
       watchlist,
       alertRules,
     };
+    if (smsAlertsEnabled || phoneNumber.trim()) {
+      payload.phoneNumber = phoneNumber.trim();
+    }
     // Only send webhook when user typed a new one (or explicit clear via "clear")
     const trimmedWebhook = discordWebhook.trim();
     if (trimmedWebhook) {
@@ -104,9 +119,13 @@ export default function SettingsPage() {
       setDiscordWebhook("");
       setDiscordConfigured(Boolean(data.discordWebhookConfigured));
       setDiscordWebhookMasked(data.discordWebhookMasked ?? null);
+      if (data.phoneNumber != null) setPhoneNumber(data.phoneNumber);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setSaveError(data.error || "Could not save settings");
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleClearWebhook = async () => {
@@ -126,6 +145,13 @@ export default function SettingsPage() {
   const handleManageBilling = async () => {
     setBillingLoading(true);
     try {
+      if (cancelReason) {
+        await fetch("/api/billing/cancel-reason", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: cancelReason }),
+        }).catch(() => {});
+      }
       const res = await fetch("/api/stripe/portal", { method: "POST" });
       const data = await res.json();
       if (data.url) {
@@ -181,13 +207,22 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center gap-4">
-        <Link href="/dashboard" className="text-zinc-400 hover:text-zinc-100">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--background)]/85 backdrop-blur-xl px-4 sm:px-6 h-14 flex items-center gap-4">
+        <Link
+          href="/dashboard"
+          className="text-zinc-400 hover:text-zinc-100 transition-colors"
+          aria-label="Back to dashboard"
+        >
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <LogoMark className="w-7 h-7" />
-          <span className="font-bold">Settings</span>
+          <span
+            className="font-bold tracking-tight"
+            style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+          >
+            Settings
+          </span>
         </div>
       </header>
 
@@ -195,7 +230,7 @@ export default function SettingsPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Watchlist &amp; Alerts</h2>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-4">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--bg-graphite)]/60 p-5 space-y-4">
             <div>
               <label className="text-sm font-medium text-zinc-300 block mb-1.5">
                 Watchlist tickers
@@ -289,9 +324,36 @@ export default function SettingsPage() {
               />
               SMS alerts for watchlist news
             </label>
-            <p className="text-xs text-zinc-600">
-              SMS uses your account phone number. Requires Twilio env vars on the server.
-            </p>
+            {smsAlertsEnabled && (
+              <div className="pl-6 space-y-1">
+                <label htmlFor="settings-phone" className="text-xs text-zinc-500">
+                  Phone number (required for SMS)
+                </label>
+                <input
+                  id="settings-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="+1 555 000 0000"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="mk-input w-full"
+                />
+                <p className="text-xs text-zinc-600">
+                  Collected only when you enable SMS. Requires Twilio on the server.
+                </p>
+              </div>
+            )}
+            {!smsAlertsEnabled && (
+              <p className="text-xs text-zinc-600">
+                Phone number is requested only if you turn SMS on.
+              </p>
+            )}
+
+            {saveError && (
+              <p className="text-sm text-red-400" role="alert">
+                {saveError}
+              </p>
+            )}
 
             <Button onClick={handleSave} disabled={loading} className="w-full">
               <Save className="w-4 h-4" />
@@ -300,9 +362,18 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-zinc-300">Alert rules</h3>
+            <h3 className="text-sm font-semibold text-zinc-300">Alert Strategy Builder</h3>
             <p className="text-xs text-zinc-600">
-              Trader-grade filters: % move, RVOL, float cap, cooldowns, and news-only triggers.
+              No-code AND/OR rules, cooldowns, historical simulation, and versioned saves — never
+              changed silently.
+            </p>
+            <AlertStrategyBuilder />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-zinc-300">Legacy alert rules</h3>
+            <p className="text-xs text-zinc-600">
+              Used when you have no Strategy Builder rules yet. Prefer the builder above.
             </p>
             <AlertRulesPanel rules={alertRules} onChange={setAlertRules} />
           </div>
@@ -312,18 +383,18 @@ export default function SettingsPage() {
             <AlertHistoryPanel />
           </div>
 
-          <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+          <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--bg-graphite)]/60 p-4">
             <h3 className="text-sm font-semibold text-zinc-300">Chrome overlay</h3>
             <p className="text-xs text-zinc-500 leading-relaxed">
               Floating TrustTicker chip on TradingView charts. Load the unpacked extension from the
               repo folder <span className="font-mono text-zinc-400">extensions/trustticker-overlay</span>{" "}
               in <span className="font-mono text-zinc-400">chrome://extensions</span> (Developer mode
-              → Load unpacked).
+              â†’ Load unpacked).
             </p>
             <ol className="text-xs text-zinc-500 list-decimal pl-4 space-y-1">
-              <li>Open Chrome → Extensions → enable Developer mode</li>
-              <li>Load unpacked → select <span className="font-mono">extensions/trustticker-overlay</span></li>
-              <li>Open a TradingView chart — the TT chip appears for the ticker</li>
+              <li>Open Chrome â†’ Extensions â†’ enable Developer mode</li>
+              <li>Load unpacked â†’ select <span className="font-mono">extensions/trustticker-overlay</span></li>
+              <li>Open a TradingView chart â€” the TT chip appears for the ticker</li>
             </ol>
             <a
               href="https://www.trustticker.com"
@@ -338,7 +409,7 @@ export default function SettingsPage() {
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Billing</h2>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-4">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--bg-graphite)]/60 p-5 space-y-4">
             {isSubscribed ? (
               <>
                 <div className="text-sm space-y-1">
@@ -360,6 +431,21 @@ export default function SettingsPage() {
                   access until the end of your current billing period — you won&apos;t be charged
                   again.
                 </p>
+                <label className="block text-xs text-zinc-500">
+                  Optional — why are you canceling?
+                  <select
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200"
+                  >
+                    <option value="">Prefer not to say</option>
+                    <option value="too_expensive">Too expensive</option>
+                    <option value="not_using">Not using it enough</option>
+                    <option value="missing_features">Missing features</option>
+                    <option value="switched_tool">Switched to another tool</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
                 <Button
                   variant="secondary"
                   onClick={handleManageBilling}
@@ -388,7 +474,7 @@ export default function SettingsPage() {
                     className="w-full"
                   >
                     <CreditCard className="w-4 h-4" />
-                    {billingLoading ? "Opening portal…" : "Open billing portal"}
+                    {billingLoading ? "Opening portalâ€¦" : "Open billing portal"}
                   </Button>
                 )}
                 <Link href="/pricing">
@@ -425,7 +511,7 @@ export default function SettingsPage() {
                   className="w-full"
                 >
                   <CreditCard className="w-4 h-4" />
-                  {billingLoading ? "Opening portal…" : "Cancel subscription first"}
+                  {billingLoading ? "Opening portalâ€¦" : "Cancel subscription first"}
                 </Button>
               </div>
             ) : (
@@ -461,7 +547,7 @@ export default function SettingsPage() {
                   onClick={() => void handleDeleteAccount()}
                 >
                   <Trash2 className="w-4 h-4" />
-                  {deleteLoading ? "Deleting…" : "Delete my account"}
+                  {deleteLoading ? "Deletingâ€¦" : "Delete my account"}
                 </Button>
               </div>
             )}
@@ -472,11 +558,11 @@ export default function SettingsPage() {
           <Link href="/legal/privacy" className="hover:text-zinc-400">
             Privacy
           </Link>
-          {" · "}
+          {" Â· "}
           <Link href="/legal/cookies" className="hover:text-zinc-400">
             Cookies
           </Link>
-          {" · "}
+          {" Â· "}
           <Link href="/legal/terms" className="hover:text-zinc-400">
             Terms
           </Link>

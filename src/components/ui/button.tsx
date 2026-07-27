@@ -3,20 +3,23 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.97] hover:opacity-95",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default: "bg-emerald-500 text-black hover:bg-emerald-400 shadow-lg shadow-emerald-500/20",
-        secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 border border-zinc-700",
-        outline: "border border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-100",
-        ghost: "hover:bg-zinc-800 text-zinc-300",
+        default:
+          "bg-[var(--accent)] text-[#0b0a08] hover:bg-[var(--accent-bright)] shadow-[var(--shadow-accent)]",
+        secondary:
+          "bg-[var(--bg-elevated)] text-[var(--text-primary)] hover:bg-[var(--bg-panel-hover)] border border-[var(--border-medium)]",
+        outline:
+          "border border-[var(--border-strong)] bg-transparent hover:bg-white/[0.04] text-[var(--text-primary)]",
+        ghost: "hover:bg-white/[0.05] text-[var(--text-secondary)]",
         destructive: "bg-red-500 text-white hover:bg-red-600",
       },
       size: {
         default: "h-10 px-5 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-12 rounded-xl px-8 text-base",
+        lg: "h-12 rounded-md px-8 text-[15px]",
         icon: "h-10 w-10",
       },
     },

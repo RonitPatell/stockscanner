@@ -46,11 +46,11 @@ export default async function TodayPage() {
   });
 
   return (
-    <div className="marketing-shell min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+    <div className="marketing-shell min-h-screen">
+      <header className="sticky top-0 z-40 border-b mk-hairline bg-[rgba(9,8,7,0.72)] backdrop-blur-xl px-4 sm:px-6 h-14 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <LogoMark className="w-7 h-7" />
-          <span className="font-bold display-font">
+          <span className="font-semibold tracking-tight">
             Trust<span className="text-emerald-400">Ticker</span>
           </span>
         </Link>
@@ -67,52 +67,52 @@ export default async function TodayPage() {
                 </Button>
               </Link>
               <Link href="/pricing">
-                <Button size="sm">Start free trial</Button>
+                <Button size="sm" className="cta-glow">
+                  Start free trial
+                </Button>
               </Link>
             </>
           )}
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-12">
-        <p className="text-emerald-400 text-xs font-semibold uppercase tracking-[0.2em] mb-3">
-          Free for everyone
-        </p>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
+      <main className="max-w-3xl mx-auto px-4 py-14 sm:py-16">
+        <p className="mk-tick !text-emerald-400 mb-4">Free for everyone</p>
+        <h1 className="mk-display text-3xl sm:text-4xl mb-3">
           Today’s 3 setups &amp; 2 skips
         </h1>
-        <p className="text-zinc-400 mb-2">
+        <p className="text-[var(--text-secondary)] mb-2 max-w-xl">
           Public daily plan — what to focus on, what to avoid. Updated{" "}
-          <span className="text-zinc-300">{updated} ET</span>.
+          <span className="text-[var(--text-primary)]">{updated} ET</span>.
         </p>
         {latency.sampleSize > 0 && (
-          <p className="text-[11px] text-zinc-600 mb-8">
+          <p className="mk-tick mb-10">
             Live-race wire: {latency.under3mRate ?? "—"}% under 3m · n={latency.sampleSize}
           </p>
         )}
 
-        <section className="mb-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
-          <h2 className="text-sm font-semibold text-emerald-300 uppercase tracking-wide mb-4">
-            Setups
-          </h2>
+        <section className="mb-8 border mk-hairline bg-emerald-500/[0.04]">
+          <div className="px-5 py-3 border-b mk-hairline">
+            <h2 className="mk-tick !text-emerald-400">Setups</h2>
+          </div>
           {plan.setups.length === 0 ? (
-            <p className="text-sm text-zinc-500">No high-conviction setups in the current feed.</p>
+            <p className="text-sm text-zinc-500 px-5 py-4">No high-conviction setups in the current feed.</p>
           ) : (
-            <ul className="space-y-4">
+            <ul className="divide-y divide-[var(--hairline)]">
               {plan.setups.map((s) => (
-                <li key={s.symbol} className="border-b border-emerald-500/10 pb-3 last:border-0">
+                <li key={s.symbol} className="px-5 py-4 transition-colors hover:bg-emerald-500/[0.03]">
                   <div className="flex items-center gap-2 mb-1">
                     <Link
                       href={`/ticker/${s.symbol}`}
-                      className="font-mono font-bold text-lg hover:text-emerald-400"
+                      className="font-mono font-bold text-lg hover:text-emerald-400 tracking-tight"
                     >
                       {s.symbol}
                     </Link>
-                    <span className="text-[10px] uppercase text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] uppercase tracking-wide text-emerald-400/90 border border-emerald-500/25 px-1.5 py-0.5">
                       {s.bias}
                     </span>
                     {s.changePercent != null && (
-                      <span className="font-mono text-xs text-zinc-400">
+                      <span className="font-mono text-xs text-zinc-500">
                         {formatPercent(s.changePercent)}
                       </span>
                     )}
@@ -125,24 +125,24 @@ export default async function TodayPage() {
           )}
         </section>
 
-        <section className="mb-10 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
-          <h2 className="text-sm font-semibold text-amber-300 uppercase tracking-wide mb-4">
-            Skips
-          </h2>
+        <section className="mb-10 border mk-hairline bg-amber-500/[0.04]">
+          <div className="px-5 py-3 border-b mk-hairline">
+            <h2 className="mk-tick !text-amber-400/90">Skips</h2>
+          </div>
           {plan.skips.length === 0 ? (
-            <p className="text-sm text-zinc-500">No dilution / FOMO skips flagged right now.</p>
+            <p className="text-sm text-zinc-500 px-5 py-4">No dilution / FOMO skips flagged right now.</p>
           ) : (
-            <ul className="space-y-4">
+            <ul className="divide-y divide-[var(--hairline)]">
               {plan.skips.map((s) => (
-                <li key={s.symbol} className="border-b border-amber-500/10 pb-3 last:border-0">
+                <li key={s.symbol} className="px-5 py-4 transition-colors hover:bg-amber-500/[0.03]">
                   <div className="flex items-center gap-2 mb-1">
                     <Link
                       href={`/ticker/${s.symbol}`}
-                      className="font-mono font-bold text-lg hover:text-amber-300"
+                      className="font-mono font-bold text-lg hover:text-amber-300 tracking-tight"
                     >
                       {s.symbol}
                     </Link>
-                    <span className="text-[10px] uppercase text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-500/25 px-1.5 py-0.5">
                       skip
                     </span>
                   </div>
@@ -154,13 +154,13 @@ export default async function TodayPage() {
           )}
         </section>
 
-        <p className="text-center text-zinc-500 text-sm italic mb-8">{plan.mantra}</p>
+        <p className="text-center text-zinc-600 text-sm italic mb-10">{plan.mantra}</p>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-center">
+        <div className="mk-panel mk-corners p-6 sm:p-8 text-center">
           {isSubscribed ? (
             <>
-              <h3 className="text-xl font-bold mb-2">You’re on Pro</h3>
-              <p className="text-sm text-zinc-400 mb-4 max-w-md mx-auto">
+              <h3 className="text-xl font-bold display-font mb-2">You’re on Pro</h3>
+              <p className="text-sm text-zinc-500 mb-5 max-w-md mx-auto">
                 This page is free for everyone to share. Your live scanner, alerts, and Prop Desk are
                 on the dashboard.
               </p>
@@ -172,8 +172,8 @@ export default async function TodayPage() {
             </>
           ) : (
             <>
-              <h3 className="text-xl font-bold mb-2">Want this on your watchlist — live?</h3>
-              <p className="text-sm text-zinc-400 mb-4 max-w-md mx-auto">
+              <h3 className="text-xl font-bold display-font mb-2">Want this on your watchlist — live?</h3>
+              <p className="text-sm text-zinc-500 mb-5 max-w-md mx-auto">
                 Pro unlocks the live wire feed, alerts, dilution radar, Prop Desk, and a personal
                 session plan every morning. 7-day free trial.
               </p>

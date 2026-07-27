@@ -27,21 +27,41 @@ Break-even: **1 subscriber** covers everything.
 
 ## Production latency (required for real speed)
 
-Vercel crons alone poll the wire **once per minute**. For sub-minute desks:
+Vercel crons alone poll the wire **once per minute** and full ingest every **2 minutes**.
+For a resilient desk, run the **priority** worker on Railway / Fly / a VPS:
 
 ```bash
-# Always-on worker (Railway / Fly / a VPS) — ~2s wire cycles
+# Recommended — separate adaptive schedules per source tier
+npm run ingest:priority
+
+# Legacy blended loop (defaults: 15s wire / 90s full — NOT 2s)
 npm run ingest:worker
 
 # Optional: keep quotes fresher under load
 npm run quote:stream
-# or both:
-npm run realtime:worker
 ```
 
-Also set `BENZINGA_API_KEY` when you have it. The Trust Status bar shows **measured** wire cycle — not a hardcoded marketing number.
+See [docs/PRIORITY_INGEST.md](./docs/PRIORITY_INGEST.md) for locks, feature flags,
+SEC rate limits, and honest interval guidance.
+
+Also set `BENZINGA_API_KEY` when you have a licensed key. The Trust Status bar shows
+**measured** wire cycle — not a hardcoded marketing number.
 
 Without workers, expect ~60s wire cadence + publisher lag. Be honest with traders.
+Do **not** claim a two-second poll unless it is explicitly configured, sustainable,
+licensed, and measured.
+
+## Public evidence demo
+
+`/demo` is evidence-based (never fictional headlines/prices):
+
+| Env | Default | Notes |
+|-----|---------|-------|
+| `DEMO_MODE` | `DELAYED_REAL` | Or `HISTORICAL_REPLAY` / `CURATED_CASES` |
+| `DEMO_DELAY_MINUTES` | `30` | Delay for DELAYED_REAL (min 5) |
+
+Admin curates cases at `/admin/demo` (`ADMIN_EMAILS`). Only SEC / issuer wires are
+eligible for public redistribution; editorial text is redacted.
 
 ---
 

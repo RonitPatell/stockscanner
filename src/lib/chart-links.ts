@@ -1,6 +1,11 @@
 /** Deep links into charts / brokers for US equities */
-export function tradingViewUrl(symbol: string): string {
-  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(`NASDAQ:${symbol}`)}`;
+export function tradingViewUrl(symbol: string, exchange?: string | null): string {
+  const ex = (exchange || "NASDAQ").toUpperCase().replace(/\s+/g, "");
+  const mapped =
+    ex === "NYSE" || ex === "AMEX" || ex === "NASDAQ" || ex === "ARCA" || ex === "BATS"
+      ? ex
+      : "NASDAQ";
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(`${mapped}:${symbol.toUpperCase()}`)}`;
 }
 
 export function finvizUrl(symbol: string): string {

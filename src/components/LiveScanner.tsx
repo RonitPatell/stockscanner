@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CatalystCard } from "./CatalystCard";
+import { DecisionCardV3 } from "./decision-card/DecisionCardV3";
+import { isDecisionCardV3Enabled } from "@/lib/decision-card/flags";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -26,12 +28,27 @@ import {
   useLiveQuotes,
   useRegisterLiveSymbols,
 } from "./LiveQuoteProvider";
+import { useAudioSquawk } from "@/hooks/useAudioSquawk";
+import { SquawkControls } from "./squawk/SquawkControls";
+import {
+  createDeliveryHealth,
+  onDeliveryError,
+  onDeliveryEvent,
+  onDeliveryOpen,
+  selectFocusActive,
+  shouldWarnDisconnect,
+  type DeliveryHealth,
+} from "@/lib/focus-mode";
+import { showFocusCatalystNotification } from "@/lib/squawk";
 
 export type ScannerTab = "all" | "premarket" | "watchlist";
 
 const POLL_MS = 12_000;
 const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
 const ROW_ESTIMATE_PX = 72;
+const DECISION_CARD_V3 = isDecisionCardV3Enabled();
+const MUTE_KEY = "tt-muted-symbols-v1";
+const DC3_ROW_ESTIMATE_PX = 96;
 
 async function safeJsonFetch<T>(url: string): Promise<T | null> {
   try {
@@ -50,6 +67,7 @@ export function LiveScanner({
   initialCatalysts = [],
   initialWatchlist = [],
   initialFilters = null,
+  focusCompact = false,
 }: {
   embedded?: boolean;
   tab?: ScannerTab;
@@ -57,10 +75,17 @@ export function LiveScanner({
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
   initialFilters?: ScannerFilters | null;
+  /** Focus Mode: max 5 ranked catalysts + delivery warnings + squawk rail */
+  focusCompact?: boolean;
 }) {
   const [catalysts, setCatalysts] = useState<CatalystItem[]>(initialCatalysts);
-  const [loading, setLoading] = useState(initialCatalysts.length === 0);
+  const [loading, setLoading] = useState(initialCatalysts.length > 0 ? false : true);
   const [connected, setConnected] = useState(initialCatalysts.length > 0);
+  const [deliveryHealth, setDeliveryHealth] = useState<DeliveryHealth>(() =>
+    createDeliveryHealth({
+      state: initialCatalysts.length > 0 ? "connecting" : "connecting",
+    })
+  );
   const [lastUpdate, setLastUpdate] = useState<Date | null>(
     initialCatalysts.length > 0 ? new Date() : null
   );
@@ -70,12 +95,17 @@ export function LiveScanner({
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [moversOnly, setMoversOnly] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>(initialWatchlist);
+  const [mutedSymbols, setMutedSymbols] = useState<string[]>([]);
   const [focusIndex, setFocusIndex] = useState(0);
   const [hotkeyExpanded, setHotkeyExpanded] = useState(false);
+  const [showSquawk, setShowSquawk] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const prevSymbolsRef = useRef<Set<string>>(
     new Set(initialCatalysts.map((c) => c.symbol))
+  );
+  const prevIdsRef = useRef<Set<string>>(
+    new Set(initialCatalysts.map((c) => c.id))
   );
   const catalystsRef = useRef<CatalystItem[]>(initialCatalysts);
   const catalystFetchInFlightRef = useRef(false);
@@ -85,10 +115,19 @@ export function LiveScanner({
     focusIndex: 0,
     onTabChange: undefined as typeof onTabChange,
     toggleWatchlist: async (_symbol: string) => {},
+    toggleMute: (_symbol: string) => {},
+    openEvidence: (_c: CatalystItem) => {},
   });
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const liveQuotes = useLiveQuotes();
+
+  const watchSet = useMemo(
+    () => new Set(watchlist.map((s) => s.toUpperCase())),
+    [watchlist]
+  );
+
+  const squawk = useAudioSquawk({ watchlist: watchSet });
 
   useRegisterLiveSymbols(
     "live-scanner",
@@ -97,6 +136,15 @@ export function LiveScanner({
 
   useEffect(() => {
     setMounted(true);
+    try {
+      const raw = localStorage.getItem(MUTE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        if (Array.isArray(parsed)) setMutedSymbols(parsed.map((s) => s.toUpperCase()));
+      }
+    } catch {
+      /* ignore */
+    }
     const timer = setInterval(() => setNowMs(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, []);
@@ -163,12 +211,31 @@ export function LiveScanner({
         (c) => Date.now() - new Date(c.publishedAt).getTime() <= MAX_FEED_AGE_MS
       );
       if (fresh.length === 0 && catalystsRef.current.length > 0) return;
+
+      for (const c of fresh) {
+        const isNew = !prevIdsRef.current.has(c.id);
+        const prev = catalystsRef.current.find((x) => x.id === c.id);
+        const enriched =
+          Boolean(prev) &&
+          (prev!.changePercent !== c.changePercent ||
+            prev!.rVol !== c.rVol ||
+            prev!.judgmentV2?.grade !== c.judgmentV2?.grade);
+        if (isNew || enriched) {
+          squawk.pushCatalyst(c);
+          if (focusCompact && isNew) {
+            showFocusCatalystNotification(c);
+          }
+        }
+      }
+      prevIdsRef.current = new Set(fresh.map((c) => c.id));
+
       setCatalysts(fresh.map((c) => applyLiveQuote(c, liveQuotes)));
       setLastUpdate(new Date());
       setConnected(true);
+      setDeliveryHealth((h) => onDeliveryEvent(h, { at: Date.now() }));
       setLoading(false);
     },
-    [liveQuotes]
+    [liveQuotes, squawk.pushCatalyst, focusCompact]
   );
 
   const fetchCatalysts = useCallback(async () => {
@@ -239,31 +306,55 @@ export function LiveScanner({
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
+    let lastEventId =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem("tt-sse-last-event-id") ?? ""
+        : "";
 
     const connect = () => {
       if (stopped) return;
       eventSource?.close();
-      eventSource = new EventSource(`/api/catalysts/stream?moversOnly=${moversOnly}`);
+      const qs = new URLSearchParams({ moversOnly: String(moversOnly) });
+      if (lastEventId) qs.set("lastEventId", lastEventId);
+      eventSource = new EventSource(`/api/catalysts/stream?${qs.toString()}`);
 
       eventSource.onopen = () => {
         setConnected(true);
+        setDeliveryHealth((h) => onDeliveryOpen(h));
       };
 
       eventSource.onmessage = (event) => {
         try {
+          if (event.lastEventId) {
+            lastEventId = event.lastEventId;
+            try {
+              sessionStorage.setItem("tt-sse-last-event-id", lastEventId);
+            } catch {
+              /* ignore */
+            }
+          }
           const data = JSON.parse(event.data);
           if (data.type === "update" && Array.isArray(data.catalysts)) {
             applyFeedUpdate(data.catalysts as CatalystItem[]);
+            setDeliveryHealth((h) =>
+              onDeliveryEvent(h, {
+                at: Date.now(),
+                eventId: event.lastEventId || lastEventId,
+              })
+            );
+          } else if (data.type === "heartbeat" || data.type === "connected") {
+            setConnected(true);
+            setDeliveryHealth((h) => onDeliveryOpen(h));
           }
         } catch { /* ignore */ }
       };
 
       eventSource.onerror = () => {
         eventSource?.close();
-        if (catalystsRef.current.length > 0) {
-          setConnected(true);
-        }
+        setConnected(false);
+        setDeliveryHealth((h) => onDeliveryError(h));
         if (!stopped) {
+          // Polling REST remains recovery; SSE reconnects with Last-Event-ID
           reconnectTimer = setTimeout(connect, 3_000);
         }
       };
@@ -291,25 +382,42 @@ export function LiveScanner({
     });
   }, [watchlist]);
 
-  const watchSet = useMemo(() => new Set(watchlist), [watchlist]);
+  const toggleMute = useCallback((symbol: string) => {
+    const sym = symbol.toUpperCase();
+    setMutedSymbols((prev) => {
+      const next = prev.includes(sym) ? prev.filter((s) => s !== sym) : [...prev, sym];
+      try {
+        localStorage.setItem(MUTE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const mutedSet = useMemo(() => new Set(mutedSymbols), [mutedSymbols]);
 
   const filtered = useMemo(
-    () =>
-      catalysts
+    () => {
+      const base = catalysts
         .filter((c) => {
           if (nowMs - new Date(c.publishedAt).getTime() > MAX_FEED_AGE_MS) return false;
           if (tab === "premarket" && !c.isPremarket) return false;
           if (tab === "watchlist" && !watchSet.has(c.symbol.toUpperCase())) return false;
+          if (DECISION_CARD_V3 && mutedSet.has(c.symbol.toUpperCase())) return false;
           return applyFilters(c, filters);
         })
-        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
-    [catalysts, nowMs, tab, watchSet, filters]
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+      if (!focusCompact) return base;
+      return selectFocusActive(base, { watchlist: watchSet, nowMs });
+    },
+    [catalysts, nowMs, tab, watchSet, mutedSet, filters, focusCompact]
   );
 
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => ROW_ESTIMATE_PX,
+    estimateSize: () => (DECISION_CARD_V3 ? DC3_ROW_ESTIMATE_PX : ROW_ESTIMATE_PX),
     overscan: 8,
   });
 
@@ -319,8 +427,18 @@ export function LiveScanner({
       focusIndex,
       onTabChange,
       toggleWatchlist,
+      toggleMute,
+      openEvidence: (c: CatalystItem) => {
+        setHotkeyExpanded(true);
+        const el = document.querySelector(
+          `[data-focus-idx="${focusIndex}"]`
+        ) as HTMLElement | null;
+        el?.focus();
+        // Expand evidence: DecisionCard opens on Enter; force expand already set
+        void c;
+      },
     };
-  }, [filtered, focusIndex, onTabChange, toggleWatchlist]);
+  }, [filtered, focusIndex, onTabChange, toggleWatchlist, toggleMute]);
 
   useEffect(() => {
     setFocusIndex(0);
@@ -341,8 +459,14 @@ export function LiveScanner({
         return;
       }
 
-      const { filtered: rows, focusIndex: idx, onTabChange: setTab, toggleWatchlist: toggleWl } =
-        hotkeyRef.current;
+      const {
+        filtered: rows,
+        focusIndex: idx,
+        onTabChange: setTab,
+        toggleWatchlist: toggleWl,
+        toggleMute: muteFn,
+        openEvidence,
+      } = hotkeyRef.current;
 
       if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
@@ -396,6 +520,35 @@ export function LiveScanner({
       if ((e.key === "w" || e.key === "W") && rows[idx]) {
         e.preventDefault();
         void toggleWl(rows[idx].symbol);
+        return;
+      }
+      if (DECISION_CARD_V3 && rows[idx]) {
+        if (e.key === "o" || e.key === "O") {
+          e.preventDefault();
+          const url = rows[idx].sourceUrl;
+          if (url) window.open(url, "_blank", "noopener,noreferrer");
+          return;
+        }
+        if (e.key === "t" || e.key === "T") {
+          e.preventDefault();
+          window.open(
+            `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(`NASDAQ:${rows[idx].symbol}`)}`,
+            "_blank",
+            "noopener,noreferrer"
+          );
+          return;
+        }
+        if (e.key === "u" || e.key === "U") {
+          e.preventDefault();
+          muteFn(rows[idx].symbol);
+          return;
+        }
+        if (e.key === "e" || e.key === "E") {
+          e.preventDefault();
+          openEvidence(rows[idx]);
+          setHotkeyExpanded(true);
+          return;
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -474,11 +627,26 @@ export function LiveScanner({
               </span>
             )}
             <div className="flex items-center gap-1.5">
-              <span className={cn("w-2 h-2 rounded-full", connected ? "bg-[--accent] animate-pulse" : "bg-[--bear]")} />
-              <span className="text-[12px] font-medium text-[--text-tertiary]">
-                {connected ? "Live" : "Offline"}
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  connected ? "bg-[--accent] animate-pulse" : "bg-[--bear]"
+                )}
+                aria-hidden
+              />
+              <span
+                className="text-[12px] font-medium text-[--text-tertiary]"
+                role="status"
+                aria-live="polite"
+              >
+                {connected ? "Live" : "Disconnected"}
               </span>
             </div>
+            {focusCompact && (
+              <Badge variant="neutral" className="text-[10px]">
+                Focus · max 5
+              </Badge>
+            )}
             {embedded && lastUpdate && mounted && (
               <span className="text-[11px] text-[--text-muted] hidden sm:inline font-mono tabular-nums">
                 {filtered.length} items · {formatClockTime(lastUpdate)}
@@ -504,6 +672,16 @@ export function LiveScanner({
               <Star className="w-3 h-3" /> {watchlist.length} tickers
             </Badge>
           )}
+          <Button
+            variant={showSquawk || squawk.settings.enabled ? "default" : "secondary"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setShowSquawk((v) => !v)}
+            aria-expanded={showSquawk}
+            aria-controls="tt-squawk-panel"
+          >
+            Squawk
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -547,6 +725,42 @@ export function LiveScanner({
           </Button>
         </div>
       </div>
+
+      {shouldWarnDisconnect(deliveryHealth) && deliveryHealth.warning && (
+        <div
+          className="mx-3 sm:mx-4 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-[11px] text-red-100"
+          role="alert"
+        >
+          {deliveryHealth.warning}
+          {deliveryHealth.lastEventAt != null && (
+            <span className="block mt-0.5 text-red-200/70 font-mono">
+              Last received event:{" "}
+              {new Date(deliveryHealth.lastEventAt).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
+
+      {(showSquawk || squawk.settings.enabled) && (
+        <div id="tt-squawk-panel" className="mx-3 sm:mx-4">
+          <SquawkControls
+            settings={squawk.settings}
+            onChange={squawk.setSettings}
+            speechSupported={squawk.speechSupported}
+            lastScript={squawk.lastSpoken?.script ?? null}
+            onReplay={squawk.replay}
+            onMute={squawk.mute}
+            onUnmute={squawk.unmute}
+          />
+        </div>
+      )}
+
+      {focusCompact && (
+        <p className="mx-3 sm:mx-4 text-[10px] text-[--text-muted]" data-guide="focus-mode-rail">
+          Focus Mode: top 5 by watchlist match, freshness & materiality (not predicted
+          profit). Hotkeys O source · T TradingView · W watchlist · U mute · E evidence.
+        </p>
+      )}
 
       {showFilters && (
         <div className="rounded-[var(--radius-inner)] border border-[--border-medium] bg-[--bg-elevated] p-3 sm:p-4 space-y-3 mx-3 sm:mx-4">
@@ -708,15 +922,29 @@ export function LiveScanner({
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    <CatalystCard
-                      catalyst={catalyst}
-                      isNew={newSymbols.has(catalyst.symbol)}
-                      inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
-                      onWatchlistToggle={toggleWatchlist}
-                      highlighted={idx === focusIndex}
-                      forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
-                      nowMs={nowMs}
-                    />
+                    {DECISION_CARD_V3 ? (
+                      <DecisionCardV3
+                        catalyst={catalyst}
+                        density={focusCompact ? "compact" : "standard"}
+                        inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
+                        muted={mutedSet.has(catalyst.symbol.toUpperCase())}
+                        onWatchlistToggle={toggleWatchlist}
+                        onMuteToggle={toggleMute}
+                        highlighted={idx === focusIndex}
+                        forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
+                        nowMs={nowMs}
+                      />
+                    ) : (
+                      <CatalystCard
+                        catalyst={catalyst}
+                        isNew={newSymbols.has(catalyst.symbol)}
+                        inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
+                        onWatchlistToggle={toggleWatchlist}
+                        highlighted={idx === focusIndex}
+                        forceExpanded={idx === focusIndex ? hotkeyExpanded : false}
+                        nowMs={nowMs}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -727,7 +955,8 @@ export function LiveScanner({
 
       {embedded && (
         <p className="scanner-hotkeys text-[9px] text-zinc-600 text-center shrink-0 px-2 pb-1">
-          j/k navigate · Enter expand · w watchlist · 1/2/3 tabs · / search · m movers
+          j/k navigate · Enter expand · w watchlist
+          {DECISION_CARD_V3 ? " · o source · t TradingView · u mute" : ""} · 1/2/3 tabs · / search · m movers
         </p>
       )}
     </div>

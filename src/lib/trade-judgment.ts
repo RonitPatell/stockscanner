@@ -1,5 +1,7 @@
 import type { CatalystItem } from "@/types";
 import { isDilutionCatalyst } from "./action-playbook";
+import { buildJudgmentV2, judgmentV2ToTradeJudgment } from "./judgment/build-v2";
+import { isJudgmentV2Enabled, type JudgmentV2 } from "./judgment/types";
 
 /** Trader-facing grade — the only three answers that matter. */
 export type TradeGrade = "go" | "watch" | "skip";
@@ -29,6 +31,9 @@ export interface TradeJudgment {
   confidence: number;
   /** Suggested next step */
   nextStep: string;
+  /** Present when Judgment V2 produced this grade */
+  judgmentVersion?: string;
+  judgmentV2?: JudgmentV2;
 }
 
 const BULL_TYPES = new Set([
@@ -50,8 +55,49 @@ function floatM(c: Pick<CatalystItem, "floatShares">): number | null {
 /**
  * Grade a catalyst using BOTH the news story and how the company is trading.
  * Deterministic, explainable — not a black-box AI signal.
+ *
+ * When JUDGMENT_V2_ENABLED is on, returns a V1-compatible shape backed by Judgment V2.
  */
 export function buildTradeJudgment(
+  c: Pick<
+    CatalystItem,
+    | "symbol"
+    | "headline"
+    | "catalystType"
+    | "sentimentScore"
+    | "changePercent"
+    | "rVol"
+    | "floatShares"
+    | "urgencyScore"
+    | "historicalAvgMove"
+    | "historicalSampleSize"
+    | "setupTags"
+    | "aiSummary"
+    | "verifiedConfidence"
+    | "sourceTier"
+    | "source"
+    | "sourceUrl"
+    | "matchMethod"
+    | "publishedAt"
+    | "keyPoints"
+    | "price"
+    | "volume"
+    | "avgVolume"
+  >
+): TradeJudgment {
+  if (isJudgmentV2Enabled()) {
+    const persisted =
+      (c as CatalystItem & { judgmentV2?: JudgmentV2 }).judgmentV2 ?? null;
+    const v2 =
+      persisted?.version?.startsWith("judgment-v2")
+        ? persisted
+        : buildJudgmentV2(c, { previous: persisted });
+    return judgmentV2ToTradeJudgment(v2);
+  }
+  return buildTradeJudgmentV1(c);
+}
+
+function buildTradeJudgmentV1(
   c: Pick<
     CatalystItem,
     | "symbol"

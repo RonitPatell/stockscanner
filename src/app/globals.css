@@ -1,49 +1,66 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-/* ═══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    DESIGN TOKENS
-═══════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 :root {
-  /* Background */
-  --bg: #04060a;
-  --bg-panel: #080d15;
-  --bg-panel-hover: #0b121d;
-  --bg-elevated: #0d1521;
+  /* â”€â”€ NIGHT DESK â”€â”€
+     Warm-ink canvas + cool-graphite panels. The tension between the
+     warm page and the neutral steel surfaces is the brand. */
+  --bg: #0b0a08;
+  --bg-panel: #131313;
+  --bg-panel-hover: #181818;
+  --bg-elevated: #1b1b1a;
+  --bg-ink: #090807;
+  --bg-graphite: #101112;
 
-  /* Borders */
-  --border: rgba(148, 178, 211, 0.1);
-  --border-medium: rgba(148, 178, 211, 0.17);
-  --border-strong: rgba(148, 178, 211, 0.28);
+  /* Borders â€” warm graphite hairlines */
+  --border: rgba(214, 200, 174, 0.1);
+  --border-medium: rgba(214, 200, 174, 0.16);
+  --border-strong: rgba(214, 200, 174, 0.28);
+  --hairline: rgba(214, 200, 174, 0.085);
 
   /* Text */
-  --text-primary: #eef4fb;
-  --text-secondary: #91a0b3;
-  --text-tertiary: #59687a;
-  --text-muted: #394657;
+  --text-primary: #f2efe9;
+  --text-secondary: #a49d90;
+  --text-tertiary: #6f6a5f;
+  --text-muted: #4a463e;
 
-  /* Accent - emerald */
-  --accent: #10b981;
-  --accent-bright: #34d399;
-  --accent-dim: #059669;
-  --accent-glow: rgba(16, 185, 129, 0.18);
-  --accent-subtle: rgba(16, 185, 129, 0.08);
+  /* Single voltage accent â€” emerald, reserved for actions + live state */
+  --accent: #16c784;
+  --accent-bright: #3ddc97;
+  --accent-dim: #0f9f68;
+  --accent-glow: rgba(22, 199, 132, 0.2);
+  --accent-subtle: rgba(22, 199, 132, 0.08);
 
-  /* Semantic */
-  --bull: #22c55e;
-  --bull-dim: rgba(34, 197, 94, 0.15);
-  --bear: #f87171;
-  --bear-dim: rgba(248, 113, 113, 0.12);
-  --warn: #f59e0b;
-  --warn-dim: rgba(245, 158, 11, 0.12);
-  --info: #38bdf8;
-  --cyan: #22d3ee;
-  --cyan-dim: rgba(34, 211, 238, 0.1);
+  /* Semantic market colors */
+  --bull: #16c784;
+  --bull-dim: rgba(22, 199, 132, 0.14);
+  --bear: #f07167;
+  --bear-dim: rgba(240, 113, 103, 0.12);
+  --warn: #e8b84a;
+  --warn-dim: rgba(232, 184, 74, 0.12);
+  --info: #6bb3ff;
+  --cyan: #5ec8d4;
+  --cyan-dim: rgba(94, 200, 212, 0.1);
 
-  /* Panel geometry */
-  --radius-panel: 8px;
-  --radius-inner: 6px;
+  /* Tighter radii = more institutional (Brex / Bloomberg marketing) */
+  --radius-panel: 6px;
+  --radius-inner: 4px;
   --radius-pill: 999px;
   --gap: 10px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snap: cubic-bezier(0.3, 0.9, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-med: 320ms;
+  --dur-slow: 700ms;
+
+  /* Elevation */
+  --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 28px 80px rgba(0, 0, 0, 0.55);
+  --shadow-accent: 0 8px 36px rgba(22, 199, 132, 0.28);
 
   /* Tailwind compat aliases */
   --background: var(--bg);
@@ -53,14 +70,14 @@
   --accent-color: var(--accent);
 }
 
-/* ═══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    BASE
-═══════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
 * {
@@ -77,32 +94,41 @@ html { font-size: 14px; }
 body {
   background: var(--bg);
   color: var(--text-primary);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11" on, "ss01" on;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
 }
 
-::selection { background: rgba(16, 185, 129, 0.28); }
+/* Tabular figures for market data */
+.font-mono,
+[data-mono],
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
 
-/* ═══════════════════════════════════════════════════════
+::selection { background: rgba(22, 199, 132, 0.28); }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    DESK SURFACE SYSTEM
    The "desk-*" classes form the product UI vocabulary.
-═══════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ── Shell (full desk wrapper) ─────────────────────── */
+/* â”€â”€ Shell (full desk wrapper) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-shell {
   background-color: var(--bg);
   background-image:
-    linear-gradient(rgba(34, 211, 238, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.018) 1px, transparent 1px);
+    linear-gradient(rgba(22, 199, 132, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 199, 132, 0.016) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
-/* ── Panel card ────────────────────────────────────── */
+/* â”€â”€ Panel card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-panel {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(20, 31, 46, 0.42), transparent 72px),
+    linear-gradient(180deg, rgba(36, 38, 41, 0.4), transparent 72px),
     var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
@@ -115,13 +141,13 @@ body {
 }
 
 .desk-panel:has(:hover) {
-  border-color: rgba(34, 211, 238, 0.2);
+  border-color: var(--border-strong);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.045),
     0 14px 42px rgba(0,0,0,0.38);
 }
 
-/* ── Panel header ──────────────────────────────────── */
+/* â”€â”€ Panel header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-panel-header {
   display: flex;
   align-items: center;
@@ -129,10 +155,10 @@ body {
   min-height: 42px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
-  background: rgba(12, 19, 30, 0.72);
+  background: rgba(17, 18, 20, 0.72);
 }
 
-/* ── Section label (small caps) ────────────────────── */
+/* â”€â”€ Section label (small caps) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-label {
   font-size: 10px;
   font-weight: 700;
@@ -141,7 +167,7 @@ body {
   color: var(--text-tertiary);
 }
 
-/* ── Command / top strip ───────────────────────────── */
+/* â”€â”€ Command / top strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-command {
   position: relative;
   display: flex;
@@ -169,18 +195,16 @@ body {
   box-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
 }
 
+/* Calm desk: subtle static sheen instead of a perpetual scan sweep */
 .desk-command::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 90px;
+  inset: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.05), transparent);
-  animation: desk-scan 8s linear infinite;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 55%);
 }
 
-/* ── Mode segmented control ────────────────────────── */
+/* â”€â”€ Mode segmented control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-seg {
   display: inline-flex;
   padding: 3px;
@@ -213,7 +237,7 @@ body {
   background: rgba(255,255,255,0.05);
 }
 
-/* ── Feed tabs ─────────────────────────────────────── */
+/* â”€â”€ Feed tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-feed-tab {
   display: inline-flex;
   align-items: center;
@@ -238,7 +262,7 @@ body {
   background: rgba(255,255,255,0.04);
 }
 
-/* ── Status pill ───────────────────────────────────── */
+/* â”€â”€ Status pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-pill {
   display: inline-flex;
   align-items: center;
@@ -252,7 +276,7 @@ body {
   color: var(--text-secondary);
 }
 
-/* ── Table / list rows ─────────────────────────────── */
+/* â”€â”€ Table / list rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-row {
   display: flex;
   align-items: center;
@@ -265,7 +289,7 @@ body {
 .desk-row:hover { background: rgba(255,255,255,0.025); }
 .desk-row:last-child { border-bottom: none; }
 
-/* ── Judgment tools rail ───────────────────────────── */
+/* â”€â”€ Judgment tools rail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-tools-rail {
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
@@ -274,7 +298,7 @@ body {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
 }
 
-/* ── Accent button ─────────────────────────────────── */
+/* â”€â”€ Accent button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-btn-accent {
   display: inline-flex;
   align-items: center;
@@ -314,7 +338,7 @@ body {
   background: rgba(255,255,255,0.04);
 }
 
-/* ── Responsive desk composition ──────────────────── */
+/* â”€â”€ Responsive desk composition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-main-grid,
 .desk-sidebar,
 .desk-feed-panel,
@@ -357,11 +381,6 @@ body {
 
 .scanner-list {
   overflow-x: hidden;
-}
-
-@keyframes desk-scan {
-  from { left: -120px; }
-  to { left: calc(100% + 120px); }
 }
 
 @media (min-width: 1536px) {
@@ -562,18 +581,138 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   MARKETING SURFACE (landing page vocabulary)
+   NIGHT DESK — MARKETING SURFACE
+   Public pages read like a prop firm's internal terminal:
+   warm-ink canvas, graphite panels, hairline rules, mono
+   micro-labels, and exactly one voltage color (emerald)
+   reserved for actions and live state.
 ═══════════════════════════════════════════════════════ */
 .marketing-shell {
-  font-family: var(--font-marketing), var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  background: var(--bg-ink);
+  color: var(--text-primary);
 }
 
 .marketing-shell h1,
 .marketing-shell h2,
 .marketing-shell h3,
 .marketing-shell .display-font {
-  font-family: var(--font-display), var(--font-marketing), system-ui, sans-serif;
-  letter-spacing: 0;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+/* Big display sizes get tighter tracking — hierarchy via weight/tracking */
+.mk-display {
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* ── Mono micro-label: the wire-authenticity voice ────── */
+.mk-tick {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Ledger section head: index number + rule + label ── */
+.mk-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.mk-eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: var(--border-strong);
+}
+.mk-eyebrow [data-index] {
+  color: var(--accent);
+}
+
+.mk-section-rule {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-top: 1px solid var(--border-medium);
+  padding-top: 16px;
+}
+
+/* ── Registration ticks (TL + BR only — asymmetric print-proof mark) ── */
+.mk-corners {
+  position: relative;
+}
+.mk-corners::before,
+.mk-corners::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+.mk-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid var(--border-strong);
+  border-left: 1px solid var(--border-strong);
+}
+.mk-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border-strong);
+}
+
+/* ── Graphite marketing panel — square, hairline, quiet ── */
+.mk-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 64px),
+    var(--bg-graphite);
+  border: 1px solid var(--border);
+}
+
+/* Hairline rules between sections */
+.mk-hairline { border-color: var(--hairline); }
+
+/* Big mono stat figure */
+.mk-stat {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Marketing input (auth forms) */
+.mk-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: rgba(16, 17, 18, 0.85);
+  border: 1px solid var(--border-medium);
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.mk-input::placeholder { color: var(--text-muted); }
+.mk-input:hover { border-color: var(--border-strong); }
+.mk-input:focus {
+  outline: none;
+  border-color: rgba(22, 199, 132, 0.55);
+  box-shadow: 0 0 0 3px rgba(22, 199, 132, 0.12);
+  background: rgba(16, 17, 18, 1);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -587,11 +726,6 @@ body {
   from { transform: translateY(6px); opacity: 0; }
   to   { transform: translateY(0);   opacity: 1; }
 }
-@keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-  70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
-  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-}
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
@@ -603,117 +737,122 @@ body {
 
 .animate-in   { animation: fade-in 0.25s ease-out, slide-up-sm 0.25s ease-out; }
 .new-row      { animation: new-row-flash 2s ease-out forwards; }
+.animate-marquee { animation: marquee 42s linear infinite; }
 
-.animate-marquee { animation: marquee 35s linear infinite; }
-
-/* Grid bg used on landing */
+/* Fine engineering grid — barely-there structure on the canvas */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
-  background-size: 64px 64px;
+    linear-gradient(rgba(214, 200, 174, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(214, 200, 174, 0.028) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
 .glow-emerald { box-shadow: 0 0 80px rgba(16, 185, 129, 0.12); }
 
+/* Compat: emerald text emphasis (used sparingly, never for CTAs' job) */
 .gradient-text {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 40%, #6ee7b7 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-style: normal;
+  font-weight: inherit;
+  color: var(--accent-bright);
+  background: none;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
 }
 
 /* ═══════════════════════════════════════════════════════
-   LANDING ANIMATIONS
+   LANDING MOTION — exactly 3 intentional moves:
+   1. hero entrance stagger   (CSS, once)
+   2. scroll reveal           (IO + transform/opacity, once per section)
+   3. wire plane row cycle    (the product being alive)
 ═══════════════════════════════════════════════════════ */
 @keyframes landing-fade-up-keyframes {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-fade-up { animation: landing-fade-up-keyframes 0.8s var(--ease-out) both; }
+.landing-delay-1 { animation-delay: 0.07s; }
+.landing-delay-2 { animation-delay: 0.14s; }
+.landing-delay-3 { animation-delay: 0.22s; }
+.landing-delay-4 { animation-delay: 0.32s; }
+.landing-delay-5 { animation-delay: 0.46s; }
+
+.reveal-base {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.65s var(--ease-out), transform 0.65s var(--ease-out);
+}
+.reveal-in { opacity: 1; transform: none; }
+
+/* Static ambient light — no drift, no pulse */
+.mk-glow-top {
+  background: radial-gradient(ellipse 85% 55% at 50% -12%, rgba(22, 199, 132, 0.09), transparent 64%);
+}
+.mk-glow-plane {
+  background: radial-gradient(ellipse 60% 70% at 50% 100%, rgba(22, 199, 132, 0.08), transparent 70%);
+}
+
+/* ── Wire plane: the product IS the hero visual ──────── */
+.wire-plane {
+  border-top: 1px solid var(--hairline);
+  background:
+    linear-gradient(180deg, rgba(16, 17, 18, 0.4), rgba(7, 7, 6, 0.95)),
+    var(--bg-ink);
+}
+.wire-plane-fade {
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 64%, transparent 100%);
+  mask-image: linear-gradient(180deg, black 0%, black 64%, transparent 100%);
+}
+
+@keyframes wire-row-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wire-row-in { animation: wire-row-in 0.5s var(--ease-out) both; }
+
+@keyframes wire-progress { from { width: 0%; } to { width: 100%; } }
+.wire-progress { animation: wire-progress 3.4s linear; }
+
+/* ── Voltage CTA — static presence, sharpens on hover ── */
+.cta-glow {
+  box-shadow:
+    0 0 0 1px rgba(22, 199, 132, 0.28),
+    0 6px 28px rgba(22, 199, 132, 0.22);
+  transition: box-shadow var(--dur-med) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.cta-glow:hover {
+  box-shadow:
+    0 0 0 1px rgba(22, 199, 132, 0.45),
+    0 10px 40px rgba(22, 199, 132, 0.36);
+}
+
+@keyframes price-rise {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.landing-fade-up { animation: landing-fade-up-keyframes 0.85s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.landing-delay-1 { animation-delay: 0.08s; }
-.landing-delay-2 { animation-delay: 0.16s; }
-.landing-delay-3 { animation-delay: 0.26s; }
-.landing-delay-4 { animation-delay: 0.38s; }
-.landing-delay-5 { animation-delay: 0.52s; }
+.price-rise { animation: price-rise 0.7s var(--ease-out) both; }
 
-.reveal-base {
-  opacity: 0; transform: translateY(28px); filter: blur(6px);
-  transition: opacity 0.8s cubic-bezier(0.22,1,0.36,1), transform 0.8s cubic-bezier(0.22,1,0.36,1), filter 0.8s cubic-bezier(0.22,1,0.36,1);
+/* Hover lift — transform/shadow only, never layout */
+.mk-lift {
+  transition: transform var(--dur-med) var(--ease-out), border-color var(--dur-med) ease, box-shadow var(--dur-med) ease;
 }
-.reveal-in { opacity: 1; transform: translateY(0); filter: blur(0); }
-
-@keyframes hero-aurora {
-  0%, 100% { transform: translate(-8%,-4%) scale(1); opacity: 0.55; }
-  50%       { transform: translate(6%,6%) scale(1.12); opacity: 0.85; }
+.mk-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-raised);
 }
-@keyframes hero-aurora-2 {
-  0%, 100% { transform: translate(10%,0%) scale(1.05); opacity: 0.35; }
-  50%       { transform: translate(-12%,8%) scale(1.15); opacity: 0.6; }
-}
-.hero-aurora   { animation: hero-aurora 14s ease-in-out infinite; }
-.hero-aurora-2 { animation: hero-aurora-2 18s ease-in-out infinite; }
-
-@keyframes hero-scanline {
-  0%   { transform: translateY(-100%); opacity: 0; }
-  10%  { opacity: 0.35; }
-  100% { transform: translateY(100vh); opacity: 0; }
-}
-.hero-scanline { animation: hero-scanline 7s linear infinite; }
-
-@keyframes hero-float {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-10px); }
-}
-.hero-stage-float { animation: hero-float 7s ease-in-out infinite; }
-
-@keyframes hero-pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.35); }
-  70%  { box-shadow: 0 0 0 18px rgba(16,185,129,0); }
-  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-}
-.hero-stage-pulse { animation: hero-pulse-ring 0.7s ease-out; }
-
-@keyframes hero-scan-bar { from { width: 0%; } to { width: 100%; } }
-.hero-scan-bar { animation: hero-scan-bar 3s linear; }
-
-@keyframes hero-row-in {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.hero-row-in { animation: hero-row-in 0.45s ease-out both; }
-
-@keyframes shimmer-sweep {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.shimmer-text {
-  background: linear-gradient(110deg, #34d399 0%, #ecfdf5 25%, #34d399 50%, #6ee7b7 75%, #34d399 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  animation: shimmer-sweep 4.5s linear infinite;
-}
-
-@keyframes orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.orbit-ring { animation: orbit-spin 40s linear infinite; }
-
-@keyframes cta-glow {
-  0%, 100% { box-shadow: 0 0 24px rgba(16,185,129,0.25); }
-  50%       { box-shadow: 0 0 48px rgba(16,185,129,0.45); }
-}
-.cta-glow { animation: cta-glow 3s ease-in-out infinite; }
-
-@keyframes price-rise {
-  from { opacity: 0; transform: translateY(24px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.price-rise { animation: price-rise 0.9s cubic-bezier(0.22,1,0.36,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-fade-up,.hero-aurora,.hero-aurora-2,.hero-scanline,
-  .hero-stage-float,.hero-stage-pulse,.hero-scan-bar,.hero-row-in,
-  .shimmer-text,.orbit-ring,.cta-glow,.price-rise,.animate-marquee,
-  .new-row { animation: none !important; }
-  .reveal-base { opacity: 1; transform: none; filter: none; }
-  .shimmer-text { -webkit-text-fill-color: #34d399; color: #34d399; }
+  .landing-fade-up,.wire-row-in,.wire-progress,.price-rise,
+  .animate-marquee,.new-row,.animate-in { animation: none !important; }
+  .reveal-base { opacity: 1; transform: none; }
+  .mk-lift, .mk-lift:hover { transform: none; }
+  * { scroll-behavior: auto !important; }
 }
+
+/* FAQ disclosure — hide default marker; keep keyboard focus visible */
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+

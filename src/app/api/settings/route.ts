@@ -152,6 +152,19 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      phoneNumber: true,
+      smsAlertsEnabled: true,
+      hasUsedTrial: true,
+      email: true,
+    },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let phoneNumber: string | null | undefined;
   if (body.phoneNumber !== undefined) {
     const phone = normalizePhone(String(body.phoneNumber ?? ""));
@@ -171,6 +184,20 @@ export async function PATCH(req: NextRequest) {
       }
     }
     phoneNumber = phone || null;
+  }
+
+  const nextSms =
+    body.smsAlertsEnabled !== undefined
+      ? Boolean(body.smsAlertsEnabled)
+      : existing.smsAlertsEnabled;
+  const nextPhone =
+    phoneNumber !== undefined ? phoneNumber : existing.phoneNumber;
+
+  if (nextSms && !nextPhone) {
+    return NextResponse.json(
+      { error: "Add a phone number to enable SMS alerts." },
+      { status: 400 }
+    );
   }
 
   const user = await prisma.user.update({
@@ -206,6 +233,20 @@ export async function PATCH(req: NextRequest) {
     },
   });
 
+  // If phone is added after a trial was used, claim the hash for abuse prevention
+  if (
+    phoneNumber &&
+    existing.hasUsedTrial &&
+    phoneNumber !== existing.phoneNumber
+  ) {
+    const { recordTrialClaims } = await import("@/lib/trial-claims");
+    await recordTrialClaims({ email: existing.email, phoneNumber });
+  }
+
+  if (watchlist !== undefined) {
+    await syncCoverageFromWatchlist(user.watchlist);
+  }
+
   return NextResponse.json({
     discordWebhookConfigured: Boolean(user.discordWebhook),
     discordWebhookMasked: redactWebhook(user.discordWebhook),
@@ -218,4 +259,14 @@ export async function PATCH(req: NextRequest) {
     scannerFilters: user.scannerFilters,
     alertRules: user.alertRules,
   });
+}
+
+async function syncCoverageFromWatchlist(symbols: string[] | undefined) {
+  if (!symbols?.length) return;
+  try {
+    const { syncWatchlistCoverage } = await import("@/lib/coverage/coverage-service");
+    await syncWatchlistCoverage(symbols);
+  } catch {
+    /* non-fatal */
+  }
 }

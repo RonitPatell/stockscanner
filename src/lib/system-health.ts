@@ -15,6 +15,9 @@ export interface SystemHealthSnapshot {
   feedUpdatedAt: string | null;
   feedItemCount: number;
   feedSource: "redis" | "memory" | "none";
+  /** Browser EventSource handshake counters (reliability). */
+  browserStreamSuccesses: number;
+  browserStreamFailures: number;
 }
 
 export type FeedHealthStatus = "live" | "ingesting" | "stale" | "starting";
@@ -77,6 +80,8 @@ const globalHealth = globalThis as typeof globalThis & {
     feedSource: "redis" | "memory" | "none";
     /** Observed gaps between successful wire finishes (ms). */
     wireIntervalsMs: number[];
+    browserStreamSuccesses: number;
+    browserStreamFailures: number;
   };
 };
 
@@ -96,9 +101,14 @@ function store() {
       feedItemCount: 0,
       feedSource: "none",
       wireIntervalsMs: [],
+      browserStreamSuccesses: 0,
+      browserStreamFailures: 0,
     };
   }
-  return globalHealth.__trustHealth;
+  const s = globalHealth.__trustHealth;
+  if (s.browserStreamSuccesses == null) s.browserStreamSuccesses = 0;
+  if (s.browserStreamFailures == null) s.browserStreamFailures = 0;
+  return s;
 }
 
 /** Median of observed wire finish intervals, else fallback (Vercel cron ≈ 60s). */
@@ -195,7 +205,16 @@ export function getSystemHealth(scaleMode: boolean): SystemHealthSnapshot {
     feedUpdatedAt: s.feedUpdatedAt,
     feedItemCount: s.feedItemCount,
     feedSource: s.feedSource,
+    browserStreamSuccesses: s.browserStreamSuccesses,
+    browserStreamFailures: s.browserStreamFailures,
   };
+}
+
+/** Record browser EventSource open/fail for reliability indicators. */
+export function recordBrowserStreamHandshake(ok: boolean): void {
+  const s = store();
+  if (ok) s.browserStreamSuccesses += 1;
+  else s.browserStreamFailures += 1;
 }
 
 export function isPipelineInFlight(): boolean {

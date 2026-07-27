@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 12;
+export const PLATFORM_GUIDE_VERSION = 23;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -31,6 +31,12 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     tip: "Tap any ? icon if something is unclear · Esc exits the guide",
   },
   {
+    id: "setup-checklist",
+    target: "onboarding-checklist",
+    title: "Setup checklist",
+    body: "After signup (or if you skip the wizard), this checklist tracks focus, watchlist, alerts, and activation — five symbols, one channel, three expands, one test alert.",
+  },
+  {
     id: "status",
     target: "trust-status",
     title: "Live status",
@@ -40,8 +46,34 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "news-feed",
     target: "news-feed",
     title: "News feed",
-    body: "Each row is graded from the headline and how the company is trading (move %, volume, float, history). Expand for the checklist and plain-English reasons.",
+    body: "Each row is graded from the headline and how the company is trading (move %, volume, float, history). Expand for the checklist and plain-English reasons. Coverage badges show why a ticker is monitored (watchlist, curated, gainer, SEC, etc.) — not a claim of full-market tape.",
     tip: "Hotkeys: j/k · Enter · w watchlist · / search · 1/2/3 tabs",
+  },
+  {
+    id: "judgment-v2",
+    target: "judgment-v2",
+    title: "Judgment audit (V2)",
+    body: "When enabled, expand a catalyst to see verified facts vs automated interpretation, missing data, strength/direction/timing/tradeability, score contributions, and feedback buttons. Not a personalized recommendation — always open the source link.",
+  },
+  {
+    id: "focus-mode",
+    target: "focus-mode-rail",
+    title: "Focus Mode + Audio Squawk",
+    body: "Focus Mode keeps at most five active catalysts ranked by watchlist match, freshness, and materiality — never predicted profit. Squawk reads a two-sentence structured summary (symbol, fact, source quality, move, RVol, tradeability, top risk). Mute, replay, quiet hours, and watchlist/risk-only filters are in Squawk controls. Live disconnect shows a clear warning.",
+    tip: "Hotkeys: O source · T TradingView · W watchlist · U mute · E evidence",
+  },
+  {
+    id: "historical-analogues",
+    target: "historical-analogues",
+    title: "Historical analogues",
+    body: "On the Decision Card, load comparable past catalysts matched on category, session, float/liquidity buckets, and more. Shows median/percentile reactions and sample size — descriptive evidence only, never a target or win-rate promise. Tighten or loosen criteria to see how n changes.",
+    tip: "Small samples are labelled on purpose",
+  },
+  {
+    id: "coverage-badge",
+    target: "coverage-badge",
+    title: "Coverage badge",
+    body: "Shows why a symbol is in the live universe (your watchlist, curated core, temporary gainer/volume/SEC/news). Temporary coverage expires. Official halt status (when HALT_OFFICIAL_URL is configured) appears on Decision Cards; otherwise headline-only halt language is labeled as such. See /halt-codes for code meanings — never a trade tip.",
   },
   {
     id: "market-monitor",
@@ -53,7 +85,21 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "dilution",
     target: "dilution-radar",
     title: "Dilution radar",
-    body: "Offering / ATM spikes to skip. Tap “I skipped” to protect your green ledger.",
+    body: "SEC-backed capital risk (S-1/S-3, 424B5, ATM, directs, convertibles, warrants). Capacity ≠ sale; open evidence links. Tap “I skipped” for the green ledger.",
+  },
+  {
+    id: "trader-feedback",
+    target: "trader-feedback-panel",
+    title: "Trader feedback & autopsy",
+    body: "Mark watched, entered, skipped, or ignored — with optional entry/exit/size and a reason. Records stay on this device until you explicitly opt in to sync. Autopsies show age, stage, tradeability, risks, and MFE/MAE from your notes. Monthly summaries are factual counts — never “TrustTicker made you money.”",
+    tip: "Export / delete anytime under Privacy",
+  },
+  {
+    id: "live-connection",
+    target: "live-connection-status",
+    title: "Live connection status",
+    body: "Shows feed, browser-stream, and in-app alert delivery health with sample sizes. Full indicators and incident timeline live on the public status page.",
+    tip: "Open /status for definitions and targets (not guarantees until verified)",
   },
   {
     id: "skip-ledger",
@@ -99,16 +145,16 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "daily-edge",
     target: "daily-edge",
-    title: "Daily Edge Recap",
-    body: "Illustrative scoreboard — not real brokerage P&L.",
+    title: "Catalyst reaction",
+    body: "Median |return|, reaction rate, and sample size after classified catalysts — calibration, not brokerage P&L. Optional illustrative $ view is behind a toggle.",
     requiresExtras: true,
-    tip: "Not financial advice",
+    tip: "Not a profit guarantee",
   },
   {
     id: "done",
     title: "You’re set",
-    body: "Work the feed. Prefer SKIP over FOMO. Log skips. Only GO when the checklist is clean.",
-    tip: "Settings → alerts · Chrome overlay",
+    body: "Work the feed. Prefer SKIP over FOMO. Log skips. Only GO when the checklist is clean. In Settings, the Alert Strategy Builder lets you build AND/OR rules (EARLY / CONFIRMED / RISK_ONLY) with cooldowns, mutes, and historical simulation — every save is versioned.",
+    tip: "Settings → Alert Strategy Builder · Chrome overlay",
   },
 ];
 
@@ -121,8 +167,8 @@ export const DESK_GUIDE_STEPS: GuideStep[] = [
   {
     id: "desk-edge",
     target: "daily-edge",
-    title: "Daily Edge Recap",
-    body: "Keeps the “did Pro pay for itself?” math visible while you trade.",
+    title: "Catalyst reaction",
+    body: "Normalized price-reaction stats for today’s classifications. Dollar scenarios stay optional and labelled.",
   },
   {
     id: "desk-plan",
@@ -134,7 +180,7 @@ export const DESK_GUIDE_STEPS: GuideStep[] = [
     id: "desk-dilution",
     target: "dilution-radar",
     title: "Dilution radar",
-    body: "Trap list for offerings — skip FOMO on names that are diluting.",
+    body: "Filing evidence for offerings and shelves — capacity vs announced sale labeled. Skip FOMO; open the SEC link when unsure.",
   },
   {
     id: "desk-calls",

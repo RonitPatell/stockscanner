@@ -1,4 +1,5 @@
 import type { CatalystItem } from "@/types";
+import { evaluateAlertMode } from "./alerts/modes";
 
 export type AlertRuleChannel = "discord" | "sms" | "email" | "push";
 
@@ -9,6 +10,8 @@ export interface AlertRule {
   /** watchlist_only | any_symbol */
   scope: "watchlist" | "any";
   channels: AlertRuleChannel[];
+  /** When set, uses EARLY / CONFIRMED / RISK_ONLY evaluation instead of threshold fields alone */
+  mode?: "EARLY" | "CONFIRMED" | "RISK_ONLY";
   minChangePercent?: number;
   maxChangePercent?: number;
   minRvol?: number;
@@ -55,6 +58,10 @@ export function normalizeAlertRules(raw: unknown): AlertRule[] {
               c === "discord" || c === "sms" || c === "email" || c === "push"
           )
         : ["discord"],
+      mode:
+        o.mode === "EARLY" || o.mode === "CONFIRMED" || o.mode === "RISK_ONLY"
+          ? o.mode
+          : undefined,
       minChangePercent: num(o.minChangePercent),
       maxChangePercent: num(o.maxChangePercent),
       minRvol: num(o.minRvol),
@@ -96,6 +103,16 @@ export function catalystMatchesRule(c: CatalystItem, rule: AlertRule, ctx: Alert
 
   const sym = c.symbol.toUpperCase();
   if (rule.scope === "watchlist" && !ctx.watchlist.has(sym)) return false;
+
+  if (rule.mode) {
+    const evalResult = evaluateAlertMode(rule.mode, c, {
+      changePercent: c.changePercent,
+      rVol: c.rVol,
+      minConfirmedChange: rule.minChangePercent,
+      minConfirmedRvol: rule.minRvol,
+    });
+    return evalResult.wouldFire;
+  }
 
   if (rule.newsAttachedOnly && !c.headline) return false;
 

@@ -39,12 +39,12 @@ export function BrandHomeLink({
       <LogoMark className={cn("w-7 h-7", iconClassName)} />
       {showText && (
         <span
-          className={cn("font-bold tracking-tight", textClassName)}
+          className={cn("font-semibold tracking-tight text-[15px]", textClassName)}
           style={{
-            fontFamily: "var(--font-display), var(--font-geist-sans), system-ui, sans-serif",
+            fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
           }}
         >
-          Trust<span className="text-emerald-400">Ticker</span>
+          Trust<span className="text-[var(--accent-bright)]">Ticker</span>
         </span>
       )}
     </Link>

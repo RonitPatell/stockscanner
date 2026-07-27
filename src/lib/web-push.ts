@@ -21,7 +21,14 @@ export function getVapidPublicKey(): string | null {
 
 export async function sendPushNotification(
   subscription: PushSubscriptionJson,
-  payload: { title: string; body: string; url?: string; symbol?: string }
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    symbol?: string;
+    catalystId?: string;
+    actionsEnabled?: boolean;
+  }
 ): Promise<boolean> {
   if (!configureVapid()) return false;
   try {
@@ -32,6 +39,8 @@ export async function sendPushNotification(
         body: payload.body,
         url: payload.url || "/dashboard",
         symbol: payload.symbol,
+        catalystId: payload.catalystId,
+        actionsEnabled: payload.actionsEnabled !== false,
       })
     );
     return true;
@@ -52,7 +61,9 @@ export async function sendPushAlert(
   return sendPushNotification(subscription, {
     title: `${catalyst.symbol} ${move}`.trim(),
     body: `[${ruleName || "Alert"}] ${catalyst.headline.slice(0, 120)}`,
-    url: `/ticker/${encodeURIComponent(catalyst.symbol)}`,
+    url: `/dashboard?focus=1&symbol=${encodeURIComponent(catalyst.symbol)}`,
     symbol: catalyst.symbol,
+    catalystId: catalyst.id,
+    actionsEnabled: true,
   });
 }

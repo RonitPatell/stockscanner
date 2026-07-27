@@ -154,9 +154,9 @@ export interface IngestLatencyStats {
 }
 
 /**
- * Latency for marketing / Caught it.
- * Only counts "live race" catches (ingest within 10 minutes of publish).
- * Hours-old RSS/Finnhub backfill is excluded — it was never a fair speed race.
+ * Reproducible aggregated ingest latency — includes all finite delays in-window.
+ * Does not cherry-pick the fastest live-race subset for public stats.
+ * Prefer LatencyTrace cohorts (/api/latency-proof, /status) for processing vs upstream split.
  */
 export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencyStats> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -164,7 +164,7 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
   const rows = await prisma.catalyst.findMany({
     where: { createdAt: { gte: since } },
     select: { publishedAt: true, createdAt: true },
-    take: 500,
+    take: 2_000,
     orderBy: { createdAt: "desc" },
   });
 
@@ -182,16 +182,14 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
 
   if (rows.length === 0) return empty;
 
-  const allDelays = rows
+  // Retain all finite non-negative delays (including poor performers). Cap absurd clock skew.
+  const ABSURD_SEC = 24 * 60 * 60;
+  const delays = rows
     .map((r) => Math.max(0, (r.createdAt.getTime() - r.publishedAt.getTime()) / 1000))
-    .filter((d) => d <= DISPLAY_MAX_SEC)
+    .filter((d) => Number.isFinite(d) && d <= ABSURD_SEC)
     .sort((a, b) => a - b);
 
-  if (allDelays.length === 0) return empty;
-
-  // Prefer true live-race samples; otherwise report best available (RSS lag honesty)
-  const live = allDelays.filter((d) => d <= LIVE_RACE_MAX_SEC);
-  const delays = live.length > 0 ? live : allDelays;
+  if (delays.length === 0) return empty;
 
   const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
   const p50 = delays[Math.floor(delays.length * 0.5)] ?? null;

@@ -29,6 +29,8 @@ import { CatalystPlaybookPanel } from "./CatalystPlaybookPanel";
 import { TradeGradeBadge, TradeJudgmentPanel } from "./TradeJudgmentPanel";
 import { PaperTradeButtons } from "./PaperTradeLedger";
 import { PostCallButton } from "./CallBoard";
+import { CoverageBadge } from "./CoverageBadge";
+import { AlertModePreview } from "./AlertModePreview";
 import { pickLiveField, useLiveQuotesOptional } from "./LiveQuoteProvider";
 import { recordGreenLedgerEntry } from "./GreenLedger";
 import { antiFomoClass, buildActionPlaybook } from "@/lib/action-playbook";
@@ -124,6 +126,18 @@ export function CatalystCard({
       cancelled = true;
     };
   }, [demoMode, expanded, catalyst.id, catalyst.keyPoints, catalyst.aiSummary, detail]);
+
+  useEffect(() => {
+    if (demoMode || !expanded) return;
+    const key = `tt-expand:${catalyst.id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      /* continue */
+    }
+    void fetch("/api/activation/expand", { method: "POST" }).catch(() => {});
+  }, [demoMode, expanded, catalyst.id]);
 
   const displaySummary = detail?.aiSummary ?? catalyst.aiSummary;
   const displayKeyPoints = detail?.keyPoints ?? catalyst.keyPoints;
@@ -267,10 +281,16 @@ export function CatalystCard({
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 mt-2 min-w-0">
+        <div className="flex items-center gap-1.5 mt-2 min-w-0 flex-wrap">
           <span className={cn("text-[9px] px-1.5 py-0.5 rounded border uppercase font-semibold", sourceTierBadgeClass(sourceTier))}>
             {sourceTierLabel(sourceTier)}
           </span>
+          <CoverageBadge
+            symbol={catalyst.symbol}
+            coverageReason={catalyst.coverageReason}
+            matchMethod={catalyst.matchMethod}
+            matchConfidence={catalyst.verifiedConfidence}
+          />
           {catalyst.newsCount && catalyst.newsCount > 1 ? (
             <span className="text-[9px] text-violet-400">{catalyst.newsCount} sources</span>
           ) : null}
@@ -474,6 +494,15 @@ export function CatalystCard({
 
       {expanded && (
         <div className="px-3 sm:px-4 pb-3 pt-0 border-t border-zinc-800/50 bg-zinc-950/40">
+          <div className="flex flex-wrap items-center gap-2 py-2">
+            <CoverageBadge
+              symbol={catalyst.symbol}
+              coverageReason={catalyst.coverageReason}
+              matchMethod={catalyst.matchMethod}
+              matchConfidence={catalyst.verifiedConfidence}
+            />
+          </div>
+          {!demoMode && <AlertModePreview catalystId={catalyst.id} />}
           <div className="flex flex-wrap items-center gap-2 py-2">
             {brokerDeepLinks(catalyst.symbol).map((link) => (
               <a

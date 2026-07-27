@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { recordTrialClaims } from "@/lib/trial-claims";
+import { track } from "@/lib/analytics/track";
 import Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
@@ -38,8 +40,24 @@ export async function POST(req: NextRequest) {
             hasUsedTrial: true,
             subscriptionEndsAt: periodEnd ? new Date(periodEnd * 1000) : undefined,
           },
-          select: { email: true, name: true, welcomeEmailSent: true },
+          select: {
+            email: true,
+            name: true,
+            phoneNumber: true,
+            welcomeEmailSent: true,
+          },
         });
+
+        await recordTrialClaims({
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+        });
+
+        if (sub.status === "trialing") {
+          void track("trial_started");
+        } else if (sub.status === "active") {
+          void track("paid_conversion");
+        }
 
         if (user && !user.welcomeEmailSent && process.env.RESEND_API_KEY) {
           const { sendWelcomeEmail } = await import("@/lib/email-brief");
@@ -59,6 +77,9 @@ export async function POST(req: NextRequest) {
       const userId = sub.metadata?.userId;
       if (userId) {
         const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+        const prevStatus = (
+          event.data.previous_attributes as { status?: string } | undefined
+        )?.status;
         const status =
           sub.status === "trialing"
             ? "trialing"
@@ -73,6 +94,11 @@ export async function POST(req: NextRequest) {
             ...(periodEnd ? { subscriptionEndsAt: new Date(periodEnd * 1000) } : {}),
           },
         });
+
+        // Trial → paid
+        if (prevStatus === "trialing" && sub.status === "active") {
+          void track("paid_conversion");
+        }
       }
       break;
     }
@@ -80,13 +106,18 @@ export async function POST(req: NextRequest) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = sub.metadata?.userId;
       if (userId) {
-        await prisma.user.update({
+        const user = await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionStatus: "canceled",
             subscriptionId: null,
           },
+          select: { cancelReason: true },
         });
+        void track("cancellation");
+        if (user.cancelReason) {
+          void track("cancellation_reason", { reason: user.cancelReason });
+        }
       }
       break;
     }

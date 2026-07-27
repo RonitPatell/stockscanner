@@ -1,6 +1,7 @@
 import type { NewsArticle } from "@/types";
 import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from "../news-verifier";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
+import { stampFromRssPubDate } from "../latency-trace";
 
 /** PR Newswire public category RSS — primary StockTitan-style wire source */
 const PRN_FEEDS = [
@@ -37,14 +38,17 @@ export async function fetchPrNewswirePRs(): Promise<NewsArticle[]> {
         const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
+        const stamp = stampFromRssPubDate(item.pubDate);
+        const id = `prn-${hashStr(key)}`;
         out.push({
-          id: `prn-${hashStr(key)}`,
+          id,
           symbol: resolved.symbol,
           headline: item.title,
           source: "PR Newswire",
           url: item.link || undefined,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: stamp.publishedAt,
           summary,
+          trace: { ...stamp.trace, providerItemId: id },
         });
       }
       return out;

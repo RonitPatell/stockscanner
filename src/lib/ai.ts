@@ -148,8 +148,13 @@ export async function analyzeNews(
     }
   }
 
-  if (source === "SEC EDGAR" || text.includes("8-k")) {
-    catalystType = "sec_filing";
+  if (source === "SEC EDGAR" || /\b8-k\b/i.test(text)) {
+    const capitalForm =
+      catalystType === "offering" ||
+      /\b(424\s*b\s*5|424b5|form\s*s-1|form\s*s-3|s-1\/a|s-3\/a|prospectus\s+supplement|shelf\s+registration|registered\s+direct|at[\s-]?the[\s-]?market|equity\s+purchase|convertible\s+(note|preferred)|warrant\s+reprice|reverse\s+split)\b/i.test(
+        text
+      );
+    catalystType = capitalForm ? "offering" : "sec_filing";
     score += scoreSecFiling(text);
   }
 

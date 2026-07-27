@@ -1,6 +1,7 @@
 import type { NewsArticle } from "@/types";
 import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from "../news-verifier";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
+import { stampFromRssPubDate } from "../latency-trace";
 
 const GLOBE_FEEDS = [
   "https://www.globenewswire.com/RssFeed/orgclass/1/feedTitle/GlobeNewswire%20-%20News%20on%20Public%20Companies",
@@ -35,14 +36,16 @@ export async function fetchGlobeNewswirePRs(): Promise<NewsArticle[]> {
         const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
+        const stamp = stampFromRssPubDate(item.pubDate);
         out.push({
           id: `globe-${hashStr(key)}`,
           symbol: resolved.symbol,
           headline: item.title,
           source: "GlobeNewswire",
           url: item.link || undefined,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: stamp.publishedAt,
           summary,
+          trace: { ...stamp.trace, providerItemId: `globe-${hashStr(key)}` },
         });
       }
       return out;

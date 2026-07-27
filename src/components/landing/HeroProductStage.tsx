@@ -1,190 +1,263 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Radio, ShieldAlert, Megaphone, Crosshair } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-const FEED = [
-  {
-    symbol: "MRNA",
-    change: "+16.94%",
-    headline: "Phase 3 data · FDA fast track",
-    play: "LONG",
-    playClass: "text-emerald-400 border-emerald-500/40",
-    tag: "Anti-FOMO 82",
-  },
-  {
-    symbol: "ABCD",
-    change: "-22.1%",
-    headline: "ATM offering announced · dilution",
-    play: "SKIP",
-    playClass: "text-amber-400 border-amber-500/40",
-    tag: "Dilution radar",
-  },
-  {
-    symbol: "NVDA",
-    change: "+4.8%",
-    headline: "Hyperscaler contract · sympathy map live",
-    play: "WATCH",
-    playClass: "text-cyan-400 border-cyan-500/40",
-    tag: "Under 3m ingest",
-  },
-];
+/**
+ * Interactive replay of real recent catches from /api/public-stats.
+ * Never invents tickers — renders empty state until measured data arrives.
+ */
 
-const CALLS = [
-  { who: "Marcus", sym: "BJDX", bias: "long", ago: "12s" },
-  { who: "Priya", sym: "GCTK", bias: "avoid", ago: "41s" },
-  { who: "Derek", sym: "SOBR", bias: "short", ago: "1m" },
-];
+export interface WireWin {
+  id: string;
+  symbol: string;
+  headline: string;
+  publishedAt: string;
+  ingestedAt: string;
+  ingestDelaySec: number;
+  changePercent: number | null;
+}
 
-export function HeroProductStage() {
+interface PublicStats {
+  recentWins?: WireWin[];
+  latency?: {
+    avgSec: number | null;
+    under3mRate?: number | null;
+    sampleSize: number;
+  };
+  feed?: { itemCount: number; status: string };
+}
+
+function fmtTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "America/New_York",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function fmtPct(n: number | null) {
+  if (n == null) return "—";
+  const sign = n >= 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+function fmtDelay(sec: number) {
+  if (sec < 60) return `${Math.round(sec)}s`;
+  return `${(sec / 60).toFixed(1)}m`;
+}
+
+export function HeroProductStage({ initialWins = [] }: { initialWins?: WireWin[] }) {
+  const [wins, setWins] = useState<WireWin[]>(initialWins);
   const [tick, setTick] = useState(0);
-  const [pulse, setPulse] = useState(false);
 
   useEffect(() => {
-    let pulseTimer: ReturnType<typeof setTimeout> | undefined;
-    const id = setInterval(() => {
-      setTick((t) => t + 1);
-      setPulse(true);
-      clearTimeout(pulseTimer);
-      pulseTimer = setTimeout(() => setPulse(false), 600);
-    }, 3200);
-    return () => {
-      clearInterval(id);
-      clearTimeout(pulseTimer);
-    };
-  }, []);
+    if (initialWins.length > 0) return;
+    void fetch("/api/public-stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: PublicStats | null) => {
+        if (d?.recentWins?.length) setWins(d.recentWins.slice(0, 5));
+      })
+      .catch(() => {});
+  }, [initialWins.length]);
 
-  const active = FEED[tick % FEED.length];
-  const call = CALLS[tick % CALLS.length];
+  useEffect(() => {
+    if (wins.length < 2) return;
+    const id = setInterval(() => setTick((t) => t + 1), 3600);
+    return () => clearInterval(id);
+  }, [wins.length]);
+
+  const activeIdx = wins.length ? tick % wins.length : 0;
+
+  if (wins.length === 0) {
+    return (
+      <div className="wire-plane wire-plane-fade relative w-full border-t border-[var(--border-medium)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+          <p className="mk-tick !text-[var(--text-tertiary)]">
+            Live catch tape loads when measured catalysts are available —{" "}
+            <Link href="/wins" className="!text-emerald-400 hover:underline">
+              audit speed wins
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full">
-      <div className="absolute -inset-6 sm:-inset-10 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.22),transparent_65%)] pointer-events-none blur-2xl" />
-      <div className="absolute inset-x-8 -bottom-8 h-24 bg-emerald-500/20 blur-3xl pointer-events-none" />
+    <div
+      className="wire-plane wire-plane-fade relative w-full select-none"
+      role="region"
+      aria-label="Recent verified catalyst catches"
+    >
+      <div className="mk-glow-plane absolute inset-0 pointer-events-none" aria-hidden />
 
-      <div
-        className={cn(
-          "relative rounded-2xl border border-zinc-700/70 bg-zinc-950/90 backdrop-blur-xl overflow-hidden shadow-[0_40px_120px_-40px_rgba(16,185,129,0.45)] hero-stage-float",
-          pulse && "hero-stage-pulse"
-        )}
-      >
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800/90 bg-zinc-950/90">
-          <div className="flex gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
-          </div>
-          <span className="text-[10px] text-zinc-500 font-mono ml-2 tracking-wide">
-            trustticker · prop desk
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center gap-4 py-3.5">
+          <span className="mk-tick inline-flex items-center gap-1.5 !text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+            Recent verified catches
           </span>
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            LIVE WIRE
-          </span>
+          <span className="mk-tick hidden sm:inline">Publish → ingest measured</span>
+          <Link
+            href="/wins"
+            className="mk-tick ml-auto !text-[var(--text-secondary)] hover:!text-emerald-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
+          >
+            Full audit →
+          </Link>
         </div>
 
-        <div className="grid lg:grid-cols-12 min-h-[300px]">
-          <div className="lg:col-span-4 border-b lg:border-b-0 lg:border-r border-zinc-800/80 p-3 space-y-2 bg-zinc-950/40">
-            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500 font-semibold flex items-center gap-1.5 mb-2">
-              <Crosshair className="w-3 h-3 text-emerald-500" /> Session plan
-            </div>
-            <MiniChip label="3 setups" tone="emerald" />
-            <MiniChip label="2 skips · dilution" tone="amber" />
-            <div className="pt-2 text-[9px] uppercase tracking-[0.14em] text-zinc-500 font-semibold flex items-center gap-1.5">
-              <Megaphone className="w-3 h-3 text-orange-400" /> Call board
-            </div>
-            <div
-              key={call.sym + tick}
-              className="hero-row-in flex items-center gap-2 text-[11px] py-1.5 px-2 rounded-lg border border-orange-500/25 bg-orange-500/5"
-            >
-              <span className="text-zinc-500 w-12 truncate">{call.who}</span>
-              <span className="font-mono font-bold text-white">{call.sym}</span>
-              <span
+        <div
+          className="grid grid-cols-[56px_56px_1fr_64px] sm:grid-cols-[84px_76px_1fr_84px_72px] gap-2 sm:gap-3 px-1 pb-2 border-b border-[var(--border-medium)]"
+          aria-hidden
+        >
+          <span className="mk-tick">Time</span>
+          <span className="mk-tick">Sym</span>
+          <span className="mk-tick">Catalyst</span>
+          <span className="mk-tick text-right hidden sm:inline">Move</span>
+          <span className="mk-tick text-right">Delay</span>
+        </div>
+
+        <div>
+          {wins.map((row, i) => {
+            const isActive = i === activeIdx;
+            const up = (row.changePercent ?? 0) >= 0;
+            return (
+              <div
+                key={row.id}
                 className={cn(
-                  "text-[9px] uppercase",
-                  call.bias === "long"
-                    ? "text-emerald-400"
-                    : call.bias === "short"
-                      ? "text-red-400"
-                      : "text-amber-400"
+                  "relative grid grid-cols-[56px_56px_1fr_64px] sm:grid-cols-[84px_76px_1fr_84px_72px] items-center gap-2 sm:gap-3 px-1 py-3 sm:py-3.5 border-b border-[var(--hairline)] transition-colors duration-500",
+                  isActive ? "bg-emerald-500/[0.05]" : "bg-transparent"
                 )}
               >
-                {call.bias}
-              </span>
-              <span className="ml-auto text-[9px] text-zinc-600 font-mono">{call.ago}</span>
-            </div>
-            <div className="pt-1 text-[9px] uppercase tracking-[0.14em] text-zinc-500 font-semibold flex items-center gap-1.5">
-              <ShieldAlert className="w-3 h-3 text-amber-400" /> Dilution radar
-            </div>
-            <div className="text-[11px] text-amber-200/90 px-2 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5">
-              Offering trap flagged · skip FOMO
-            </div>
-          </div>
-
-          <div className="lg:col-span-8 p-3 space-y-2">
-            <div className="text-[9px] uppercase tracking-[0.14em] text-zinc-500 font-semibold flex items-center gap-1.5 mb-1">
-              <Radio className="w-3 h-3 text-emerald-500" /> Catalyst feed · action playbooks
-            </div>
-            {FEED.map((row, i) => {
-              const isActive = row.symbol === active.symbol;
-              return (
-                <div
-                  key={row.symbol}
+                <span
                   className={cn(
-                    "rounded-xl border p-3 transition-all duration-500",
-                    isActive
-                      ? "border-emerald-500/40 bg-emerald-500/8 scale-[1.01] shadow-[0_0_40px_-12px_rgba(16,185,129,0.5)]"
-                      : "border-zinc-800/80 bg-zinc-900/40 opacity-70"
+                    "font-mono text-[10px] sm:text-[11px] tabular-nums transition-colors",
+                    isActive ? "text-emerald-400/90" : "text-[var(--text-muted)]"
                   )}
                 >
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-mono font-bold text-sm tracking-tight">{row.symbol}</span>
-                    <span
-                      className={cn(
-                        "font-mono text-xs",
-                        row.change.startsWith("-") ? "text-red-400" : "text-emerald-400"
-                      )}
-                    >
-                      {row.change}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border font-semibold",
-                        row.playClass
-                      )}
-                    >
-                      {row.play}
-                    </span>
-                    <span className="text-[9px] text-zinc-500 ml-auto">{row.tag}</span>
-                  </div>
-                  <p className="text-xs text-zinc-300">{row.headline}</p>
-                  {isActive && (
-                    <div className="mt-2 h-0.5 rounded-full bg-zinc-800 overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 hero-scan-bar" />
-                    </div>
+                  {fmtTime(row.ingestedAt)}
+                </span>
+                <span className="font-mono font-bold text-sm text-[var(--text-primary)] tracking-tight">
+                  {row.symbol}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs sm:text-[13px] truncate",
+                    isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                   )}
-                </div>
-              );
-            })}
-          </div>
+                >
+                  {row.headline}
+                </span>
+                <span
+                  className={cn(
+                    "font-mono text-xs text-right tabular-nums hidden sm:block",
+                    row.changePercent == null
+                      ? "text-[var(--text-muted)]"
+                      : up
+                        ? "text-emerald-400"
+                        : "text-red-400"
+                  )}
+                >
+                  {fmtPct(row.changePercent)}
+                </span>
+                <span className="font-mono text-[10px] sm:text-xs text-right text-[var(--text-tertiary)] tabular-nums">
+                  {fmtDelay(row.ingestDelaySec)}
+                </span>
+
+                {isActive && (
+                  <span className="absolute left-0 right-0 bottom-0 h-px overflow-hidden" aria-hidden>
+                    <span
+                      key={tick}
+                      className="wire-progress block h-full bg-gradient-to-r from-emerald-500/80 to-emerald-400/30"
+                    />
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function MiniChip({ label, tone }: { label: string; tone: "emerald" | "amber" }) {
+/* ── Real proof rail beside the CTA ─────────────────────── */
+
+export function HeroProofRail({
+  initial,
+}: {
+  initial?: {
+    avgSec: number | null;
+    under3mRate: number | null;
+    sampleSize: number;
+    feedCount: number;
+    fastestSec?: number | null;
+  } | null;
+}) {
+  const [stats, setStats] = useState(initial ?? null);
+
+  useEffect(() => {
+    if (initial) return;
+    void fetch("/api/public-stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: PublicStats | null) => {
+        if (!d?.latency) return;
+        setStats({
+          avgSec: d.latency.avgSec,
+          under3mRate: d.latency.under3mRate ?? null,
+          sampleSize: d.latency.sampleSize,
+          feedCount: d.feed?.itemCount ?? 0,
+          fastestSec: null,
+        });
+      })
+      .catch(() => {});
+  }, [initial]);
+
+  if (!stats || stats.sampleSize <= 0) return null;
+
+  function fmtSec(sec: number) {
+    return sec >= 120 ? `${Math.round(sec / 60)}m` : `${Math.round(sec)}s`;
+  }
+
+  const rows: { label: string; value: string }[] = [];
+  if (stats.avgSec != null) rows.push({ label: "Avg ingest", value: fmtSec(stats.avgSec) });
+  if (stats.under3mRate != null && stats.under3mRate > 0)
+    rows.push({ label: "Under 3 min", value: `${stats.under3mRate}%` });
+  if (stats.sampleSize) rows.push({ label: "Sample (24h)", value: String(stats.sampleSize) });
+  if (stats.feedCount) rows.push({ label: "In feed now", value: String(stats.feedCount) });
+  if (rows.length === 0) return null;
+
   return (
-    <div
-      className={cn(
-        "text-[11px] px-2 py-1.5 rounded-lg border",
-        tone === "emerald"
-          ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-300"
-          : "border-amber-500/25 bg-amber-500/5 text-amber-200"
-      )}
+    <aside
+      className="landing-fade-up landing-delay-4 border-l border-[var(--border-medium)] pl-6"
+      aria-label="Measured latency"
     >
-      {label}
-    </div>
+      <p className="mk-tick mb-4 !text-emerald-400 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+        Measured (last 24h)
+      </p>
+      <dl className="space-y-4">
+        {rows.slice(0, 4).map((r) => (
+          <div key={r.label}>
+            <dd className="mk-stat text-2xl text-[var(--text-primary)]">{r.value}</dd>
+            <dt className="mk-tick mt-1">{r.label}</dt>
+          </div>
+        ))}
+      </dl>
+      <Link
+        href="/wins"
+        className="mk-tick !text-[var(--text-secondary)] hover:!text-emerald-400 transition-colors mt-5 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
+      >
+        Audit every catch →
+      </Link>
+    </aside>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/trade-judgment";
 import { cn } from "@/lib/utils";
 import { HelpTip } from "./HelpTip";
+import { JudgmentV2Panel } from "./JudgmentV2Panel";
 
 const ICONS: Record<TradeGrade, typeof Check> = {
   go: Check,
@@ -125,6 +126,12 @@ export function TradeJudgmentPanel({
       </div>
 
       <p className="text-[11px] opacity-60 leading-snug">{j.explanation}</p>
+
+      {j.judgmentVersion && (
+        <p className="text-[10px] font-mono text-zinc-500">Classifier {j.judgmentVersion}</p>
+      )}
+
+      <JudgmentV2Panel catalyst={catalyst} />
 
       {(onSkip || onTake) && (
         <div className="flex flex-wrap gap-2 pt-1">

@@ -13,9 +13,9 @@ import { CatchesBoard } from "@/components/CatchesBoard";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Speed Wins — TrustTicker",
+  title: "Latency Stats — TrustTicker",
   description:
-    "Real catalyst catches: headline published, ingested in seconds, stock moved. Proof of TrustTicker wire speed.",
+    "Reproducible aggregated ingest latency and recent catalyst examples. Sample sizes shown; no cherry-picked speed claims.",
 };
 
 export default async function WinsPage() {
@@ -32,11 +32,11 @@ export default async function WinsPage() {
   const [wins, latency] = await Promise.all([getSpeedWins(24, 168), getIngestLatencyStats(24)]);
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <header className="border-b border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+    <div className="marketing-shell min-h-screen">
+      <header className="sticky top-0 z-40 border-b mk-hairline bg-[rgba(9,8,7,0.72)] backdrop-blur-xl px-4 sm:px-6 h-14 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <LogoMark className="w-7 h-7" />
-          <span className="font-bold">
+          <span className="font-semibold tracking-tight">
             Trust<span className="text-emerald-400">Ticker</span>
           </span>
         </Link>
@@ -53,19 +53,28 @@ export default async function WinsPage() {
                 </Button>
               </Link>
               <Link href="/pricing">
-                <Button size="sm">Start trial</Button>
+                <Button size="sm" className="cta-glow">
+                  Start trial
+                </Button>
               </Link>
             </>
           )}
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-12">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3">Caught before the crowd</h1>
-          <p className="text-zinc-400 max-w-xl mx-auto">
-            Real headlines from our feed — publish time, ingest delay, and how the stock moved.
-            This is what you&apos;re paying for.
+      <main className="max-w-5xl mx-auto px-4 py-14 sm:py-16">
+        <div className="text-center mb-12">
+          <p className="mk-tick !text-emerald-400 mb-4">Latency · aggregated</p>
+          <h1 className="mk-display text-3xl sm:text-4xl mb-3">
+            Measured ingest latency
+          </h1>
+          <p className="text-[var(--text-secondary)] max-w-xl mx-auto">
+            Reproducible aggregates over all in-window samples (including slow ones).
+            Processing vs upstream split is on{" "}
+            <a href="/status" className="text-emerald-400/90 underline">
+              /status
+            </a>
+            .
           </p>
         </div>
 
@@ -73,7 +82,7 @@ export default async function WinsPage() {
         <CatchesBoard className="mb-10" />
 
         {latency.sampleSize > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
+          <div className="mk-corners grid grid-cols-2 sm:grid-cols-4 border-t border-l mk-hairline mb-10">
             {[
               { label: "Avg ingest", value: `${latency.avgSec}s` },
               { label: "Median", value: `${latency.p50Sec}s` },
@@ -82,37 +91,41 @@ export default async function WinsPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-center"
+                className="border-b border-r mk-hairline px-4 py-4 text-center bg-[var(--bg-graphite)]/50"
               >
-                <div className="text-lg font-bold text-emerald-400 font-mono">{s.value}</div>
-                <div className="text-[10px] text-zinc-500 mt-0.5">{s.label}</div>
+                <div className="mk-stat text-lg text-emerald-400">
+                  {s.value}
+                </div>
+                <div className="mk-tick mt-1">
+                  {s.label}
+                </div>
               </div>
             ))}
           </div>
         )}
 
         {wins.length === 0 ? (
-          <p className="text-center text-zinc-500 py-16">
+          <p className="text-center text-zinc-600 py-16">
             Speed wins populate as the feed ingests live catalysts. Check back during market hours.
           </p>
         ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-px bg-[var(--hairline)] border mk-hairline mb-4">
             {wins.map((w) => (
               <SpeedWinCard key={w.id} win={w} showTimeline />
             ))}
           </div>
         )}
 
-        <div className="text-center">
+        <div className="text-center pt-4">
           {isSubscribed ? (
             <Link href="/dashboard">
-              <Button size="lg" className="mt-8">
+              <Button size="lg" className="mt-8 cta-glow">
                 Back to live scanner <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           ) : (
             <Link href="/pricing">
-              <Button size="lg" className="mt-8">
+              <Button size="lg" className="mt-8 cta-glow">
                 Catch the next one — Start free trial <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

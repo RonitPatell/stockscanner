@@ -1,6 +1,7 @@
 import type { NewsArticle } from "@/types";
 import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from "../news-verifier";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
+import { stampFromRssPubDate } from "../latency-trace";
 
 const BUSINESS_WIRE_FEEDS = [
   "https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJeGVtQ==",
@@ -34,14 +35,17 @@ export async function fetchBusinessWirePRs(): Promise<NewsArticle[]> {
         const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
+        const stamp = stampFromRssPubDate(item.pubDate);
+        const id = `bw-${hashStr(key)}`;
         out.push({
-          id: `bw-${hashStr(key)}`,
+          id,
           symbol: resolved.symbol,
           headline: item.title,
           source: "Business Wire",
           url: item.link || undefined,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: stamp.publishedAt,
           summary,
+          trace: { ...stamp.trace, providerItemId: id },
         });
       }
       return out;

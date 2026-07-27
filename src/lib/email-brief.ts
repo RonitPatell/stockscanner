@@ -1,7 +1,5 @@
 import type { WatchlistBrief } from "@/types";
 import { sendEmail, emailShell, APP_URL } from "./email";
-import { getSpeedEdgeSummary } from "./speed-edge";
-import { getDilutionRadar } from "./dilution-radar";
 
 function fmtPct(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -41,27 +39,24 @@ function briefSectionHtml(brief: WatchlistBrief): string {
 
 async function eodEdgeHtml(): Promise<string> {
   try {
-    const [edge, dilution] = await Promise.all([
-      getSpeedEdgeSummary(8, 24),
-      getDilutionRadar(8, 24),
-    ]);
-    const skipSaved = dilution.reduce((sum, d) => {
-      const move = Math.abs(d.changePercent ?? 0);
-      if (move < 2) return sum;
-      return sum + (move / 100) * 1000 * 0.25;
-    }, 0);
-    const total = edge.totalEdgeUsd + skipSaved;
-    const months = total > 0 ? (total / 19.99).toFixed(1) : "0";
+    const { getCalibrationDashboardSummary } = await import("./calibration/service");
+    const cal = await getCalibrationDashboardSummary(24);
+    const n = cal.sampleSize;
+    const med = cal.medianAbsReturnPct;
+    const medLabel = med != null ? `${med.toFixed(1)}%` : "—";
+    const reaction =
+      cal.reactionRate != null ? `${(cal.reactionRate * 100).toFixed(0)}%` : "—";
+    const sampleNote = cal.insufficientSample ? " · low sample — treat as provisional" : "";
 
     return `
-      <div style="background:#052e1f;border:1px solid #05966955;border-radius:12px;padding:16px;margin:0 0 24px">
-        <h3 style="color:#34d399;margin:0 0 8px;font-size:14px">Daily Edge Recap</h3>
+      <div style="background:#0c1929;border:1px solid #0ea5e955;border-radius:12px;padding:16px;margin:0 0 24px">
+        <h3 style="color:#7dd3fc;margin:0 0 8px;font-size:14px">Catalyst reaction (calibration)</h3>
         <p style="color:#d4d4d8;margin:0 0 8px;font-size:13px">
-          Illustrative speed scenario <strong style="color:#34d399">$${edge.totalEdgeUsd.toFixed(0)}</strong>
-          · Dilution skips (${dilution.length}) ~<strong style="color:#fbbf24">$${skipSaved.toFixed(0)}</strong>
-          · Combined <strong style="color:#34d399">$${total.toFixed(0)}</strong> (~${months}× a $19.99 month)
+          Median |return| at ${cal.primaryHorizon}: <strong style="color:#7dd3fc">${medLabel}</strong>
+          · reaction rate <strong style="color:#34d399">${reaction}</strong>
+          · n=<strong>${n}</strong>${sampleNote}
         </p>
-        <p style="color:#71717a;font-size:11px;margin:0">Illustrative on $1k notional · not financial advice</p>
+        <p style="color:#71717a;font-size:11px;margin:0">${cal.disclaimer}</p>
       </div>`;
   } catch {
     return "";

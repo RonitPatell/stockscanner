@@ -5,12 +5,12 @@ import {
   ArrowLeft,
   Zap,
   ShieldAlert,
-  Target,
   Gauge,
   Megaphone,
   FlaskConical,
   Keyboard,
   Bell,
+  Target,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,10 @@ import { hasActiveSubscription } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { LiveProofStrip } from "@/components/LiveProofStrip";
 import { LogoMark } from "@/components/Logo";
+import { FunnelViewBeacon } from "@/components/FunnelViewBeacon";
+import { hasTrialClaim } from "@/lib/trial-claims";
 import {
   SUBSCRIPTION_PRICE,
   SUBSCRIPTION_PRICE_MO,
@@ -30,31 +33,16 @@ import {
 } from "@/lib/stripe";
 
 const pillars = [
-  {
-    icon: Gauge,
-    title: "Speed",
-    body: "Wire ingest + SSE push. Auditable under-3m live-race proof on /wins.",
-  },
-  {
-    icon: Target,
-    title: "Judgment",
-    body: "Playbooks, anti-FOMO, dilution radar — know when to skip.",
-  },
-  {
-    icon: FlaskConical,
-    title: "Proof",
-    body: "Measured ingest latency, candle comparisons, and transparent illustrative scenarios.",
-  },
-  {
-    icon: Megaphone,
-    title: "Desk",
-    body: "Call board, Prop Desk, hotkeys, sympathy map, session plan.",
-  },
+  { icon: Gauge, title: "Speed", body: "Wire ingest + SSE push, auditable on /wins" },
+  { icon: Target, title: "Judgment", body: "Playbooks, anti-FOMO, dilution radar" },
+  { icon: FlaskConical, title: "Proof", body: "Measured latency + candle comparisons" },
+  { icon: Megaphone, title: "Desk", body: "Call board, Prop Desk, hotkeys, session plan" },
 ];
 
 const included = [
   {
     group: "Speed & feed",
+    icon: Gauge,
     items: [
       "Measured ingest latency varies; Pro pushes via SSE when the feed updates — speed depends on source + worker",
       "Stock-impact headlines only — noise filtered at ingest",
@@ -66,6 +54,7 @@ const included = [
   },
   {
     group: "Judgment stack",
+    icon: ShieldAlert,
     items: [
       "Action playbooks: Long / Short / Watch / Skip + invalidation",
       "Anti-FOMO scoring on every expanded catalyst",
@@ -77,6 +66,7 @@ const included = [
   },
   {
     group: "Proof & ROI",
+    icon: FlaskConical,
     items: [
       "Illustrative speed scenarios — ingest vs +3m on $1k notional",
       "Verified 1-minute candle speed backtests when available",
@@ -87,6 +77,7 @@ const included = [
   },
   {
     group: "Desk & alerts",
+    icon: Keyboard,
     items: [
       "Prop Desk (/desk) focused trading layout",
       "Shared call board — who called it first",
@@ -117,20 +108,18 @@ export default async function PricingPage({
         subscriptionEndsAt: true,
         hasUsedTrial: true,
         phoneNumber: true,
+        email: true,
       },
     });
     isSubscribed = hasActiveSubscription(user ?? undefined);
     if (user?.hasUsedTrial) {
       trialAvailable = false;
-    } else if (user?.phoneNumber) {
-      const phoneTrialUsed = await prisma.user.findFirst({
-        where: {
-          phoneNumber: user.phoneNumber,
-          hasUsedTrial: true,
-          NOT: { id: session.user.id },
-        },
+    } else {
+      const claimUsed = await hasTrialClaim({
+        email: user?.email,
+        phoneNumber: user?.phoneNumber,
       });
-      trialAvailable = !phoneTrialUsed;
+      trialAvailable = !claimUsed;
     }
   }
 
@@ -140,147 +129,111 @@ export default async function PricingPage({
 
   return (
     <div className="marketing-shell min-h-screen flex flex-col relative overflow-hidden">
+      <FunnelViewBeacon event="pricing_view" />
       <div className="absolute inset-0 grid-bg opacity-50 pointer-events-none" />
-      <div className="hero-aurora absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/15 blur-[120px] pointer-events-none" />
-      <div className="hero-aurora-2 absolute bottom-0 right-0 w-[420px] h-[420px] bg-cyan-500/10 blur-[100px] pointer-events-none" />
+      <div className="mk-glow-top absolute inset-x-0 top-0 h-[50vh] pointer-events-none" />
 
-      <header className="relative border-b border-zinc-800/80 px-4 sm:px-6 h-16 flex items-center backdrop-blur-xl bg-zinc-950/60">
+      <header className="relative border-b mk-hairline px-4 sm:px-6 h-16 flex items-center justify-between backdrop-blur-xl bg-black/40 z-10">
         <Link
           href="/"
-          className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+          className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7" />
-            <span className="font-bold display-font">TrustTicker</span>
+            <span className="font-semibold tracking-tight">
+              Trust<span className="text-emerald-400">Ticker</span>
+            </span>
           </div>
         </Link>
+        <span className="mk-tick hidden sm:inline">One plan · cancel anytime</span>
       </header>
 
-      <main className="relative flex-1 px-4 py-14 sm:py-20">
+      <main className="relative flex-1 px-4 py-10 sm:py-14">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12 price-rise">
-            <p className="text-emerald-400 text-xs font-semibold uppercase tracking-[0.22em] mb-4">
-              Simple pricing
-            </p>
-            <h1 className="text-3xl sm:text-5xl font-extrabold mb-4 tracking-tight">
+          {/* Compact head — plans stay above the fold */}
+          <div className="text-center mb-8 sm:mb-10 price-rise">
+            <p className="mk-tick !text-emerald-400 mb-4">Pricing</p>
+            <h1 className="mk-display text-3xl sm:text-[2.75rem] mb-3">
               One plan. The whole judgment stack.
             </h1>
-            <p className="text-zinc-400 max-w-2xl mx-auto text-lg">
-              Free gets you the habit. Pro gets you the live desk. Lock annual and save —
-              reinvest goes to faster wire later.
+            <p className="text-[var(--text-secondary)] max-w-xl mx-auto leading-relaxed">
+              Free gets you the habit. Pro gets you the live desk.
             </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4 mb-10 max-w-3xl mx-auto price-rise">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 text-left">
-              <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Free (no account needed)</p>
-              <ul className="space-y-2 text-sm text-zinc-400">
-                <li>· Public daily plan at /today</li>
-                <li>· Demo scanner (sample data)</li>
-                <li>· Speed wins proof page</li>
-                <li>· Ticker info pages</li>
-              </ul>
-              <Link href="/today" className="inline-block mt-4 text-sm text-emerald-400 hover:underline">
-                See today’s plan →
-              </Link>
-            </div>
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5 text-left">
-              <p className="text-xs uppercase tracking-wide text-emerald-400 mb-2">Pro — live desk</p>
-              <ul className="space-y-2 text-sm text-zinc-300">
-                <li>· Live wire feed + SSE (the real product)</li>
-                <li>· Alerts, dilution, Prop Desk, briefs</li>
-                <li>· Monthly ${SUBSCRIPTION_PRICE}/mo or annual ${SUBSCRIPTION_ANNUAL_PRICE}/yr</li>
-                <li>· Annual is cheaper — {SUBSCRIPTION_ANNUAL_SAVE} vs paying monthly</li>
-              </ul>
-            </div>
           </div>
 
           {params.canceled === "true" && (
-            <div className="mb-8 max-w-lg mx-auto rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 text-center">
+            <div className="mb-8 max-w-lg mx-auto border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 text-center">
               Checkout canceled. Start your trial whenever you&apos;re ready.
             </div>
           )}
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10">
-            {pillars.map((p, i) => (
-              <div
-                key={p.title}
-                className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4 price-rise hover:border-emerald-500/30 transition-colors"
-                style={{ animationDelay: `${0.1 + i * 0.08}s` }}
-              >
-                <p.icon className="w-5 h-5 text-emerald-400 mb-2" />
-                <p className="font-semibold text-sm mb-1">{p.title}</p>
-                <p className="text-[12px] text-zinc-500 leading-relaxed">{p.body}</p>
+          {/* Plan cards — the one decision on this page */}
+          <div
+            className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto mb-5 price-rise"
+            style={{ animationDelay: "0.08s" }}
+          >
+            {/* Monthly */}
+            <div className="mk-lift mk-panel mk-corners p-6 sm:p-7 flex flex-col">
+              <div className="mb-5">
+                <p className="mk-tick mb-3">Pro Monthly</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="mk-display text-[2.75rem] leading-none">
+                    ${SUBSCRIPTION_PRICE}
+                  </span>
+                  <span className="text-[var(--text-tertiary)]">/mo</span>
+                </div>
+                <p className="text-[13px] text-[var(--text-tertiary)] mt-2">
+                  Flexible · cancel anytime · ${Math.round(SUBSCRIPTION_PRICE * 12)}/yr if you stay
+                </p>
               </div>
-            ))}
-          </div>
-
-          <div className="grid lg:grid-cols-5 gap-8 items-start">
-            <div className="lg:col-span-2 space-y-4 price-rise sticky top-8" style={{ animationDelay: "0.2s" }}>
-              {/* Monthly */}
-              <div className="rounded-2xl border border-zinc-700/80 bg-zinc-900/60 p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-zinc-700 text-zinc-100 text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wide">
-                  MONTHLY
-                </div>
-                <div className="mb-4 pr-16">
-                  <h2 className="text-lg font-bold display-font">Pro Monthly</h2>
-                  <p className="text-sm text-zinc-400">Flexible · cancel anytime</p>
-                </div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-extrabold tracking-tight">${SUBSCRIPTION_PRICE}</span>
-                  <span className="text-zinc-400">/mo</span>
-                </div>
-                <p className="text-xs text-zinc-500 mb-4">
-                  Billed monthly · ${Math.round(SUBSCRIPTION_PRICE * 12)}/yr if you stay all year
-                </p>
-                <p className="text-sm text-emerald-400 mb-5">
-                  {trialAvailable
-                    ? "7-day free trial included"
-                    : "No trial — billed immediately at checkout"}
-                </p>
+              <p className="text-sm text-emerald-400 mb-5">
+                {trialAvailable
+                  ? "7-day free trial included"
+                  : "No trial — billed immediately at checkout"}
+              </p>
+              <div className="mt-auto">
                 {session ? (
-                  <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="monthly">
+                  <CheckoutButton size="lg" className="w-full text-base" plan="monthly">
                     {trialAvailable ? "Start free trial" : `Subscribe — ${SUBSCRIPTION_PRICE_MO}`}
                   </CheckoutButton>
                 ) : (
                   <Link href="/login?register=true&next=checkout" className="block">
-                    <Button size="lg" className="w-full text-base cta-glow">
-                      Create account & start trial
+                    <Button size="lg" variant="secondary" className="w-full text-base">
+                      Create account &amp; start trial
                     </Button>
                   </Link>
                 )}
               </div>
+            </div>
 
-              {/* Annual */}
-              <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-6 glow-emerald relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wide">
-                  BEST VALUE
-                </div>
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-emerald-500/15 via-transparent to-transparent pointer-events-none" />
-                <div className="relative mb-4 pr-20">
-                  <h2 className="text-lg font-bold display-font">Pro Annual</h2>
-                  <p className="text-sm text-zinc-400">Same Pro desk · cheaper by the year</p>
-                </div>
-                <div className="relative flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-extrabold tracking-tight">
+            {/* Annual — recommended */}
+            <div className="mk-lift relative mk-panel p-6 sm:p-7 flex flex-col !border-emerald-500/40 bg-emerald-500/[0.04] shadow-[0_0_60px_-24px_rgba(22,199,132,0.4)]">
+              <div className="absolute -top-px right-6 bg-emerald-500 text-black text-[10px] font-mono font-bold px-3 py-1 tracking-[0.14em]">
+                BEST VALUE
+              </div>
+              <div className="mb-5">
+                <p className="mk-tick !text-emerald-400 mb-3">Pro Annual</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="mk-display text-[2.75rem] leading-none">
                     ${SUBSCRIPTION_ANNUAL_PRICE}
                   </span>
-                  <span className="text-zinc-400">/yr</span>
+                  <span className="text-[var(--text-tertiary)]">/yr</span>
                 </div>
-                <p className="relative text-sm text-emerald-300 font-medium mb-1">
+                <p className="text-[13px] text-emerald-300 font-medium mt-2">
                   {SUBSCRIPTION_ANNUAL_PER_MO_LABEL} effective · {SUBSCRIPTION_ANNUAL_SAVE}
                 </p>
-                <p className="relative text-xs text-zinc-400 mb-4">
-                  vs ${Math.round(SUBSCRIPTION_PRICE * 12)}/yr on monthly — you keep ~$
-                  {SUBSCRIPTION_ANNUAL_SAVE_USD} (about{" "}
+                <p className="text-[13px] text-[var(--text-tertiary)] mt-1">
+                  You keep ~${SUBSCRIPTION_ANNUAL_SAVE_USD} vs monthly (about{" "}
                   {Math.round(SUBSCRIPTION_ANNUAL_SAVE_USD / SUBSCRIPTION_PRICE)} months free)
                 </p>
-                <p className="relative text-sm text-emerald-400 mb-5">
-                  {trialAvailable
-                    ? "7-day free trial, then billed annually"
-                    : "Billed annually at checkout"}
-                </p>
+              </div>
+              <p className="text-sm text-emerald-400 mb-5">
+                {trialAvailable
+                  ? "7-day free trial, then billed annually"
+                  : "Billed annually at checkout"}
+              </p>
+              <div className="mt-auto">
                 {session ? (
                   <CheckoutButton size="lg" className="w-full text-base cta-glow" plan="annual">
                     Lock annual — {SUBSCRIPTION_ANNUAL_LABEL}
@@ -288,50 +241,81 @@ export default async function PricingPage({
                 ) : (
                   <Link href="/login?register=true&next=checkout" className="block">
                     <Button size="lg" className="w-full text-base cta-glow">
-                      Create account & lock annual
+                      Create account &amp; lock annual
                     </Button>
                   </Link>
                 )}
-                <p className="relative text-[11px] text-zinc-500 mt-3 text-center">
+                <p className="text-[11px] text-[var(--text-tertiary)] mt-3 text-center">
                   Same features as monthly — just a lower effective rate
                 </p>
               </div>
-
-              <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
-                <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                See → Skip → Prove — cancel anytime
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
-                <Bell className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                Discord · email · SMS · push · Chrome overlay (install from Settings)
-              </div>
-              {!session && (
-                <p className="text-center text-sm text-zinc-500 px-1">
-                  Already have an account?{" "}
-                  <Link href="/login?next=checkout" className="text-emerald-400 hover:underline">
-                    Sign in
-                  </Link>
-                </p>
-              )}
             </div>
+          </div>
 
-            <div className="lg:col-span-3 space-y-6 price-rise" style={{ animationDelay: "0.28s" }}>
+          {/* Trust line, right under the ask */}
+          <div
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mb-4 price-rise"
+            style={{ animationDelay: "0.16s" }}
+          >
+            <span className="mk-tick inline-flex items-center gap-1.5 normal-case !tracking-[0.08em]">
+              <Zap className="w-3.5 h-3.5 text-emerald-500" />
+              See → Skip → Prove · cancel anytime
+            </span>
+            <span className="mk-tick inline-flex items-center gap-1.5 normal-case !tracking-[0.08em]">
+              <Bell className="w-3.5 h-3.5 text-emerald-500" />
+              Discord · email · SMS · push · Chrome overlay
+            </span>
+          </div>
+          {!session && (
+            <p className="text-center text-sm text-[var(--text-tertiary)] mb-10">
+              Already have an account?{" "}
+              <Link
+                href="/login?next=checkout"
+                className="text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                Sign in
+              </Link>
+            </p>
+          )}
+
+          {/* Live measured proof, adjacent to the conversion decision */}
+          <div className="max-w-3xl mx-auto mb-12 price-rise" style={{ animationDelay: "0.22s" }}>
+            <LiveProofStrip compact />
+          </div>
+
+          {/* Four pillars — slim ledger strip */}
+          <div
+            className="mk-corners grid grid-cols-2 lg:grid-cols-4 border-t border-l mk-hairline mb-14 price-rise"
+            style={{ animationDelay: "0.28s" }}
+          >
+            {pillars.map((p) => (
+              <div key={p.title} className="border-b border-r mk-hairline p-5">
+                <p.icon className="w-4.5 h-4.5 text-emerald-500/90 mb-2.5" />
+                <p className="font-semibold text-sm tracking-tight mb-1">{p.title}</p>
+                <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">{p.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Everything included */}
+          <div className="mb-12 price-rise" style={{ animationDelay: "0.34s" }}>
+            <h2 className="mk-display text-xl sm:text-2xl mb-8 text-center">
+              Everything in Pro
+            </h2>
+            <div className="grid md:grid-cols-2 gap-x-12 gap-y-10">
               {included.map((section) => (
-                <div
-                  key={section.group}
-                  className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-5 sm:p-6"
-                >
-                  <h3 className="text-sm font-semibold text-emerald-400/90 uppercase tracking-[0.14em] mb-4 flex items-center gap-2">
-                    {section.group === "Speed & feed" && <Gauge className="w-4 h-4" />}
-                    {section.group === "Judgment stack" && <ShieldAlert className="w-4 h-4" />}
-                    {section.group === "Proof & ROI" && <FlaskConical className="w-4 h-4" />}
-                    {section.group === "Desk & alerts" && <Keyboard className="w-4 h-4" />}
+                <div key={section.group}>
+                  <h3 className="mk-tick !text-emerald-400/90 mb-4 flex items-center gap-2">
+                    <section.icon className="w-4 h-4" />
                     {section.group}
                   </h3>
                   <ul className="space-y-2.5">
                     {section.items.map((item) => (
-                      <li key={item} className="flex items-start gap-3 text-sm text-zinc-300">
-                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <li
+                        key={item}
+                        className="flex items-start gap-3 text-sm text-[var(--text-secondary)]"
+                      >
+                        <Check className="w-4 h-4 text-emerald-500/80 shrink-0 mt-0.5" />
                         {item}
                       </li>
                     ))}
@@ -341,21 +325,28 @@ export default async function PricingPage({
             </div>
           </div>
 
-          <div className="mt-12 max-w-2xl mx-auto text-center">
-            <p className="text-zinc-500 text-sm mb-4">
-              Prefer to poke around first?{" "}
-              <Link href="/today" className="text-emerald-400 hover:underline">
-                Today’s free plan
-              </Link>
-              ,{" "}
-              <Link href="/demo" className="text-emerald-400 hover:underline">
-                live demo
-              </Link>
-              , or{" "}
-              <Link href="/wins" className="text-emerald-400 hover:underline">
-                speed wins
-              </Link>
-              .
+          {/* Free tier + explore */}
+          <div className="max-w-2xl mx-auto text-center border-t mk-hairline pt-10">
+            <p className="text-sm text-[var(--text-tertiary)] mb-2">
+              Not ready? The free tier has a public daily plan, demo scanner, and the
+              speed-wins proof page.
+            </p>
+            <p className="text-sm mb-8">
+              {[
+                { href: "/today", label: "Today's free plan" },
+                { href: "/demo", label: "Evidence demo" },
+                { href: "/wins", label: "Speed wins" },
+              ].map((l, i) => (
+                <span key={l.href}>
+                  {i > 0 && <span className="text-[var(--text-muted)]"> · </span>}
+                  <Link
+                    href={l.href}
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    {l.label}
+                  </Link>
+                </span>
+              ))}
             </p>
             <DisclaimerBanner compact />
           </div>

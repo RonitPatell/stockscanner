@@ -25,8 +25,21 @@ model User {
   watchlist        String[]  @default([])
   scannerFilters   Json?
   alertRules       Json?
+  /// Alert Strategy Builder rules (versioned JSON array). Never silently mutated.
+  alertStrategies  Json?
+  strategyVersions AlertStrategyVersion[]
   lastBriefSeenAt  DateTime?
   onboardingCompleted Boolean @default(false)
+  /// Checklist / step state for the 3-step onboarding funnel (no PII).
+  onboardingProgress Json?
+  tradingFocus       String?   // small_cap | biotech | large_cap | custom
+  activatedAt        DateTime?
+  testAlertSentAt    DateTime?
+  catalystsExpandedCount Int @default(0)
+  cancelReason       String?
+  cancelReasonDetail String?
+  lastSeenAt         DateTime?
+  cohortReturns      Json?     // { d2?: true, d5?: true }
   emailAlertsEnabled Boolean @default(false)
   emailBriefEnabled  Boolean @default(true)
   pushSubscription Json?
@@ -35,10 +48,25 @@ model User {
   lastEodBriefSentAt DateTime?
   trialDripDay       Int       @default(0)
   lastTrialDripAt    DateTime?
+  /// Explicit opt-in to sync trader feedback / autopsy records to the account.
+  traderFeedbackSyncOptIn Boolean @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]
   traderCalls      TraderCall[]
+  judgmentFeedback JudgmentFeedback[]
+  traderDecisions  TraderDecision[]
+}
+
+/// Durable trial-abuse claims (email/phone hashes) — survives account delete.
+model TrialClaim {
+  id        String   @id @default(cuid())
+  claimType String   // email_hash | phone_hash
+  claimHash String
+  createdAt DateTime @default(now())
+
+  @@unique([claimType, claimHash])
+  @@index([createdAt])
 }
 
 model Catalyst {
@@ -66,10 +94,21 @@ model Catalyst {
   storyClusterId  String?
   setupTags       String[] @default([])
   verifiedConfidence Float?
+  /// Match method from news-verifier (cashtag, exchange_tag, headline_parse, …)
+  matchMethod     String?
+  /// Why this symbol is in the dynamic coverage universe (if known at ingest)
+  coverageReason  String?
+  /// True when match confidence was too low to alert (row may still exist for audit)
+  quarantined     Boolean  @default(false)
+  /// Judgment V2 snapshot (JSON) — versioned for reproducible historical audits
+  judgmentJson    Json?
+  judgmentVersion String?
+  judgmentClassifiedAt DateTime?
   keyPoints       String[] @default([])
   sourceTier      String?
   rawNewsId       String?  @unique
   alertLogs       AlertLog[]
+  judgmentFeedback JudgmentFeedback[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -78,6 +117,55 @@ model Catalyst {
   @@index([urgencyScore])
   @@index([sentimentScore])
   @@index([storyClusterId])
+  @@index([quarantined])
+  @@index([judgmentVersion])
+}
+
+/// User calibration feedback on judgments — does NOT auto-change production rules.
+model JudgmentFeedback {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalystId       String
+  catalyst         Catalyst @relation(fields: [catalystId], references: [id], onDelete: Cascade)
+  judgmentVersion  String
+  /// correct_ticker | wrong_category | duplicate | stale | material | not_material | missing_risk
+  action           String
+  detail           String?
+  proposedTicker   String?
+  /// Snapshot of grade/axes at feedback time (no PII)
+  judgmentSnapshot Json?
+  createdAt        DateTime @default(now())
+
+  @@index([catalystId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([judgmentVersion])
+}
+
+/// Admin review queue — prioritised by reports + high-impact low-confidence.
+model JudgmentReviewItem {
+  id              String    @id @default(cuid())
+  catalystId      String    @unique
+  symbol          String
+  headline        String
+  priorityScore   Float     @default(0)
+  reportCount     Int       @default(0)
+  confidence      String?
+  catalystStrength String?
+  grade           String?
+  judgmentVersion String?
+  status          String    @default("open") // open | reviewed | dismissed
+  adminNote       String?
+  reviewedAt      DateTime?
+  reviewedByEmail String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, priorityScore])
+  @@index([createdAt])
+  @@index([symbol])
 }
 
 model AlertLog {
@@ -86,13 +174,72 @@ model AlertLog {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   catalystId String
   catalyst  Catalyst @relation(fields: [catalystId], references: [id], onDelete: Cascade)
-  channel   String   // discord, sms, email
-  status    String   // sent, failed
+  channel   String   // discord, sms, email, push
+  status    String   // sent, failed, blocked, cooldown
+  /// EARLY | CONFIRMED | RISK_ONLY | legacy rule id
+  alertMode String?
+  ruleId    String?
+  /// Conditions that passed (JSON array of {id,label,detail})
+  triggeredConditions Json?
+  /// Conditions that blocked firing
+  blockedConditions   Json?
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([catalystId])
   @@unique([userId, catalystId, channel])
+}
+
+/// Immutable snapshots of Alert Strategy Builder saves — every explicit save bumps version.
+model AlertStrategyVersion {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategyId   String
+  version      Int
+  schemaVersion String
+  contentHash  String
+  /// Full strategy snapshot (no phone / watchlist PII)
+  snapshot     Json
+  changeNote   String?
+  savedAt      DateTime @default(now())
+
+  @@unique([userId, strategyId, version])
+  @@index([userId, strategyId])
+  @@index([savedAt])
+}
+
+/// Optional cloud copy of trader feedback decisions — only when user explicitly opts in.
+/// Local-first; never stores phone/watchlist/webhook secrets.
+model TraderDecision {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  localId            String
+  schemaVersion      String
+  action             String
+  reason             String?
+  symbol             String
+  catalystId         String?
+  headline           String?
+  decidedAt          DateTime
+  entryPrice         Float?
+  exitPrice          Float?
+  positionSize       Float?
+  side               String?
+  alertId            String?
+  alertRuleId        String?
+  alertStrategyId    String?
+  /// DecisionContextSnapshot JSON — event-time freeze
+  contextJson        Json
+  mfePctAfter        Float?
+  maePctAfter        Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([userId, localId])
+  @@index([userId, decidedAt])
+  @@index([userId, symbol])
 }
 
 // Prop-style call board — who called the ticker first
@@ -111,4 +258,438 @@ model TraderCall {
 
   @@index([createdAt])
   @@index([symbol])
+}
+
+/// End-to-end source→user latency tracing (one row per newly ingested catalyst).
+model LatencyTrace {
+  id                       String    @id @default(cuid())
+  catalystId               String?   @unique
+  source                   String
+  sourceTier               String?
+  providerItemId           String?
+  urlHash                  String?
+  symbol                   String
+  catalystType             String?
+  headline                 String?
+  actionable               Boolean   @default(false)
+  /// urgent_filing | scheduled_earnings | editorial_recap | actionable_breaking | other
+  metricCohort             String
+  timestampQuality         String
+  marketSession            String?
+  providerPublishedAt      DateTime?
+  firstFetchedAt           DateTime?
+  fetchCompletedAt         DateTime?
+  parsedAt                 DateTime?
+  classifiedAt             DateTime?
+  persistedAt              DateTime?
+  ssePublishedAt           DateTime?
+  firstDeliveryAttemptAt   DateTime?
+  fetchLatencyMs           Int?
+  processingLatencyMs      Int?
+  deliveryLatencyMs        Int?
+  totalLatencyMs           Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([persistedAt])
+  @@index([source])
+  @@index([sourceTier])
+  @@index([metricCohort])
+  @@index([timestampQuality])
+  @@index([actionable])
+  @@index([marketSession])
+  @@index([catalystType])
+  @@index([totalLatencyMs])
+}
+
+/// Manually approved historical cases for the public evidence demo (CURATED_CASES mode).
+model DemoCase {
+  id                    String    @id @default(cuid())
+  catalystId            String?
+  symbol                String
+  headline              String
+  source                String
+  sourceUrl             String?
+  catalystType          String?
+  publishedAt           DateTime
+  ingestedAt            DateTime
+  priceAtIngest         Float?
+  changePercentAtIngest Float?
+  priceLater            Float?
+  changeLater           Float?
+  laterCheckpointLabel  String?   // e.g. "+30m", "EOD"
+  whatHappened          String
+  whyItMattered         String
+  trapRisks             String
+  howItReacted          String
+  evidence              String[]  @default([])
+  riskFlags             String[]  @default([])
+  approved              Boolean   @default(false)
+  approvedAt            DateTime?
+  approvedByEmail       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([approved, publishedAt])
+  @@index([symbol])
+}
+
+/// Dilution Radar V2 — SEC-evidence capital-risk instruments (not headline heuristics alone).
+model DilutionInstrument {
+  id                    String    @id @default(cuid())
+  symbol                String
+  cik                   String?
+  /// S1_REGISTRATION | S3_SHELF | PROSPECTUS_424B5 | REGISTERED_DIRECT | ATM_PROGRAM | …
+  instrumentType        String
+  /// active | exhausted | expired | terminated | unknown
+  status                String    @default("unknown")
+  accessionNumber       String
+  sourceUrl             String?
+  formType              String?
+  filingDate            DateTime?
+  effectiveDate         DateTime?
+  maxShares             Float?
+  maxDollars            Float?
+  offerPrice            Float?
+  warrantCount          Float?
+  warrantExercisePrice  Float?
+  /// Only set when denominator + terms are reliable; otherwise null and estimateLabel explains
+  potentialDilutionPct  Float?
+  /// estimate | capacity_only | announced_sale | unavailable
+  estimateLabel         String    @default("unavailable")
+  /// registration_capacity | announced_sale | atm_availability | confirmed_issuance | other
+  capacityKind          String    @default("other")
+  confidence            Float     @default(0)
+  missingFields         String[]  @default([])
+  evidenceSnippets      String[]  @default([])
+  structuredSections    Json?
+  sharesOutstandingDenom Float?
+  catalystId            String?
+  rawNewsId             String?
+  needsManualReview     Boolean   @default(false)
+  conflictNote          String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([symbol, accessionNumber, instrumentType])
+  @@index([symbol, filingDate])
+  @@index([instrumentType])
+  @@index([status])
+  @@index([needsManualReview])
+  @@index([filingDate])
+}
+
+/// Conflicting dilution filings flagged for manual review.
+model DilutionConflict {
+  id              String   @id @default(cuid())
+  symbol          String
+  instrumentIdA   String
+  instrumentIdB   String
+  reason          String
+  resolved        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([symbol, resolved])
+  @@index([createdAt])
+}
+
+/// Daily-refreshed US-listed equity / ETF master (SEC company_tickers + ETF hints).
+/// Not a claim of full market data coverage — symbols we can name, not necessarily quote in real time.
+model SymbolMaster {
+  symbol      String   @id
+  name        String?
+  exchange    String?  // NASDAQ | NYSE | AMEX | OTHER (best-effort)
+  assetType   String   @default("equity") // equity | etf
+  cik         String?
+  isActive    Boolean  @default(true)
+  refreshedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([assetType])
+  @@index([refreshedAt])
+  @@index([isActive])
+}
+
+/// Why a ticker is in the live monitoring / poll universe.
+model SymbolCoverage {
+  id         String    @id @default(cuid())
+  symbol     String
+  /// USER_WATCHLIST | CURATED_CORE | ACTIVE_GAINER | UNUSUAL_VOLUME | RECENT_HALT | FRESH_SEC_FILING | FRESH_NEWS | MANUAL
+  reason     String
+  temporary  Boolean   @default(false)
+  expiresAt  DateTime?
+  note       String?   // short non-PII hint (e.g. "rvol>=3", "8-K")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([symbol, reason])
+  @@index([expiresAt])
+  @@index([symbol])
+  @@index([temporary])
+}
+
+/// Low-confidence ticker matches held back from live alerts.
+model MatchQuarantine {
+  id           String    @id @default(cuid())
+  rawNewsId    String    @unique
+  symbol       String?
+  headline     String
+  source       String
+  confidence   Float
+  matchMethod  String?
+  reason       String
+  publishedAt  DateTime?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([symbol])
+  @@index([confidence])
+}
+
+/// Objective catalyst price-reaction outcomes for classification calibration (not P&L guarantees).
+model CatalystOutcome {
+  id                String   @id @default(cuid())
+  catalystId        String   @unique
+  symbol            String
+  /// Denormalized dimensions for reporting
+  catalystType      String?
+  sourceTier        String?
+  /// Judgment strength / grade bucket when available
+  strength          String?
+  confidenceBucket  String?
+  floatBucket       String?
+  liquidityBucket   String?
+  /// Session at ingest: premarket | regular | afterhours | weekend
+  marketSession     String?
+  /// Eligible for urgent-catalyst performance cohort
+  eligibleUrgent    Boolean  @default(true)
+  excludeReason     String?
+  /// Horizon snapshots JSON — see calibration/types.ts PriceSnapshot
+  snapshots         Json     @default("{}")
+  /// Per-horizon metrics JSON
+  metrics           Json?
+  /// Primary horizon (15m) convenience columns for SQL aggregates
+  rawReturnPct      Float?
+  spyRelativePct    Float?
+  sectorRelativePct Float?
+  mfePct            Float?
+  maePct            Float?
+  volumeChangePct   Float?
+  spreadPct         Float?
+  dataComplete      Boolean  @default(false)
+  lastBackfillAt    DateTime?
+  /// Approved for public case-study page (auditable examples only)
+  approvedCaseStudy Boolean  @default(false)
+  caseStudyNote     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([symbol, createdAt])
+  @@index([catalystType])
+  @@index([sourceTier])
+  @@index([marketSession])
+  @@index([eligibleUrgent])
+  @@index([approvedCaseStudy])
+  @@index([floatBucket])
+  @@index([dataComplete])
+}
+
+/// Deterministic Reaction Stage Engine snapshots (not a profit model).
+model ReactionStageSnapshot {
+  id                 String   @id @default(cuid())
+  catalystId         String
+  symbol             String
+  engineVersion      String
+  stage              String   // EARLY | ACTIVE | EXTENDED | STALE | UNKNOWN
+  previousStage      String?
+  profileId          String?
+  flappedSuppressed  Boolean  @default(false)
+  explanation        String
+  metricsJson        Json
+  rulesJson          Json
+  conflictingJson    Json     @default("[]")
+  timelineJson       Json     @default("[]")
+  marketSession      String?
+  category           String?
+  floatBucket        String?
+  priceBucket        String?
+  liquidityClass     String?
+  createdAt          DateTime @default(now())
+
+  @@index([catalystId, createdAt])
+  @@index([stage, createdAt])
+  @@index([engineVersion])
+  @@index([symbol, createdAt])
+  @@index([profileId])
+}
+
+model ReactionStageTransition {
+  id            String   @id @default(cuid())
+  catalystId    String
+  symbol        String
+  fromStage     String
+  toStage       String
+  engineVersion String
+  reason        String?
+  ruleIds       String[] @default([])
+  profileId     String?
+  createdAt     DateTime @default(now())
+
+  @@index([catalystId, createdAt])
+  @@index([fromStage, toStage])
+  @@index([createdAt])
+}
+
+/// Official-source Halt Monitor — authoritative halt lifecycle (never invents resume times).
+model HaltSnapshot {
+  id                         String   @id @default(cuid())
+  haltId                     String
+  symbol                     String
+  exchange                   String?
+  haltCode                   String
+  haltReason                 String?
+  haltStartAt                DateTime
+  newsDisseminationStatus    String
+  officialResumptionQuoteAt  DateTime?
+  officialResumptionTradeAt  DateTime?
+  lastPriceBeforeHalt        Float?
+  lastSpreadBeforeHalt       Float?
+  volumeBeforeHalt           Float?
+  catalystIds                String[] @default([])
+  filingOrNewsIds            String[] @default([])
+  source                     String
+  sourceKind                 String
+  sourceTimestamp            DateTime
+  confidence                 String
+  reconciliationStatus       String
+  lifecycle                  String
+  sessionDateEt              String
+  monitorVersion             String
+  createdAt                  DateTime @default(now())
+
+  @@index([haltId, createdAt])
+  @@index([symbol, sessionDateEt])
+  @@index([lifecycle])
+  @@index([createdAt])
+}
+
+model HaltTransitionLog {
+  id                   String   @id @default(cuid())
+  haltId               String
+  symbol               String
+  fromLifecycle        String?
+  toLifecycle          String
+  alertTransition      String
+  haltCode             String
+  at                   DateTime
+  source               String
+  sourceKind           String
+  detail               String?
+  suppressedDuplicate  Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  @@index([haltId, at])
+  @@index([symbol, at])
+  @@index([alertTransition])
+}
+
+/// Tradeability Engine snapshots — entry/exit realism only (not direction).
+model TradeabilitySnapshot {
+  id                 String   @id @default(cuid())
+  symbol             String
+  engineVersion      String
+  class              String   // LIQUID | ACCEPTABLE | THIN | EXTREMELY_THIN | UNKNOWN
+  previousClass      String?
+  flappedSuppressed  Boolean  @default(false)
+  explanation        String
+  metricsJson        Json
+  warningsJson       Json
+  rulesJson          Json
+  slippageJson       Json     @default("[]")
+  missingInputs      String[] @default([])
+  marketSession      String?
+  createdAt          DateTime @default(now())
+
+  @@index([symbol, createdAt])
+  @@index([class, createdAt])
+  @@index([engineVersion])
+}
+
+model TradeabilityTransition {
+  id            String   @id @default(cuid())
+  symbol        String
+  fromClass     String
+  toClass       String
+  engineVersion String
+  explanation   String?
+  createdAt     DateTime @default(now())
+
+  @@index([symbol, createdAt])
+  @@index([fromClass, toClass])
+  @@index([createdAt])
+}
+
+/// Service reliability incident — evidence preserved; maintenance exclusion only if announced in advance.
+model ServiceIncident {
+  id                       String    @id @default(cuid())
+  title                    String
+  summary                  String
+  severity                 String    // minor | major | critical
+  status                   String    // investigating | identified | monitoring | resolved
+  startedAt                DateTime
+  endedAt                  DateTime?
+  announcedMaintenance     Boolean   @default(false)
+  announcedAt              DateTime?
+  components               String[]  @default([])
+  sources                  String[]  @default([])
+  /// Raw evidence array — never silently rewritten
+  evidenceJson             Json      @default("[]")
+  affectedSubscriberCount  Int?
+  createdBy                String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([startedAt])
+  @@index([status])
+  @@index([severity])
+}
+
+/// Subscription service-credit evaluation — preview before apply; admin-gated.
+model ServiceCreditEvaluation {
+  id                  String    @id @default(cuid())
+  billingPeriodStart  DateTime
+  billingPeriodEnd    DateTime
+  incidentIds         String[]  @default([])
+  status              String    // draft | previewed | applied | rejected | duplicate_blocked
+  previewJson         Json?
+  amountCents         Int       @default(0)
+  reason              String?
+  legalDisclaimer     String?
+  appliedAt           DateTime?
+  appliedBy           String?
+  stripeCreditNoteId  String?
+  createdBy           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  auditLogs           ServiceCreditAuditLog[]
+
+  @@index([billingPeriodStart, billingPeriodEnd])
+  @@index([status])
+}
+
+model ServiceCreditAuditLog {
+  id            String   @id @default(cuid())
+  evaluationId  String?
+  evaluation    ServiceCreditEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  actorUserId   String
+  action        String
+  detailJson    Json
+  createdAt     DateTime @default(now())
+
+  @@index([evaluationId])
+  @@index([actorUserId])
+  @@index([createdAt])
 }

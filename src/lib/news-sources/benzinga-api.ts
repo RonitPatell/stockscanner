@@ -1,5 +1,6 @@
 import type { NewsArticle } from "@/types";
 import { hashStr } from "./rss-utils";
+import { parseProviderTimestamp, fallbackPublishNow } from "../latency-trace";
 
 /**
  * Optional Benzinga Cloud News API — the affordable path to true low-latency wire.
@@ -45,28 +46,36 @@ export async function fetchBenzingaApiNews(limit = 40): Promise<NewsArticle[]> {
             .filter(Boolean)
         : [];
       const symbol = stocks[0] || "SPY";
-      const created =
-        typeof r.created === "string"
-          ? new Date(r.created)
-          : typeof r.updated === "string"
-            ? new Date(r.updated)
-            : new Date();
+      const hasCreated = typeof r.created === "string";
+      const hasUpdated = typeof r.updated === "string";
+      const parsed = hasCreated
+        ? parseProviderTimestamp(String(r.created), { fieldKind: "created" })
+        : hasUpdated
+          ? parseProviderTimestamp(String(r.updated), { fieldKind: "updated" })
+          : fallbackPublishNow();
       const idRaw = String(r.id ?? r.url ?? headline);
       const link = typeof r.url === "string" ? r.url : undefined;
+      const id = `bz:${hashStr(idRaw)}`;
 
       out.push({
-        id: `bz:${hashStr(idRaw)}`,
+        id,
         symbol: symbol.slice(0, 5),
         headline: headline.slice(0, 280),
         source: "Benzinga API",
         url: link,
-        publishedAt: Number.isFinite(created.getTime()) ? created : new Date(),
+        publishedAt: parsed.at ?? new Date(),
         summary:
           typeof r.teaser === "string"
             ? r.teaser.slice(0, 400)
             : typeof r.body === "string"
               ? r.body.slice(0, 400)
               : undefined,
+        trace: {
+          providerPublishedAt: parsed.at,
+          parsedAt: new Date(),
+          timestampQuality: parsed.quality,
+          providerItemId: String(r.id ?? id),
+        },
       });
     }
 

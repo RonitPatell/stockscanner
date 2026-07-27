@@ -28,6 +28,10 @@ import {
   refreshQuoteCache,
   refreshQuoteVolumes,
 } from "./quote-cache-service";
+import {
+  recordLatencyTrace,
+  markTracesSsePublished,
+} from "./latency-trace";
 import { getCachedProfiles, refreshProfileCache } from "./profile-cache-service";
 import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
@@ -278,6 +282,39 @@ export async function ingestAndAnalyzeNews(
           article.source === "SEC EDGAR",
       }
     );
+
+    const { assessMatchConfidence, quarantineMatch } = await import("./coverage/match-confidence");
+    const { matchMethodForSymbol } = await import("./news-verifier");
+    const method =
+      verified.method ||
+      (verified.symbol
+        ? matchMethodForSymbol(verified.symbol, article.headline, article.summary)
+        : "unknown");
+    const assessment = assessMatchConfidence({
+      confidence: verified.confidence,
+      method,
+      reason: verified.reason,
+      headline: article.headline,
+      summary: article.summary,
+      valid: verified.valid,
+    });
+
+    if (assessment.disposition === "reject") return null;
+
+    if (assessment.disposition === "quarantine") {
+      await quarantineMatch({
+        rawNewsId: article.id,
+        symbol: verified.symbol || null,
+        headline: article.headline,
+        source: article.source,
+        confidence: assessment.confidence,
+        matchMethod: assessment.method,
+        reason: assessment.reason,
+        publishedAt: article.publishedAt,
+      }).catch(() => {});
+      return null;
+    }
+
     if (!verified.valid) return null;
 
     const symbol = verified.symbol;
@@ -307,13 +344,22 @@ export async function ingestAndAnalyzeNews(
       }
     );
 
-    const historical = estimateHistoricalMove(analysis.catalystType);
-    if (historical.avgMove != null) {
-      analysis.keyPoints = [
-        ...analysis.keyPoints,
-        `Historical avg move for similar news: ${historical.avgMove.toFixed(1)}% (n=${historical.sampleSize})`,
-      ];
-      analysis.summary += ` · hist avg move ~${historical.avgMove.toFixed(1)}%`;
+    const classifiedAt = new Date();
+    // Alert Backbone V2: do not block breaking publish on historical enrichment.
+    let historical: { avgMove: number | null; sampleSize: number | null } = {
+      avgMove: null,
+      sampleSize: null,
+    };
+    const { isPreliminaryPublishEnabled } = await import("./alert-backbone/flags");
+    if (!isPreliminaryPublishEnabled() || !wireOnly) {
+      historical = estimateHistoricalMove(analysis.catalystType);
+      if (historical.avgMove != null) {
+        analysis.keyPoints = [
+          ...analysis.keyPoints,
+          `Historical avg move for similar news: ${historical.avgMove.toFixed(1)}% (n=${historical.sampleSize})`,
+        ];
+        analysis.summary += ` · hist avg move ~${historical.avgMove.toFixed(1)}%`;
+      }
     }
     const catalystType =
       relatedSymbols.length >= 2 ? "macro" : analysis.catalystType;
@@ -353,9 +399,53 @@ export async function ingestAndAnalyzeNews(
       storyClusterId: clusterId,
       setupTags,
       verifiedConfidence: verified.confidence,
+      matchMethod: method,
+      coverageReason: null as string | null,
+      quarantined: false,
       keyPoints: analysis.keyPoints,
       sourceTier,
     };
+
+    // Temporary coverage for fresh news / SEC outside curated core
+    void (async () => {
+      try {
+        const { promoteTemporaryCoverage, primaryCoverageReason } = await import(
+          "./coverage/coverage-service"
+        );
+        const isSec = article.source === "SEC EDGAR" || article.id.startsWith("sec-");
+        const haltNews = /\b(trading\s+halt|halted|luld)\b/i.test(article.headline);
+        if (isSec) {
+          await promoteTemporaryCoverage({
+            symbol,
+            reason: "FRESH_SEC_FILING",
+            note: "edgar",
+          });
+        } else if (haltNews) {
+          await promoteTemporaryCoverage({
+            symbol,
+            reason: "RECENT_HALT",
+            note: "headline_halt — no exchange halt feed",
+          });
+        } else {
+          await promoteTemporaryCoverage({
+            symbol,
+            reason: "FRESH_NEWS",
+            note: method,
+          });
+        }
+        const reason = await primaryCoverageReason(symbol);
+        if (reason) {
+          await prisma.catalyst
+            .updateMany({
+              where: { rawNewsId: article.id },
+              data: { coverageReason: reason },
+            })
+            .catch(() => {});
+        }
+      } catch {
+        /* non-fatal */
+      }
+    })();
 
     const catalyst = await prisma.catalyst.upsert({
       where: { rawNewsId: article.id },
@@ -381,8 +471,191 @@ export async function ingestAndAnalyzeNews(
       },
     });
 
+    void recordLatencyTrace({
+      catalystId: catalyst.id,
+      source: article.source,
+      sourceTier,
+      providerItemId: article.trace?.providerItemId ?? article.id,
+      url: article.url,
+      symbol,
+      catalystType,
+      headline: article.headline,
+      summary: article.summary ?? analysis.summary,
+      relatedSymbols,
+      timestampQuality: article.trace?.timestampQuality ?? "ESTIMATED_PROVIDER",
+      providerPublishedAt:
+        article.trace?.providerPublishedAt ?? article.publishedAt,
+      firstFetchedAt: article.trace?.firstFetchedAt,
+      fetchCompletedAt: article.trace?.fetchCompletedAt,
+      parsedAt: article.trace?.parsedAt,
+      classifiedAt,
+      persistedAt: catalyst.createdAt,
+      trace: article.trace,
+    });
+
+    const mapped = mapCatalyst(catalyst);
+    void (async () => {
+      try {
+        const { registerPreliminaryAlertEvent } = await import(
+          "./alert-backbone/preliminary"
+        );
+        await registerPreliminaryAlertEvent({
+          item: mapped,
+          rawNewsId: article.id,
+          timestampQuality: article.trace?.timestampQuality ?? null,
+        });
+      } catch {
+        /* non-fatal */
+      }
+    })();
+
+    void (async () => {
+      try {
+        const { computeReactionStageEngine, persistReactionStageResult, floatBand, priceBand, liquidityBand } =
+          await import("./reaction-stage");
+        const result = computeReactionStageEngine({
+          catalystId: catalyst.id,
+          symbol,
+          headline: article.headline,
+          summary: article.summary ?? analysis.summary,
+          source: article.source,
+          category: catalystType,
+          floatShares: quote?.floatShares ?? null,
+          providerPublishedAt: article.publishedAt.toISOString(),
+          firstSeenAt: catalyst.createdAt.toISOString(),
+          classifiedAt: classifiedAt.toISOString(),
+          ingestedAt: catalyst.createdAt.toISOString(),
+          timestampQuality:
+            (article.trace?.timestampQuality as
+              | "EXACT_PROVIDER"
+              | "ESTIMATED_PROVIDER"
+              | "ARTICLE_UPDATED_TIME"
+              | "MISSING"
+              | "INVALID"
+              | null) ?? "ESTIMATED_PROVIDER",
+          priceAtIngestion: quote?.price ?? null,
+          priceAtIngestionQuality: quote?.price != null ? "ok" : "unavailable",
+          tape: {
+            currentPrice: quote?.price ?? null,
+            dayChangePercent: quote?.changePercent ?? null,
+            rVol: null,
+            quoteAgeSec: 0,
+          },
+        });
+        await persistReactionStageResult(result, {
+          catalystId: catalyst.id,
+          symbol,
+          category: catalystType,
+          floatBucket: floatBand(quote?.floatShares ?? null),
+          priceBucket: priceBand(quote?.price ?? null),
+          liquidityClass: liquidityBand({
+            dollarVolume:
+              quote?.price != null && quote?.volume != null
+                ? quote.price * quote.volume
+                : null,
+          }),
+        });
+      } catch {
+        /* non-fatal — table may not be pushed yet */
+      }
+    })();
+
+    void (async () => {
+      try {
+        const { persistJudgmentV2 } = await import("./judgment/persist");
+        const { isJudgmentV2Enabled } = await import("./judgment/types");
+        if (!isJudgmentV2Enabled()) return;
+        await persistJudgmentV2(
+          catalyst.id,
+          {
+            symbol,
+            headline: article.headline,
+            source: article.source,
+            sourceUrl: article.url,
+            sourceTier,
+            catalystType,
+            sentimentScore: analysis.sentimentScore,
+            changePercent: quote?.changePercent ?? null,
+            rVol: null,
+            floatShares: quote?.floatShares ?? null,
+            urgencyScore: analysis.urgencyScore,
+            historicalAvgMove: historical.avgMove,
+            historicalSampleSize: historical.sampleSize,
+            setupTags,
+            aiSummary: analysis.summary,
+            keyPoints: analysis.keyPoints,
+            verifiedConfidence: verified.confidence,
+            matchMethod: method,
+            publishedAt: article.publishedAt.toISOString(),
+            price: quote?.price ?? null,
+          },
+          (catalyst as { judgmentJson?: unknown }).judgmentJson
+        );
+      } catch {
+        /* non-fatal */
+      }
+    })();
+
+    // Dilution Radar V2 — SEC evidence extraction (non-blocking / enrichment path)
+    void (async () => {
+      try {
+        const { processCatalystForDilution } = await import("./dilution/from-catalyst");
+        await processCatalystForDilution({
+          catalystId: catalyst.id,
+          symbol,
+          headline: article.headline,
+          summary: article.summary ?? analysis.summary,
+          source: article.source,
+          sourceUrl: article.url,
+          rawNewsId: article.id,
+          publishedAt: article.publishedAt,
+          floatShares: quote?.floatShares ?? null,
+        });
+      } catch {
+        /* non-fatal */
+      }
+    })();
+
+    // Outcome calibration — freeze ingest price snapshot (non-blocking)
+    void (async () => {
+      try {
+        const { captureIngestSnapshot } = await import("./calibration/capture");
+        let strength: string | null = null;
+        let timing: string | null = null;
+        try {
+          const j = (catalyst as { judgmentJson?: { catalystStrength?: string; timing?: string } })
+            .judgmentJson;
+          strength = j?.catalystStrength ?? null;
+          timing = j?.timing ?? null;
+        } catch {
+          /* ignore */
+        }
+        await captureIngestSnapshot({
+          catalystId: catalyst.id,
+          symbol,
+          headline: article.headline,
+          summary: article.summary ?? analysis.summary,
+          publishedAt: article.publishedAt,
+          ingestedAt: catalyst.createdAt,
+          catalystType,
+          sourceTier,
+          strength,
+          timing,
+          verifiedConfidence: verified.confidence,
+          floatShares: quote?.floatShares ?? null,
+          price: quote?.price ?? null,
+          volume: quote?.volume ?? null,
+          avgVolume: quote?.avgVolume ?? null,
+          changePercent: quote?.changePercent ?? null,
+          quoteObservedAtMs: Date.now(),
+        });
+      } catch {
+        /* non-fatal */
+      }
+    })();
+
     if (!quote) backfillQuote(symbol, article.id);
-    return mapCatalyst(catalyst);
+    return mapped;
   };
 
   const newItems: CatalystItem[] = [];
@@ -432,6 +705,10 @@ export async function ingestAndAnalyzeNews(
         storyClusterId: true,
         setupTags: true,
         verifiedConfidence: true,
+        matchMethod: true,
+        coverageReason: true,
+        quarantined: true,
+        judgmentJson: true,
         keyPoints: true,
         sourceTier: true,
         createdAt: true,
@@ -574,7 +851,7 @@ async function buildFeedFromDatabase(
   }
 
   const catalysts = await prisma.catalyst.findMany({
-    where: { publishedAt: { gte: cutoff } },
+    where: { publishedAt: { gte: cutoff }, quarantined: false },
     orderBy: { publishedAt: "desc" },
     take: Math.min(limit * 2, 400),
   });
@@ -639,6 +916,8 @@ async function writeMergedFeeds(
   ]);
   lastGood.set("all", { ts: Date.now(), items: allMerged });
   lastGood.set("movers", { ts: Date.now(), items: moversMerged });
+  const ids = [...new Set([...allMerged, ...moversMerged].map((c) => c.id))];
+  void markTracesSsePublished(ids).catch(() => {});
 }
 
 /** Patch feed rows after async quote enrichment (wire fast path). */
@@ -713,6 +992,9 @@ export async function refreshPublicFeedCache(): Promise<void> {
 
   lastGood.set("all", { ts: Date.now(), items: mergedAll });
   lastGood.set("movers", { ts: Date.now(), items: mergedMovers });
+  void markTracesSsePublished(
+    [...new Set([...mergedAll, ...mergedMovers].map((c) => c.id))]
+  ).catch(() => {});
 }
 
 export async function getCatalysts(
@@ -796,11 +1078,15 @@ function mapCatalyst(c: {
   storyClusterId?: string | null;
   setupTags?: string[];
   verifiedConfidence?: number | null;
+  matchMethod?: string | null;
+  coverageReason?: string | null;
+  quarantined?: boolean;
+  judgmentJson?: unknown;
   keyPoints?: string[];
   sourceTier?: string | null;
   createdAt?: Date;
 }): CatalystItem {
-  return {
+  const base = {
     id: c.id,
     symbol: c.symbol,
     headline: c.headline,
@@ -826,6 +1112,9 @@ function mapCatalyst(c: {
     storyClusterId: c.storyClusterId ?? undefined,
     setupTags: c.setupTags?.length ? c.setupTags : undefined,
     verifiedConfidence: c.verifiedConfidence ?? undefined,
+    matchMethod: c.matchMethod ?? undefined,
+    coverageReason: c.coverageReason ?? undefined,
+    quarantined: c.quarantined ?? false,
     keyPoints: c.keyPoints?.length ? c.keyPoints : undefined,
     sourceTier: c.sourceTier ?? undefined,
     ingestedAt: c.createdAt?.toISOString(),
@@ -837,6 +1126,13 @@ function mapCatalyst(c: {
           )
         : undefined,
   };
+  if (c.judgmentJson && typeof c.judgmentJson === "object") {
+    return {
+      ...base,
+      judgmentV2: c.judgmentJson as import("@/lib/judgment/types").JudgmentV2,
+    };
+  }
+  return base;
 }
 
 function isPremarketHours(): boolean {

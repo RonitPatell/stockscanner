@@ -51,7 +51,7 @@ const SECRET = (process.env.CRON_SECRET || "")
   .replace(/^['"]/, "")
   .replace(/['"]$/, "")
   .trim();
-const WIRE_MS = Number(process.env.INGEST_WIRE_MS || 2_000);
+const WIRE_MS = Number(process.env.INGEST_WIRE_MS || 15_000);
 const FULL_MS = Number(process.env.INGEST_FULL_MS || 90_000);
 const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
 
@@ -143,9 +143,15 @@ function fullTick() {
 }
 
 console.log(
-  `Ingest worker → wire every ${WIRE_MS}ms, full every ${FULL_MS}ms (${BASE})`
+  `Ingest worker (legacy blended) → wire every ${WIRE_MS}ms, full every ${FULL_MS}ms (${BASE}). Prefer npm run ingest:priority for tiered schedules. Do not claim 2s unless INGEST_WIRE_MS is explicitly set that low and measured.`
 );
 wireTick();
 fullTick();
 setInterval(wireTick, WIRE_MS);
 setInterval(fullTick, FULL_MS);
+
+process.on("SIGTERM", () => {
+  console.log(new Date().toISOString(), "SIGTERM — exiting after in-flight ticks");
+  process.exit(0);
+});
+process.on("SIGINT", () => process.exit(0));

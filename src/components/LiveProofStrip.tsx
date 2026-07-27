@@ -52,59 +52,58 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
   return (
     <div
       className={cn(
-        "rounded-xl border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 via-zinc-900/80 to-cyan-500/5 overflow-hidden",
+        "overflow-hidden mk-panel",
         className
       )}
     >
-      <div className={cn("px-4 py-3", compact ? "py-2.5" : "py-4")}>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
-          <span className="inline-flex items-center gap-1.5 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <div className={cn("px-4 sm:px-5", compact ? "py-3" : "py-5")}>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
+          <span className="mk-tick !text-emerald-400 inline-flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
             Live proof
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
-            <Zap className="w-3 h-3 text-emerald-500" />
+          <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+            <Zap className="w-3 h-3 text-emerald-500/80" />
             Source poll ~{stats?.sourcePollCycleSec ?? stats?.wireCycleSec ?? 60}s
           </span>
           {avg != null && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
+            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
               <Clock className="w-3 h-3" />
               Avg ingest{" "}
-              <strong className="text-emerald-400 font-mono">{formatIngest(avg)}</strong> after
-              publish
+              <strong className="text-emerald-400 font-mono font-medium">{formatIngest(avg)}</strong>
               {stats?.latency.sampleSize ? (
-                <span className="text-zinc-600"> (n={stats.latency.sampleSize})</span>
+                <span className="text-zinc-600"> · n={stats.latency.sampleSize}</span>
               ) : null}
             </span>
           )}
           {showUnder3m && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
-              <strong className="text-emerald-400">
+            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+              <strong className="text-emerald-400 font-medium">
                 {stats?.latency.under3mRate ?? stats?.latency.under60sRate}%
               </strong>{" "}
               under 3m
             </span>
           )}
           {fastest != null && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
-              <TrendingUp className="w-3 h-3 text-emerald-500" />
-              Fastest catch{" "}
-              <strong className="text-emerald-400 font-mono">{formatIngest(fastest)}</strong>
+            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+              <TrendingUp className="w-3 h-3 text-emerald-500/80" />
+              Fastest{" "}
+              <strong className="text-emerald-400 font-mono font-medium">{formatIngest(fastest)}</strong>
             </span>
           )}
           {stats?.feed.itemCount ? (
-            <span className="text-[11px] text-zinc-600 ml-auto">{stats.feed.itemCount} catalysts in feed</span>
+            <span className="text-[11px] text-zinc-600 ml-auto">{stats.feed.itemCount} in feed</span>
           ) : null}
         </div>
 
         {!compact && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider">
-              <TrendingUp className="w-3 h-3 text-emerald-500" />
-              Caught it — fastest ingests
+          <div className="border-t mk-hairline divide-y divide-[var(--hairline)]">
+            <div className="mk-tick flex items-center gap-1.5 py-2.5">
+              <TrendingUp className="w-3 h-3 text-emerald-500/80" />
+              Fastest ingests
             </div>
             {recent.length === 0 ? (
-              <p className="text-xs text-zinc-500 py-1">
+              <p className="text-xs text-zinc-500 py-3">
                 {stats
                   ? "No catch samples in the current window yet — ingest a few headlines and this fills automatically."
                   : "Loading live proof…"}
@@ -113,15 +112,15 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
               recent.slice(0, 3).map((win) => {
                 const delayLabel =
                   win.ingestDelaySec >= 120
-                    ? `+${Math.round(win.ingestDelaySec / 60)}m ingest`
-                    : `+${win.ingestDelaySec}s ingest`;
+                    ? `+${Math.round(win.ingestDelaySec / 60)}m`
+                    : `+${win.ingestDelaySec}s`;
                 return (
                   <div
                     key={`${win.symbol}-${win.ingestDelaySec}-${win.headline.slice(0, 24)}`}
-                    className="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2"
+                    className="py-3 transition-colors duration-300 hover:bg-emerald-500/[0.03]"
                   >
                     <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="font-mono font-bold text-white">{win.symbol}</span>
+                      <span className="font-mono font-bold text-white tracking-tight">{win.symbol}</span>
                       {win.changePercent != null && (
                         <span
                           className={cn(
@@ -134,7 +133,7 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
                       )}
                       <span className="text-[10px] text-emerald-500/90 font-mono">{delayLabel}</span>
                     </div>
-                    <p className="text-xs text-zinc-400 line-clamp-1 mt-1">{win.headline}</p>
+                    <p className="text-xs text-zinc-500 line-clamp-1 mt-1">{win.headline}</p>
                   </div>
                 );
               })
@@ -169,12 +168,12 @@ export function SpeedWinCard({
   }, []);
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 hover:border-zinc-700 transition-colors">
+    <div className="bg-[var(--bg-graphite)]/80 p-5 transition-colors duration-300 hover:bg-emerald-500/[0.04]">
       <div className="flex items-start justify-between gap-3 mb-2">
         <div>
-          <span className="font-mono font-bold text-lg text-white">{win.symbol}</span>
+          <span className="font-mono font-bold text-lg text-white tracking-tight">{win.symbol}</span>
           {win.catalystType && (
-            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/25">
+            <span className="ml-2 text-[10px] uppercase tracking-wide text-zinc-500 border mk-hairline px-1.5 py-0.5">
               {win.catalystType.replace(/_/g, " ")}
             </span>
           )}
@@ -188,12 +187,12 @@ export function SpeedWinCard({
           {formatPercent(win.changePercent ?? 0)}
         </span>
       </div>
-      <p className="text-sm text-zinc-300 line-clamp-2 mb-3">{win.headline}</p>
+      <p className="text-sm text-zinc-400 line-clamp-2 mb-3">{win.headline}</p>
       {showTimeline && mounted && (
-        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-zinc-500 mb-2">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-zinc-600 mb-2">
           <span>Published {formatClockTime(win.publishedAt)}</span>
           <span className="text-zinc-700">→</span>
-          <span className="text-emerald-500">In feed {formatClockTime(win.ingestedAt)}</span>
+          <span className="text-emerald-500/90">In feed {formatClockTime(win.ingestedAt)}</span>
           <span className="text-zinc-700">·</span>
           <span className="text-emerald-400">+{win.ingestDelaySec}s</span>
         </div>

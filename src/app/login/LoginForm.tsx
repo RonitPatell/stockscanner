@@ -28,7 +28,6 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -39,10 +38,20 @@ export default function LoginForm() {
 
     try {
       if (mode === "register") {
+        void fetch("/api/analytics/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: "signup_started" }),
+        }).catch(() => {});
+
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name, phoneNumber: phone }),
+          body: JSON.stringify({
+            email,
+            password,
+            ...(name.trim() ? { name: name.trim() } : {}),
+          }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -73,90 +82,146 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-4 sm:px-6 h-16 flex items-center">
-        <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100">
+    <div className="marketing-shell min-h-screen flex flex-col relative overflow-hidden">
+      <div className="absolute inset-0 grid-bg opacity-50 pointer-events-none" />
+      <div className="mk-glow-top absolute inset-x-0 top-0 h-[50vh] pointer-events-none" />
+
+      <header className="relative border-b mk-hairline px-4 sm:px-6 h-16 flex items-center justify-between z-10">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           <div className="flex items-center gap-2">
             <LogoMark className="w-7 h-7" />
-            <span className="font-bold">TrustTicker</span>
+            <span className="font-semibold tracking-tight">
+              Trust<span className="text-emerald-400">Ticker</span>
+            </span>
           </div>
         </Link>
+        <span className="mk-tick hidden sm:inline">Secure sign-in</span>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-4 py-16">
-        <div className="w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center mb-2">
-            {mode === "login" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p className="text-zinc-400 text-center text-sm mb-8">
-            {mode === "register"
-              ? "Start your 7-day free trial"
-              : "Sign in to your TrustTicker account"}
-          </p>
+      <main className="relative flex-1 flex items-center justify-center px-4 py-16">
+        <div className="w-full max-w-md price-rise">
+          <div className="mk-panel mk-corners p-7 sm:p-9">
+            <div className="text-center mb-8">
+              <LogoMark className="w-11 h-11 mx-auto mb-5" />
+              <h1 className="mk-display text-2xl sm:text-[1.75rem] mb-2">
+                {mode === "login" ? "Welcome back" : "Create your account"}
+              </h1>
+              <p className="mk-tick normal-case !tracking-[0.06em]">
+                {mode === "register"
+                  ? "7-day free trial · cancel anytime"
+                  : "Sign in to your TrustTicker desk"}
+              </p>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "register" && (
-              <>
+            {/* Mode toggle */}
+            <div
+              className="grid grid-cols-2 gap-1 p-1 border border-[var(--border-medium)] bg-black/30 mb-6"
+              role="tablist"
+              aria-label="Sign in or create account"
+            >
+              {(
+                [
+                  { key: "login", label: "Sign in" },
+                  { key: "register", label: "Create account" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === t.key}
+                  onClick={() => {
+                    setMode(t.key);
+                    setError("");
+                  }}
+                  className={
+                    mode === t.key
+                      ? "py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] text-sm font-semibold transition-colors"
+                      : "py-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] text-sm font-medium transition-colors"
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "register" && (
+                <div>
+                  <label htmlFor="auth-name" className="mk-tick block mb-1.5">
+                    Name <span className="text-[var(--text-tertiary)]">(optional)</span>
+                  </label>
+                  <input
+                    id="auth-name"
+                    type="text"
+                    placeholder="Your name"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mk-input"
+                  />
+                </div>
+              )}
+              <div>
+                <label htmlFor="auth-email" className="mk-tick block mb-1.5">
+                  Email
+                </label>
                 <input
-                  type="text"
-                  placeholder="Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone number"
+                  id="auth-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
                   required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mk-input"
                 />
-              </>
+              </div>
+              <div>
+                <label htmlFor="auth-password" className="mk-tick block mb-1.5">
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  placeholder={mode === "register" ? "8+ characters" : "Your password"}
+                  autoComplete={mode === "register" ? "new-password" : "current-password"}
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mk-input"
+                />
+              </div>
+
+              {error && (
+                <p
+                  className="text-red-400 text-sm border border-red-500/25 bg-red-500/10 px-3 py-2"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" size="lg" className="w-full cta-glow" disabled={loading}>
+                {loading
+                  ? "One moment…"
+                  : mode === "login"
+                    ? "Sign in"
+                    : "Create account"}
+              </Button>
+            </form>
+
+            {mode === "register" && (
+              <p className="mk-tick text-center normal-case !tracking-[0.06em] mt-4">
+                Billing starts only if you stay past the trial
+              </p>
             )}
-            <input
-              type="email"
-              placeholder="Email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
-
-            {error && <p className="text-red-400 text-sm">{error}</p>}
-
-            <Button type="submit" size="lg" className="w-full" disabled={loading}>
-              {loading ? "Loading..." : mode === "login" ? "Sign In" : "Create Account"}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-zinc-500 mt-6">
-            {mode === "login" ? (
-              <>
-                Don&apos;t have an account?{" "}
-                <button onClick={() => setMode("register")} className="text-emerald-400 hover:underline">
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{" "}
-                <button onClick={() => setMode("login")} className="text-emerald-400 hover:underline">
-                  Sign in
-                </button>
-              </>
-            )}
-          </p>
+          </div>
 
           <div className="mt-8">
             <DisclaimerBanner compact />

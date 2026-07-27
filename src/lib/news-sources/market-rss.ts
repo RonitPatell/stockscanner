@@ -3,6 +3,7 @@ import { resolveArticleSymbol, isNonStockArticle, articleIsAboutSymbol } from ".
 import { isValidTickerFormat } from "../ticker-utils";
 import { getNextTickerBatch } from "./active-tickers";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
+import { stampFromRssPubDate } from "../latency-trace";
 
 /** Broad market/news RSS feeds — symbol resolved from headline when present */
 const FAST_MARKET_FEEDS: { url: string; source: string }[] = [
@@ -43,14 +44,17 @@ async function fetchRssFeedBatch(
         const resolved = resolveArticleSymbol(item.title, summary);
         if (!resolved || !articleIsAboutSymbol(resolved.symbol, item.title, summary)) continue;
 
+        const stamp = stampFromRssPubDate(item.pubDate);
+        const id = `rss-${hashStr(key)}`;
         out.push({
-          id: `rss-${hashStr(key)}`,
+          id,
           symbol: resolved.symbol,
           headline: item.title,
           source,
           url: item.link || undefined,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: stamp.publishedAt,
           summary,
+          trace: { ...stamp.trace, providerItemId: id },
         });
       }
       return out;
@@ -114,14 +118,17 @@ export async function fetchYahooTickerNews(
         if (!symbol || !isValidTickerFormat(symbol)) continue;
         if (!articleIsAboutSymbol(symbol, item.title, item.description.slice(0, 300))) continue;
 
+        const stamp = stampFromRssPubDate(item.pubDate);
+        const id = `yh-${hashStr(key)}`;
         articles.push({
-          id: `yh-${hashStr(key)}`,
+          id,
           symbol,
           headline: item.title,
           source: "Yahoo Finance",
           url: item.link || undefined,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: stamp.publishedAt,
           summary: item.description.slice(0, 300),
+          trace: { ...stamp.trace, providerItemId: id },
         });
       }
     })

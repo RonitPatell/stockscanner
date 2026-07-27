@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createCheckoutSession, getOrCreateStripeCustomer } from "@/lib/stripe";
+import { hasTrialClaim } from "@/lib/trial-claims";
+import { track } from "@/lib/analytics/track";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -27,13 +29,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (!user.phoneNumber) {
-      return NextResponse.json(
-        { error: "Add a phone number to your account before subscribing" },
-        { status: 400 }
-      );
-    }
-
     if (plan === "annual" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
       return NextResponse.json(
         { error: "Annual plan is not available right now — use monthly." },
@@ -54,21 +49,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const phoneTrialUsed = user.phoneNumber
-      ? await prisma.user.findFirst({
-          where: {
-            phoneNumber: user.phoneNumber,
-            hasUsedTrial: true,
-            NOT: { id: user.id },
-          },
-        })
-      : null;
+    // Trial abuse: account flag + durable email/phone hash claims (no phone required at signup)
+    const claimUsed = await hasTrialClaim({
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+    });
+    const allowTrial = !user.hasUsedTrial && !claimUsed;
+
+    void track("checkout_started", { plan });
 
     const checkoutSession = await createCheckoutSession(
       customerId,
       user.id,
       user.email,
-      !user.hasUsedTrial && !phoneTrialUsed,
+      allowTrial,
       plan
     );
 

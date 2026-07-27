@@ -37,6 +37,13 @@ export interface CatalystItem {
   storyClusterId?: string | null;
   setupTags?: string[];
   verifiedConfidence?: number | null;
+  /** cashtag | exchange_tag | company_name | … */
+  matchMethod?: string | null;
+  /** USER_WATCHLIST | CURATED_CORE | ACTIVE_GAINER | … */
+  coverageReason?: string | null;
+  quarantined?: boolean;
+  /** Judgment V2 snapshot when flag enabled / persisted */
+  judgmentV2?: import("@/lib/judgment/types").JudgmentV2;
   keyPoints?: string[];
   sourceTier?: string | null;
   /** All headlines when multiple news items exist for this symbol */
@@ -151,6 +158,21 @@ export interface MarketScannerSnapshot {
   marketSession: "premarket" | "regular" | "afterhours" | "closed";
 }
 
+/** Optional end-to-end latency tracing metadata attached during ingest. */
+export interface NewsArticleTraceMeta {
+  providerPublishedAt?: Date | null;
+  firstFetchedAt?: Date;
+  fetchCompletedAt?: Date;
+  parsedAt?: Date;
+  timestampQuality?:
+    | "EXACT_PROVIDER"
+    | "ESTIMATED_PROVIDER"
+    | "ARTICLE_UPDATED_TIME"
+    | "MISSING"
+    | "INVALID";
+  providerItemId?: string;
+}
+
 export interface NewsArticle {
   id: string;
   symbol: string;
@@ -159,6 +181,8 @@ export interface NewsArticle {
   url?: string;
   publishedAt: Date;
   summary?: string;
+  /** Populated by news fetchers / annotateFetchedArticles for latency tracing. */
+  trace?: NewsArticleTraceMeta;
 }
 
 export const CATALYST_TYPES = [
