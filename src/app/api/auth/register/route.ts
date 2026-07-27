@@ -15,7 +15,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
-  const rl = await rateLimit(`register:ip:${ip}`, 5, 60 * 60_000);
+  const rl = await rateLimit(`register:ip:${ip}`, 5, 60 * 60_000, { strict: true });
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many registration attempts. Try again later." },

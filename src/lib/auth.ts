@@ -33,8 +33,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         // Brute-force protection: per IP and per email
         const [ipLimit, emailLimit] = await Promise.all([
-          rateLimit(`login:ip:${ip}`, 20, 15 * 60_000),
-          rateLimit(`login:email:${email}`, 10, 15 * 60_000),
+          rateLimit(`login:ip:${ip}`, 20, 15 * 60_000, { strict: true }),
+          rateLimit(`login:email:${email}`, 10, 15 * 60_000, { strict: true }),
         ]);
         if (!ipLimit.ok || !emailLimit.ok) {
           return null;

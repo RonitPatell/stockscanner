@@ -70,11 +70,17 @@ function secretsMatch(provided: string, expected: string): boolean {
   }
 }
 
-/** Cron / worker Bearer auth — fail closed without CRON_SECRET outside development. */
+/** Cron / worker Bearer auth — always fail closed without CRON_SECRET except local `next dev`. */
 export function authorizeCron(req: Request): boolean {
   const secret = normalizeCronSecret(process.env.CRON_SECRET);
+  const isLocalDev =
+    process.env.NODE_ENV === "development" &&
+    !process.env.VERCEL &&
+    !process.env.RAILWAY_ENVIRONMENT &&
+    !process.env.RAILWAY_PROJECT_ID;
+
   if (!secret) {
-    return process.env.NODE_ENV === "development";
+    return isLocalDev;
   }
 
   const auth = (req.headers.get("authorization") || "").trim();

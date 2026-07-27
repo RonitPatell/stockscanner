@@ -9,7 +9,10 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { stripeCustomerId: true },
+  });
   if (!user?.stripeCustomerId) {
     return NextResponse.json({ error: "No subscription found" }, { status: 404 });
   }

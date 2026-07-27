@@ -15,6 +15,13 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
+      select: {
+        id: true,
+        email: true,
+        phoneNumber: true,
+        stripeCustomerId: true,
+        hasUsedTrial: true,
+      },
     });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -29,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     if (plan === "annual" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
       return NextResponse.json(
-        { error: "Annual plan not configured yet — use monthly or set STRIPE_PRICE_ID_ANNUAL" },
+        { error: "Annual plan is not available right now — use monthly." },
         { status: 400 }
       );
     }

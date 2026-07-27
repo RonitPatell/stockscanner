@@ -38,19 +38,34 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
+  const password = String(body?.password ?? "");
+  if (!password || password.length > 72) {
+    return NextResponse.json(
+      { error: "Enter your password to delete this account" },
+      { status: 400 }
+    );
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
       email: true,
+      passwordHash: true,
       subscriptionStatus: true,
       subscriptionEndsAt: true,
       stripeCustomerId: true,
     },
   });
 
-  if (!user) {
+  if (!user?.passwordHash) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
+  }
+
+  const bcrypt = await import("bcryptjs");
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    return NextResponse.json({ error: "Incorrect password" }, { status: 403 });
   }
 
   if (hasOpenSubscription(user.subscriptionStatus)) {

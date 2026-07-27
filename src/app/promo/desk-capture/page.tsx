@@ -494,14 +494,11 @@ function buildScanner(): MarketScannerSnapshot {
 export default async function DeskCapturePage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; secret?: string }>;
+  searchParams: Promise<{ token?: string }>;
 }) {
-  const { token, secret } = await searchParams;
+  const { token } = await searchParams;
   const expected = process.env.CRON_SECRET;
-  // Prefer short-lived HMAC token. Legacy ?secret= still accepted briefly for local scripts.
-  const ok =
-    verifyPromoCaptureToken(expected, token) ||
-    (!!expected && !!secret && secret === expected && process.env.NODE_ENV === "development");
+  const ok = verifyPromoCaptureToken(expected, token);
   if (!ok) {
     notFound();
   }

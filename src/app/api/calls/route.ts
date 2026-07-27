@@ -46,7 +46,11 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     calls: calls.map((c) => ({
-      ...c,
+      id: c.id,
+      symbol: c.symbol,
+      bias: c.bias,
+      note: c.note,
+      displayName: c.displayName,
       createdAt: c.createdAt.toISOString(),
       liveChangePercent: quotes[c.symbol]?.changePercent ?? null,
       livePrice: quotes[c.symbol]?.price ?? null,
@@ -105,5 +109,15 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ call, ok: true });
+  return NextResponse.json({
+    ok: true,
+    call: {
+      id: call.id,
+      symbol: call.symbol,
+      bias: call.bias,
+      note: call.note,
+      displayName: call.displayName,
+      createdAt: call.createdAt.toISOString(),
+    },
+  });
 }

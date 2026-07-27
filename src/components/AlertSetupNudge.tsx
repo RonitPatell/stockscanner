@@ -19,10 +19,10 @@ export function AlertSetupNudge() {
       .then((data) => {
         if (!data) return;
         const hasChannel =
-          (data.discordAlertsEnabled && data.discordWebhook) ||
+          (data.discordAlertsEnabled && data.discordWebhookConfigured) ||
           data.emailAlertsEnabled ||
           data.smsAlertsEnabled ||
-          data.pushSubscription;
+          data.pushSubscription?.configured;
         const subscribed =
           data.subscriptionStatus === "active" || data.subscriptionStatus === "trialing";
         if (subscribed && !hasChannel) setShow(true);

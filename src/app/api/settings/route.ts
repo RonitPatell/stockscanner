@@ -94,8 +94,19 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    ...user,
+    discordWebhookConfigured: Boolean(user.discordWebhook),
     discordWebhookMasked: redactWebhook(user.discordWebhook),
+    phoneNumber: user.phoneNumber,
+    smsAlertsEnabled: user.smsAlertsEnabled,
+    discordAlertsEnabled: user.discordAlertsEnabled,
+    watchlist: user.watchlist,
+    scannerFilters: user.scannerFilters,
+    alertRules: user.alertRules,
+    subscriptionStatus: user.subscriptionStatus,
+    subscriptionEndsAt: user.subscriptionEndsAt,
+    emailAlertsEnabled: user.emailAlertsEnabled,
+    emailBriefEnabled: user.emailBriefEnabled,
+    onboardingCompleted: user.onboardingCompleted,
     pushSubscription: user.pushSubscription ? { configured: true } : null,
   });
 }
@@ -122,14 +133,22 @@ export async function PATCH(req: NextRequest) {
     body.alertRules !== undefined ? normalizeAlertRules(body.alertRules) : undefined;
 
   let discordWebhook: string | undefined;
+  let clearDiscordWebhook = false;
   if (body.discordWebhook !== undefined) {
-    try {
-      discordWebhook = assertDiscordWebhookOrThrow(String(body.discordWebhook ?? ""));
-    } catch {
-      return NextResponse.json(
-        { error: "Discord webhook must be a valid discord.com webhook URL" },
-        { status: 400 }
-      );
+    const raw = String(body.discordWebhook ?? "").trim();
+    // Empty string clears; omit / whitespace-only leaves existing webhook unchanged
+    if (!raw) {
+      clearDiscordWebhook = true;
+      discordWebhook = undefined;
+    } else {
+      try {
+        discordWebhook = assertDiscordWebhookOrThrow(raw);
+      } catch {
+        return NextResponse.json(
+          { error: "Discord webhook must be a valid discord.com webhook URL" },
+          { status: 400 }
+        );
+      }
     }
   }
 
@@ -146,7 +165,7 @@ export async function PATCH(req: NextRequest) {
       });
       if (taken) {
         return NextResponse.json(
-          { error: "That phone number is already in use" },
+          { error: "Could not update phone number. Try a different number." },
           { status: 409 }
         );
       }
@@ -157,7 +176,8 @@ export async function PATCH(req: NextRequest) {
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      ...(discordWebhook !== undefined && { discordWebhook: discordWebhook || null }),
+      ...(clearDiscordWebhook && { discordWebhook: null }),
+      ...(discordWebhook !== undefined && { discordWebhook }),
       ...(phoneNumber !== undefined && { phoneNumber }),
       ...(body.smsAlertsEnabled !== undefined && { smsAlertsEnabled: body.smsAlertsEnabled }),
       ...(body.discordAlertsEnabled !== undefined && {
@@ -173,10 +193,21 @@ export async function PATCH(req: NextRequest) {
         alertRules: alertRules as unknown as Prisma.InputJsonValue,
       }),
     },
+    select: {
+      discordWebhook: true,
+      phoneNumber: true,
+      smsAlertsEnabled: true,
+      discordAlertsEnabled: true,
+      emailAlertsEnabled: true,
+      emailBriefEnabled: true,
+      watchlist: true,
+      scannerFilters: true,
+      alertRules: true,
+    },
   });
 
   return NextResponse.json({
-    discordWebhook: user.discordWebhook,
+    discordWebhookConfigured: Boolean(user.discordWebhook),
     discordWebhookMasked: redactWebhook(user.discordWebhook),
     phoneNumber: user.phoneNumber,
     smsAlertsEnabled: user.smsAlertsEnabled,

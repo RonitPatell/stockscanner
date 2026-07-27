@@ -1,0 +1,41 @@
+---
+description: Mandatory security / data-isolation rules for every code change
+alwaysApply: true
+---
+
+# Security (required on every change)
+
+No change is “done” if it weakens auth, leaks secrets, or lets user A read/write user B’s private data.
+
+## Absolute rules
+
+1. **Never return secrets** — `passwordHash`, raw Discord webhooks, Stripe secrets, `CRON_SECRET`, DB URLs, VAPID private keys, full push subscriptions, phone numbers beyond what the owner needs. Prefer masks / booleans (`configured: true`).
+2. **Never trust client `userId`** — ownership always comes from `session.user.id` via `requireUser` / `requirePro` / `auth()`. Do not accept body/query `userId` for private rows.
+3. **Scope every user-owned query** — `where: { id: session.user.id }` or `where: { userId: session.user.id }`. Shared product data (catalysts, call board) is intentional; private settings/alerts/watchlists are not.
+4. **Cron / workers fail closed** — `authorizeCron` must reject when `CRON_SECRET` is missing in any non-local deploy. Never put the secret in URLs or JSON responses.
+5. **Least-privilege `select`** — never `findUnique` a full User row when you only need email/Stripe ids. Never load `passwordHash` except for login/password verify.
+6. **No debug/env leaks** — public `/api/health` and errors must not expose stack traces, env names with values, or internal pipeline error strings that aid attackers.
+7. **Rate-limit auth & mutation routes** — login, register, settings, account delete, calls POST. Prefer Redis; do not silently remove limits.
+8. **Validate & allowlist writes** — PATCH/POST only known fields; never mass-assign `subscriptionStatus`, `stripe*`, `passwordHash`, `hasUsedTrial`.
+9. **No `NEXT_PUBLIC_` secrets** — only truly public config. Server secrets stay server-only.
+10. **SSR/middleware gates for private pages** — settings/dashboard/desk must not rely on client-only “if !session” UI.
+
+## Prisma / “RLS” equivalent
+
+Postgres RLS is not wired through Prisma. Application-level row security is mandatory:
+
+- User-owned tables: always filter by session user id
+- When adding a new model with private data, add `userId` + cascade delete + enforce in every route
+- Prefer centralized helpers in `src/lib/api-guard.ts` over ad-hoc `auth()` checks
+
+## Checklist before shipping any API or data change
+
+- [ ] Auth gate correct (`requirePro` vs `requireUser` vs public vs cron)
+- [ ] No cross-user read/write by changing an id
+- [ ] Response JSON reviewed for secret fields
+- [ ] Errors are generic to clients; details only in server logs
+- [ ] Mutations rate-limited where abuse is plausible
+
+## Honesty
+
+“Fully secure / cannot be hacked” is impossible. Goal: defense in depth, no known IDOR/secret leaks, fail closed on ops auth, and keep this bar on every change.

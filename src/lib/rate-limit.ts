@@ -28,14 +28,28 @@ function memoryLimit(key: string, limit: number, windowMs: number): RateLimitRes
 
 /**
  * Sliding fixed-window rate limit. Prefers Upstash Redis when configured.
+ * Auth-sensitive callers should pass `strict: true` so memory fallback uses
+ * tighter limits when Redis is unavailable (serverless multi-instance risk).
  */
 export async function rateLimit(
   key: string,
   limit: number,
-  windowMs: number
+  windowMs: number,
+  options?: { strict?: boolean }
 ): Promise<RateLimitResult> {
   const redis = getRedis();
-  if (!redis) return memoryLimit(key, limit, windowMs);
+  const effectiveLimit =
+    !redis && options?.strict ? Math.max(3, Math.floor(limit / 2)) : limit;
+
+  if (!redis) {
+    if (options?.strict && process.env.NODE_ENV === "production") {
+      console.warn(
+        "[rate-limit] Redis unset — using tighter in-memory limits for",
+        key.split(":")[0]
+      );
+    }
+    return memoryLimit(key, effectiveLimit, windowMs);
+  }
 
   try {
     const redisKey = `rl:${key}`;
@@ -50,7 +64,7 @@ export async function rateLimit(
     }
     return { ok: true, remaining: Math.max(0, limit - count), resetAt };
   } catch {
-    return memoryLimit(key, limit, windowMs);
+    return memoryLimit(key, effectiveLimit, windowMs);
   }
 }
 

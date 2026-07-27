@@ -15,7 +15,8 @@ import type { AlertRule } from "@/lib/alert-rules";
 import { DEFAULT_ALERT_RULES } from "@/lib/alert-rules";
 
 interface SettingsData {
-  discordWebhook?: string;
+  discordWebhookConfigured?: boolean;
+  discordWebhookMasked?: string | null;
   discordAlertsEnabled?: boolean;
   smsAlertsEnabled?: boolean;
   emailAlertsEnabled?: boolean;
@@ -29,6 +30,8 @@ interface SettingsData {
 export default function SettingsPage() {
   const { data: session } = useSession();
   const [discordWebhook, setDiscordWebhook] = useState("");
+  const [discordWebhookMasked, setDiscordWebhookMasked] = useState<string | null>(null);
+  const [discordConfigured, setDiscordConfigured] = useState(false);
   const [discordAlertsEnabled, setDiscordAlertsEnabled] = useState(false);
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
   const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
@@ -42,6 +45,7 @@ export default function SettingsPage() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>(DEFAULT_ALERT_RULES);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -50,7 +54,9 @@ export default function SettingsPage() {
       fetch("/api/settings")
         .then((r) => r.json())
         .then((data: SettingsData) => {
-          setDiscordWebhook(data.discordWebhook || "");
+          setDiscordWebhook("");
+          setDiscordConfigured(Boolean(data.discordWebhookConfigured));
+          setDiscordWebhookMasked(data.discordWebhookMasked ?? null);
           setDiscordAlertsEnabled(data.discordAlertsEnabled || false);
           setSmsAlertsEnabled(data.smsAlertsEnabled || false);
           setEmailAlertsEnabled(data.emailAlertsEnabled || false);
@@ -74,21 +80,47 @@ export default function SettingsPage() {
       .map((s) => s.trim().toUpperCase())
       .filter((s) => /^[A-Z]{1,5}$/.test(s));
 
-    await fetch("/api/settings", {
+    const payload: Record<string, unknown> = {
+      discordAlertsEnabled,
+      smsAlertsEnabled,
+      emailAlertsEnabled,
+      emailBriefEnabled,
+      watchlist,
+      alertRules,
+    };
+    // Only send webhook when user typed a new one (or explicit clear via "clear")
+    const trimmedWebhook = discordWebhook.trim();
+    if (trimmedWebhook) {
+      payload.discordWebhook = trimmedWebhook;
+    }
+
+    const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        discordWebhook,
-        discordAlertsEnabled,
-        smsAlertsEnabled,
-        emailAlertsEnabled,
-        emailBriefEnabled,
-        watchlist,
-        alertRules,
-      }),
+      body: JSON.stringify(payload),
     });
+    if (res.ok) {
+      const data = (await res.json()) as SettingsData;
+      setDiscordWebhook("");
+      setDiscordConfigured(Boolean(data.discordWebhookConfigured));
+      setDiscordWebhookMasked(data.discordWebhookMasked ?? null);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleClearWebhook = async () => {
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ discordWebhook: "" }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as SettingsData;
+      setDiscordWebhook("");
+      setDiscordConfigured(Boolean(data.discordWebhookConfigured));
+      setDiscordWebhookMasked(data.discordWebhookMasked ?? null);
+    }
   };
 
   const handleManageBilling = async () => {
@@ -113,7 +145,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/account", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmation: deleteConfirm }),
+        body: JSON.stringify({ confirmation: deleteConfirm, password: deletePassword }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -192,11 +224,30 @@ export default function SettingsPage() {
 
             <input
               type="url"
-              placeholder="https://discord.com/api/webhooks/..."
+              placeholder={
+                discordConfigured
+                  ? "Paste a new webhook to replace (leave blank to keep current)"
+                  : "https://discord.com/api/webhooks/..."
+              }
               value={discordWebhook}
               onChange={(e) => setDiscordWebhook(e.target.value)}
+              autoComplete="off"
               className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
+            {discordConfigured && discordWebhookMasked && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                <span>
+                  Saved: <span className="font-mono text-zinc-400">{discordWebhookMasked}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleClearWebhook()}
+                  className="text-red-400/90 hover:underline"
+                >
+                  Remove webhook
+                </button>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
@@ -390,10 +441,23 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500/40"
                   autoComplete="off"
                 />
+                <label className="text-xs text-zinc-500 block">Password</label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your account password"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  autoComplete="current-password"
+                />
                 {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
                 <Button
                   className="w-full bg-red-600 hover:bg-red-500 text-white"
-                  disabled={deleteLoading || deleteConfirm.trim().toUpperCase() !== "DELETE"}
+                  disabled={
+                    deleteLoading ||
+                    deleteConfirm.trim().toUpperCase() !== "DELETE" ||
+                    !deletePassword
+                  }
                   onClick={() => void handleDeleteAccount()}
                 >
                   <Trash2 className="w-4 h-4" />
