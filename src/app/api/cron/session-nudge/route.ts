@@ -18,11 +18,13 @@ export async function GET(req: NextRequest) {
   const plan = await buildSessionPlan();
 
   const setupLine = plan.setups.length
-    ? plan.setups.map((s) => `${s.symbol} ${s.bias}`).join(" · ")
-    : "No high-conviction setups yet — check the desk";
+    ? plan.setups
+        .map((s) => `${s.symbol} ${s.directionLabel} (${s.materialityLabel})`)
+        .join(" · ")
+    : "No material review candidates yet — check the desk";
   const skipLine = plan.skips.length
-    ? `Skip: ${plan.skips.map((s) => s.symbol).join(", ")}`
-    : "No dilution skips flagged";
+    ? `Capital caution: ${plan.skips.map((s) => s.symbol).join(", ")}`
+    : "No dilution / capital-caution names flagged";
 
   const users = await prisma.user.findMany({
     where: {

@@ -39,9 +39,15 @@ import { LiveQuoteProvider } from "./LiveQuoteProvider";
 import { MarketMonitor } from "./MarketMonitor";
 import { PlatformGuide } from "./PlatformGuide";
 import { HelpTip } from "./HelpTip";
+import { DashboardShellV3 } from "./dashboard-shell/DashboardShellV3";
+import { isDashboardShellV3Enabled } from "@/lib/dashboard-shell";
 import { cn } from "@/lib/utils";
 
-const FEED_TABS: { id: ScannerTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const FEED_TABS: {
+  id: ScannerTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   { id: "all", label: "All News", icon: Radio },
   { id: "premarket", label: "Premarket", icon: Sun },
   { id: "watchlist", label: "Watchlist", icon: Star },
@@ -50,6 +56,44 @@ const FEED_TABS: { id: ScannerTab; label: string; icon: React.ComponentType<{ cl
 const MODE_KEY = "tt-dashboard-mode";
 
 export function TradingDashboard({
+  initialCatalysts = [],
+  initialWatchlist = [],
+  initialFilters = null,
+  initialScanner = null,
+  shellV3,
+}: {
+  initialCatalysts?: CatalystItem[];
+  initialWatchlist?: string[];
+  initialFilters?: ScannerFilters | null;
+  initialScanner?: MarketScannerSnapshot | null;
+  /** Server-resolved feature flag; falls back to client env helper */
+  shellV3?: boolean;
+}) {
+  const useShellV3 = shellV3 ?? isDashboardShellV3Enabled();
+
+  if (useShellV3) {
+    return (
+      <DashboardShellV3
+        initialCatalysts={initialCatalysts}
+        initialWatchlist={initialWatchlist}
+        initialFilters={initialFilters}
+        initialScanner={initialScanner}
+      />
+    );
+  }
+
+  return (
+    <TradingDashboardLegacy
+      initialCatalysts={initialCatalysts}
+      initialWatchlist={initialWatchlist}
+      initialFilters={initialFilters}
+      initialScanner={initialScanner}
+    />
+  );
+}
+
+/** Legacy multi-panel desk — retained behind dashboardShellV3=false */
+function TradingDashboardLegacy({
   initialCatalysts = [],
   initialWatchlist = [],
   initialFilters = null,
@@ -75,7 +119,6 @@ export function TradingDashboard({
       /* ignore */
     }
 
-    // Notification action deep-links from service worker
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("focus") === "1") {
@@ -142,7 +185,7 @@ export function TradingDashboard({
     return () => clearTimeout(t);
   }, []);
 
-  const openExtras = useCallback(() => {
+  const openExtras = useCallback((_step?: { id: string; target?: string }) => {
     setShowTools(true);
     setMode("full");
     try {
@@ -198,8 +241,9 @@ export function TradingDashboard({
             </button>
           </div>
           <HelpTip title="Focus vs Full">
-            Focus keeps the desk simple: live news graded GO / WATCH / SKIP, wire &amp; volume,
-            dilution traps, and your green ledger. Full adds extras when you want them.
+            Focus keeps the desk simple: materiality, direction, reaction stage,
+            tradeability, and top risk — plus wire &amp; volume, dilution, and your
+            ledger. Full adds extras when you want them.
           </HelpTip>
 
           <div className="desk-command-status flex-1 min-w-0" data-guide="trust-status">
@@ -223,18 +267,18 @@ export function TradingDashboard({
 
         <div className="px-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[--text-tertiary]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="font-semibold text-emerald-300">GO</span> consider with a plan
+            <span className="font-semibold text-cyan-300">Materiality</span> attention priority
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="font-semibold text-zinc-300">WATCH</span> wait for confirmation
+            <span className="font-semibold text-emerald-300">Direction</span> catalyst implication
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="font-semibold text-amber-200">SKIP</span> protect capital
+            <span className="font-semibold text-amber-200">Risk</span> highest capital caution
           </span>
-          <HelpTip title="How grades work">
-            Each headline is graded from the news story and how the company is trading today
-            (move %, volume, float, history). Expand a row for the full checklist. Not financial
-            advice.
+          <HelpTip title="How judgment labels work">
+            Materiality is whether the event warrants review. Direction is catalyst
+            implication only — not a buy or sell instruction. Expand a row for reaction
+            stage, tradeability, and evidence. Not financial advice.
           </HelpTip>
         </div>
 
@@ -297,7 +341,8 @@ export function TradingDashboard({
             <div className="desk-panel-header desk-feed-header shrink-0">
               <span className="desk-label">News feed</span>
               <HelpTip title="News feed">
-                Stock-moving headlines only. Each row has a GO / WATCH / SKIP grade. Expand for
+                Stock-moving headlines only. Each row shows materiality, direction, reaction,
+                and tradeability — not a buy or sell label. Expand for
                 checklist, news summary, and company performance reasons.
               </HelpTip>
               <div className="desk-feed-tabs flex items-center gap-1">
@@ -401,7 +446,7 @@ export function TradingDashboard({
         )}
 
         <p className="desk-disclaimer text-[10px] text-[--text-muted] text-center shrink-0 pb-1">
-          Not financial advice · grades help you take fewer bad trades · click tickers for charts
+          Not financial advice · dimensions separate attention from direction · click tickers for charts
         </p>
 
         <PlatformGuide surface="dashboard" onExtrasRequired={openExtras} />

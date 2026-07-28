@@ -17,7 +17,11 @@ import { computeRvol } from "./volume-utils";
 import { verifyNewsArticle, isRoundupArticle, isLikelyStockNews, isKnownFalsePositive, articleIsAboutSymbol } from "./news-verifier";
 import { isMoverCatalyst, sortByRecency } from "./movers";
 import { dispatchWatchlistAlerts } from "./watchlist-alerts";
-import { storyClusterKey, attachStoryClusters } from "./story-cluster";
+import {
+  storyClusterKey,
+  collapseStoryClusters,
+  storyDedupeKey,
+} from "./story-cluster";
 import { detectSetupTags } from "./setup-tags";
 import { getSourceTier } from "./source-trust";
 import { isScaleMode } from "./redis";
@@ -876,7 +880,7 @@ async function buildFeedFromDatabase(
           }),
   }));
   items = rankMovers(items, moversOnly);
-  items = attachStoryClusters(items);
+  items = collapseStoryClusters(items);
   return items.slice(0, limit);
 }
 
@@ -885,25 +889,27 @@ function mergePrependFeeds(
   existingAll: CatalystItem[],
   existingMovers: CatalystItem[]
 ): { allMerged: CatalystItem[]; moversMerged: CatalystItem[] } {
-  const seen = new Set<string>();
-  const allMerged: CatalystItem[] = [];
-  for (const c of [...displayable, ...existingAll]) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    allMerged.push(c);
-    if (allMerged.length >= MAX_CATALYSTS_SHOWN) break;
-  }
+  const mergeByStory = (incoming: CatalystItem[], existing: CatalystItem[]) => {
+    const seen = new Set<string>();
+    const out: CatalystItem[] = [];
+    for (const c of collapseStoryClusters([...incoming, ...existing])) {
+      const key = storyDedupeKey(c);
+      if (seen.has(key) || seen.has(c.id)) continue;
+      seen.add(key);
+      seen.add(c.id);
+      out.push(c);
+      if (out.length >= MAX_CATALYSTS_SHOWN) break;
+    }
+    return out;
+  };
 
-  const moverSeen = new Set<string>();
-  const moversMerged: CatalystItem[] = [];
-  for (const c of [...displayable.filter(isMoverCatalyst), ...existingMovers]) {
-    if (moverSeen.has(c.id)) continue;
-    moverSeen.add(c.id);
-    moversMerged.push(c);
-    if (moversMerged.length >= MAX_CATALYSTS_SHOWN) break;
-  }
-
-  return { allMerged, moversMerged };
+  return {
+    allMerged: mergeByStory(displayable, existingAll),
+    moversMerged: mergeByStory(
+      displayable.filter(isMoverCatalyst),
+      existingMovers
+    ),
+  };
 }
 
 async function writeMergedFeeds(
@@ -1006,12 +1012,12 @@ export async function getCatalysts(
 
   const cached = lastGood.get(cacheKey);
   if (cached && Date.now() - cached.ts < FEED_CACHE_MS) {
-    return cached.items.slice(0, limit);
+    return collapseStoryClusters(cached.items).slice(0, limit);
   }
 
   const shared = await getCachedFeed(cacheKey);
   if (shared.items.length > 0) {
-    const items = shared.items.slice(0, limit);
+    const items = collapseStoryClusters(shared.items).slice(0, limit);
     lastGood.set(cacheKey, { ts: Date.now(), items });
     return items;
   }
@@ -1019,7 +1025,7 @@ export async function getCatalysts(
   if (isScaleMode()) {
     const stale = lastGood.get(cacheKey);
     if (stale && Date.now() - stale.ts < LAST_GOOD_TTL_MS) {
-      return stale.items.slice(0, limit);
+      return collapseStoryClusters(stale.items).slice(0, limit);
     }
     return [];
   }
@@ -1027,14 +1033,14 @@ export async function getCatalysts(
   try {
     const result = await buildFeedFromDatabase(limit, moversOnly);
     const quotes = await getCachedQuotes(result.map((c) => c.symbol));
-    const merged = mergeQuotesIntoFeed(result, quotes);
+    const merged = collapseStoryClusters(mergeQuotesIntoFeed(result, quotes));
     lastGood.set(cacheKey, { ts: Date.now(), items: merged });
     void setCachedFeed(cacheKey, merged).catch(() => {});
     return merged;
   } catch {
     const stale = lastGood.get(cacheKey);
     if (stale && Date.now() - stale.ts < LAST_GOOD_TTL_MS) {
-      return stale.items.slice(0, limit);
+      return collapseStoryClusters(stale.items).slice(0, limit);
     }
     return [];
   }

@@ -1,22 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { Ban, Check, CircleDot, Eye } from "lucide-react";
 import type { CatalystItem } from "@/types";
-import {
-  buildTradeJudgment,
-  gradeClass,
-  type TradeGrade,
-} from "@/lib/trade-judgment";
+import { buildTradeJudgment } from "@/lib/trade-judgment";
+import { presentJudgment } from "@/lib/judgment/present";
 import { cn } from "@/lib/utils";
 import { HelpTip } from "./HelpTip";
 import { JudgmentV2Panel } from "./JudgmentV2Panel";
-
-const ICONS: Record<TradeGrade, typeof Check> = {
-  go: Check,
-  watch: Eye,
-  skip: Ban,
-};
+import { JudgmentDimensionsView } from "./judgment/JudgmentDimensionsStrip";
 
 export function TradeJudgmentPanel({
   catalyst,
@@ -30,32 +21,50 @@ export function TradeJudgmentPanel({
   onTake?: () => void;
 }) {
   const j = useMemo(() => buildTradeJudgment(catalyst), [catalyst]);
-  const Icon = ICONS[j.grade];
+  const presented = useMemo(
+    () =>
+      presentJudgment({
+        judgment: j.judgmentV2 ?? null,
+        catalystStrength: j.judgmentV2?.catalystStrength,
+        directionalImplication: j.judgmentV2?.directionalImplication,
+        legacyGrade: j.grade,
+        dilutionHint: j.checklist.some(
+          (c) => c.id === "not-dilution" && !c.pass
+        ),
+      }),
+    [j]
+  );
 
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-3 space-y-3",
-        gradeClass(j.grade),
+        "rounded-xl border border-zinc-700/80 bg-zinc-950/50 px-3 py-3 space-y-3",
         className
       )}
     >
       <div className="flex items-start gap-2">
-        <Icon className="w-4 h-4 mt-0.5 shrink-0" />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[12px] font-bold tracking-wide">{j.label}</span>
-            <span className="text-[11px] opacity-80">{j.summary}</span>
-            <HelpTip title="What does GO / WATCH / SKIP mean?">
-              GO = story and how the stock is trading look aligned enough to consider a plan.
-              WATCH = wait for confirmation. SKIP = protect capital (dilution, chase, weak setup).
-              Not financial advice — a decision aid only.
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              Judgment dimensions
+            </span>
+            <HelpTip title="Not a buy or sell label">
+              {presented.separationNote} Legacy desk grades (GO / WATCH / SKIP)
+              remain in the database for compatibility but are not shown as the
+              primary label.
             </HelpTip>
             <span className="ml-auto text-[11px] font-mono opacity-70">
               {j.confidence}% confidence
             </span>
           </div>
-          <p className="text-[12px] mt-1.5 leading-snug opacity-90">{j.nextStep}</p>
+          <JudgmentDimensionsView
+            presentation={presented}
+            compact
+            showHelp={false}
+          />
+          <p className="text-[12px] mt-1.5 leading-snug text-zinc-300">
+            {j.nextStep}
+          </p>
         </div>
       </div>
 
@@ -67,7 +76,7 @@ export function TradeJudgmentPanel({
           <ul className="space-y-1">
             {j.articleReasons.map((r) => (
               <li key={r} className="text-[11px] leading-snug flex gap-1.5">
-                <CircleDot className="w-3 h-3 mt-0.5 shrink-0 opacity-50" />
+                <span className="opacity-50">·</span>
                 <span>{r}</span>
               </li>
             ))}
@@ -83,7 +92,7 @@ export function TradeJudgmentPanel({
             ) : (
               j.performanceReasons.map((r) => (
                 <li key={r} className="text-[11px] leading-snug flex gap-1.5">
-                  <CircleDot className="w-3 h-3 mt-0.5 shrink-0 opacity-50" />
+                  <span className="opacity-50">·</span>
                   <span>{r}</span>
                 </li>
               ))
@@ -98,8 +107,8 @@ export function TradeJudgmentPanel({
             Pre-trade checklist
           </p>
           <HelpTip title="Why a checklist?">
-            Green trades come from filters. If a box fails, pause — especially dilution and
-            already-extended moves.
+            Filters protect capital. A failed box means pause and verify — especially
+            dilution and already-extended moves. Not a personalized recommendation.
           </HelpTip>
         </div>
         <ul className="space-y-1">
@@ -144,13 +153,13 @@ export function TradeJudgmentPanel({
               Log as skipped
             </button>
           )}
-          {onTake && j.grade === "go" && (
+          {onTake && presented.materiality === "High" && (
             <button
               type="button"
               onClick={onTake}
               className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/15"
             >
-              Log as taken
+              Log as reviewed
             </button>
           )}
         </div>
@@ -159,7 +168,7 @@ export function TradeJudgmentPanel({
   );
 }
 
-/** Compact badge for the feed row */
+/** Compact badge for the feed row — materiality + direction, never GO/LONG/SHORT. */
 export function TradeGradeBadge({
   catalyst,
   className,
@@ -168,16 +177,35 @@ export function TradeGradeBadge({
   className?: string;
 }) {
   const j = useMemo(() => buildTradeJudgment(catalyst), [catalyst]);
+  const presented = useMemo(
+    () =>
+      presentJudgment({
+        judgment: j.judgmentV2 ?? null,
+        legacyGrade: j.grade,
+      }),
+    [j]
+  );
+  const dirTone =
+    presented.direction === "Positive"
+      ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10"
+      : presented.direction === "Negative"
+        ? "border-red-500/40 text-red-300 bg-red-500/10"
+        : presented.direction === "Mixed"
+          ? "border-amber-500/40 text-amber-200 bg-amber-500/10"
+          : "border-zinc-600 text-zinc-300 bg-zinc-800/40";
+
   return (
     <span
       className={cn(
-        "inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md border tracking-wide",
-        gradeClass(j.grade),
+        "inline-flex flex-col items-center justify-center text-[9px] font-semibold px-1 py-0.5 rounded-md border leading-tight text-center min-w-[2.75rem]",
+        dirTone,
         className
       )}
-      title={j.summary}
+      title={presented.dimensionsLine}
+      aria-label={presented.ariaLabel}
     >
-      {j.label}
+      <span className="tracking-wide">{presented.direction.slice(0, 3)}</span>
+      <span className="opacity-80 font-normal">{presented.materiality}</span>
     </span>
   );
 }

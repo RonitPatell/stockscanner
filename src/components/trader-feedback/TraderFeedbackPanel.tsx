@@ -184,10 +184,22 @@ export function TraderFeedbackPanel() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={exportJson}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={exportJson}
+          data-testid="feedback-export-json"
+        >
           Export JSON
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={exportCsv}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={exportCsv}
+          data-testid="feedback-export-csv"
+        >
           Export CSV
         </Button>
         <label className="flex items-center gap-1.5 text-[11px] text-[--text-secondary]">
@@ -195,6 +207,7 @@ export function TraderFeedbackPanel() {
             type="checkbox"
             checked={syncOptIn}
             onChange={(e) => void toggleSync(e.target.checked)}
+            data-testid="feedback-sync-opt-in"
           />
           Opt in to account sync
         </label>
@@ -312,6 +325,7 @@ export function TraderFeedbackPanel() {
                 variant="ghost"
                 className="h-6 text-[10px]"
                 onClick={() => openAutopsy(r)}
+                data-testid="feedback-autopsy"
               >
                 Autopsy
               </Button>
@@ -320,6 +334,7 @@ export function TraderFeedbackPanel() {
                 size="sm"
                 variant="ghost"
                 className="h-6 text-[10px] text-red-400"
+                data-testid="feedback-delete-row"
                 onClick={() => {
                   deleteLocalDecision(r.id);
                   refresh();
@@ -400,12 +415,14 @@ export function TraderFeedbackPanel() {
           onChange={(e) => setConfirmDelete(e.target.value)}
           placeholder='Type DELETE'
           className="w-40 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-[11px]"
+          data-testid="feedback-delete-confirm"
         />
         <Button
           type="button"
           size="sm"
           variant="destructive"
           onClick={handleDeleteAll}
+          data-testid="feedback-delete-all-local"
         >
           Delete all local records
         </Button>

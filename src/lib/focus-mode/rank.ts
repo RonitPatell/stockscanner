@@ -24,8 +24,12 @@ export interface FocusRankResult {
 
 /**
  * Rank catalysts for Focus Mode.
- * Factors: user rule/watchlist match, freshness, materiality (urgency/confidence/move).
- * Explicitly does NOT rank by predicted profitability.
+ * Priority order (never predicted profitability):
+ * 1. User alert-strategy match
+ * 2. Watchlist match
+ * 3. Materiality
+ * 4. Freshness
+ * 5. Risk severity
  */
 export function rankForFocusMode(
   items: CatalystItem[],
@@ -46,45 +50,65 @@ export function rankForFocusMode(
     const reasons: FocusRankReason[] = [];
     let score = 0;
 
-    const onWl = watch.has(c.symbol.toUpperCase());
-    if (onWl) {
-      score += 40;
-      reasons.push("watchlist_match");
-    }
+    // 1. Alert-strategy match (highest)
     if (ruleIds.has(c.id)) {
-      score += 35;
+      score += 100;
       reasons.push("rule_hint");
     }
 
-    const pub = Date.parse(c.publishedAt);
-    const ageMin = Number.isFinite(pub) ? (now - pub) / 60_000 : 999;
-    if (ageMin <= 15) {
-      score += 30;
-      reasons.push("fresh");
-    } else if (ageMin <= 60) {
-      score += 15;
-      reasons.push("fresh");
-    } else if (ageMin <= 180) {
-      score += 5;
+    // 2. Watchlist match
+    const onWl = watch.has(c.symbol.toUpperCase());
+    if (onWl) {
+      score += 70;
+      reasons.push("watchlist_match");
     }
 
-    // Materiality — observable market/news intensity, not predicted P&L
+    // 3. Materiality — observable intensity, not predicted P&L
     const urgency = c.urgencyScore ?? 0;
     const conf = c.verifiedConfidence ?? 0;
     const absMove = Math.abs(c.changePercent ?? 0);
     const materialPts =
       Math.min(25, urgency / 4) +
       Math.min(15, conf / 5) +
-      Math.min(15, absMove);
-    if (materialPts >= 20) reasons.push("material");
+      Math.min(20, absMove);
     score += materialPts;
+    if (materialPts >= 20) reasons.push("material");
 
-    if ((c.judgmentV2?.riskFlags?.length ?? 0) > 0 || /offering|dilution/i.test(c.catalystType ?? "")) {
-      score += 12;
+    // 4. Freshness
+    const pub = Date.parse(c.publishedAt);
+    const ageMin = Number.isFinite(pub) ? (now - pub) / 60_000 : 999;
+    if (ageMin <= 15) {
+      score += 40;
+      reasons.push("fresh");
+    } else if (ageMin <= 60) {
+      score += 22;
+      reasons.push("fresh");
+    } else if (ageMin <= 180) {
+      score += 8;
+      reasons.push("fresh");
+    }
+
+    // 5. Risk severity
+    const flags = c.judgmentV2?.riskFlags ?? [];
+    let riskPts = 0;
+    for (const f of flags) {
+      if (f.severity === "high") riskPts = Math.max(riskPts, 18);
+      else if (f.severity === "medium") riskPts = Math.max(riskPts, 10);
+      else riskPts = Math.max(riskPts, 4);
+    }
+    if (
+      riskPts === 0 &&
+      /offering|dilution/i.test(c.catalystType ?? "")
+    ) {
+      riskPts = 10;
+    }
+    if (riskPts > 0) {
+      score += riskPts;
       reasons.push("risk");
     }
+
     if (conf >= 70) {
-      score += 8;
+      score += 6;
       reasons.push("verified");
     }
 
@@ -109,6 +133,39 @@ export function selectFocusActive(
   const byId = new Map(items.map((c) => [c.id, c]));
   const out: CatalystItem[] = [];
   for (const r of ranked) {
+    const c = byId.get(r.catalystId);
+    if (c) out.push(c);
+    if (out.length >= FOCUS_MAX_ACTIVE) break;
+  }
+  return out;
+}
+
+/**
+ * Focus Mode V2 — never pad with low-quality events to reach five.
+ * Qualifies only if: strategy match, watchlist, material reason, critical risk,
+ * or score meets the priority floor.
+ */
+export const FOCUS_PRIORITY_SCORE_FLOOR = 55;
+
+export function qualifiesForFocusPriority(r: FocusRankResult): boolean {
+  if (r.reasons.includes("rule_hint")) return true;
+  if (r.reasons.includes("watchlist_match")) return true;
+  if (r.reasons.includes("material")) return true;
+  if (r.reasons.includes("risk") && r.score >= FOCUS_PRIORITY_SCORE_FLOOR) {
+    return true;
+  }
+  return r.score >= FOCUS_PRIORITY_SCORE_FLOOR;
+}
+
+export function selectFocusPriority(
+  items: CatalystItem[],
+  opts: Parameters<typeof rankForFocusMode>[1]
+): CatalystItem[] {
+  const ranked = rankForFocusMode(items, opts);
+  const byId = new Map(items.map((c) => [c.id, c]));
+  const out: CatalystItem[] = [];
+  for (const r of ranked) {
+    if (!qualifiesForFocusPriority(r)) continue;
     const c = byId.get(r.catalystId);
     if (c) out.push(c);
     if (out.length >= FOCUS_MAX_ACTIVE) break;

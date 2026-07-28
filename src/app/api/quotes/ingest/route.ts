@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       rVol: q.rVol,
       floatShares: q.floatShares,
       marketCap: q.marketCap,
+      dayHigh: q.dayHigh,
     };
   }
 

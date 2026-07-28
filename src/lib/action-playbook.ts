@@ -104,11 +104,11 @@ export function buildActionPlaybook(
     return withFomo(
       {
         bias: "avoid",
-        label: "Skip / Fade bias",
-        action: "Do not chase the spike. Wait for offering price discovery or skip entirely.",
+        label: "Capital caution",
+        action: "Do not chase the spike. Wait for offering price discovery or stand aside.",
         invalidation: "Only reconsider if price reclaims VWAP on declining dilution headlines.",
         why: "Offerings are usually dilutive — early longs get trapped after the print.",
-        risk: "Low-float names can still rip into the offering — size zero or tiny fade only.",
+        risk: "Low-float names can still rip into the offering — treat as capital risk.",
         conviction: 82,
       },
       88 + (extended ? 8 : 0) + (lowFloat ? 4 : 0)
@@ -119,11 +119,11 @@ export function buildActionPlaybook(
     return withFomo(
       {
         bias: "short",
-        label: "Short bias",
-        action: "Look for failed reclaim of the news spike; prefer short into strength, not panic chase.",
-        invalidation: "Stop if price holds above pre-news VWAP with rising volume.",
+        label: "Negative direction",
+        action: "Look for failed reclaim of the news spike; watch strength for confirmation, not panic chase.",
+        invalidation: "Invalid if price holds above pre-news VWAP with rising volume.",
         why: `Bearish catalyst (${type}) with sentiment ${score}.`,
-        risk: "Short squeezes on low float — use hard stops.",
+        risk: "Short squeezes on low float — use hard stops if you engage.",
         conviction: Math.min(90, 50 + Math.abs(score) / 3 + urgency / 5),
       },
       40 + (extended ? 25 : 0) + (lowFloat ? 15 : 0)
@@ -143,9 +143,9 @@ export function buildActionPlaybook(
     return withFomo(
       {
         bias: "long",
-        label: "Long bias",
-        action: `Trade with the news impulse only on strength (HOD hold / VWAP reclaim).${sympathy}`,
-        invalidation: "Out if it loses the first pullback low or VWAP with expanding volume against you.",
+        label: "Positive direction",
+        action: `Review with the news impulse only on strength (HOD hold / VWAP reclaim).${sympathy}`,
+        invalidation: "Invalid if it loses the first pullback low or VWAP with expanding volume against.",
         why: `${type} catalyst, sentiment ${score}, move ${signedMove >= 0 ? "+" : ""}${signedMove.toFixed(1)}%.`,
         risk: heavyVol
           ? "Relative volume is elevated — spreads and slippage will be worse."

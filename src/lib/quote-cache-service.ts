@@ -13,6 +13,8 @@ export interface CachedQuote {
   rVol?: number | null;
   floatShares?: number;
   marketCap?: number;
+  /** Session high when the quote provider supplies it */
+  dayHigh?: number;
 }
 
 const QUOTES_KEY = "quotes:v2";
@@ -230,6 +232,9 @@ async function refreshOneQuote(
       volume,
       avgVolume,
       rVol,
+      dayHigh: q.dayHigh ?? existing[symbol]?.dayHigh,
+      floatShares: existing[symbol]?.floatShares,
+      marketCap: existing[symbol]?.marketCap,
     };
   } catch {
     return existing[symbol] ?? null;

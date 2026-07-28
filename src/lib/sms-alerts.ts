@@ -1,4 +1,5 @@
 import type { CatalystItem } from "@/types";
+import { presentJudgment } from "./judgment/present";
 
 /** Sends SMS via Twilio when env vars are configured. */
 export async function sendSmsAlert(
@@ -14,7 +15,9 @@ export async function sendSmsAlert(
     catalyst.changePercent != null
       ? `${catalyst.changePercent >= 0 ? "+" : ""}${catalyst.changePercent.toFixed(1)}%`
       : "";
-  const body = `TrustTicker [${catalyst.symbol}] ${catalyst.headline.slice(0, 100)} ${chg}`.trim();
+  const p = presentJudgment({ judgment: catalyst.judgmentV2 ?? null });
+  const body =
+    `TrustTicker [${catalyst.symbol}] ${p.materiality}/${p.direction} ${catalyst.headline.slice(0, 80)} ${chg}`.trim();
 
   try {
     const auth = Buffer.from(`${sid}:${token}`).toString("base64");

@@ -1,4 +1,6 @@
 import { isAllowedDiscordWebhook } from "@/lib/discord-webhook";
+import { presentJudgment } from "@/lib/judgment/present";
+import type { JudgmentV2 } from "@/lib/judgment/types";
 
 export async function sendDiscordWebhook(
   webhookUrl: string,
@@ -9,22 +11,56 @@ export async function sendDiscordWebhook(
       console.error("Blocked non-Discord webhook URL");
       return false;
     }
+    const presented = presentJudgment({
+      judgment: payload.judgmentV2 ?? null,
+      directionalImplication: payload.directionalImplication,
+      catalystStrength: payload.catalystStrength,
+    });
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         embeds: [
           {
-            title: `🚨 ${payload.symbol} — ${payload.sentimentLabel?.toUpperCase() || "CATALYST"}`,
+            title: `🔔 ${payload.symbol} — ${presented.materiality} · ${presented.direction}`,
             description: payload.headline,
-            color: getDiscordColor(payload.sentimentScore),
+            color: getDiscordColor(presented.direction, payload.sentimentScore),
             fields: [
-              { name: "Price", value: `$${payload.price?.toFixed(2) || "—"}`, inline: true },
-              { name: "Change", value: `${payload.changePercent?.toFixed(2) || "—"}%`, inline: true },
-              { name: "Sentiment", value: `${payload.sentimentScore?.toFixed(0) || "—"}/100`, inline: true },
+              {
+                name: "Price",
+                value: `$${payload.price?.toFixed(2) || "—"}`,
+                inline: true,
+              },
+              {
+                name: "Change",
+                value: `${payload.changePercent?.toFixed(2) || "—"}%`,
+                inline: true,
+              },
+              {
+                name: "Materiality",
+                value: presented.materiality,
+                inline: true,
+              },
+              {
+                name: "Direction",
+                value: presented.direction,
+                inline: true,
+              },
+              {
+                name: "Tradeability",
+                value: presented.tradeability,
+                inline: true,
+              },
+              {
+                name: "Risk",
+                value: presented.topRisk ?? "None flagged",
+                inline: true,
+              },
               { name: "Summary", value: payload.summary || "—" },
             ],
-            footer: { text: "TrustTicker — Informational only, not investment advice" },
+            footer: {
+              text: "TrustTicker — Informational only. Direction ≠ buy/sell instruction.",
+            },
             timestamp: new Date().toISOString(),
           },
         ],
@@ -46,9 +82,15 @@ interface DiscordAlertPayload {
   sentimentLabel?: string | null;
   price?: number | null;
   changePercent?: number | null;
+  judgmentV2?: JudgmentV2 | null;
+  catalystStrength?: string | null;
+  directionalImplication?: string | null;
 }
 
-function getDiscordColor(score?: number | null): number {
+function getDiscordColor(direction: string, score?: number | null): number {
+  if (direction === "Positive") return 0x10b981;
+  if (direction === "Negative") return 0xef4444;
+  if (direction === "Mixed") return 0xf59e0b;
   if (score == null) return 0x6b7280;
   if (score >= 40) return 0x10b981;
   if (score <= -40) return 0xef4444;

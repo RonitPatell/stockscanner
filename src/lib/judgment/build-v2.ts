@@ -13,6 +13,7 @@ import {
   type TradeGrade,
   type Tradeability,
 } from "./types.ts";
+import { presentJudgment } from "./present.ts";
 
 const BULL_TYPES = new Set([
   "fda",
@@ -40,6 +41,11 @@ const SCHEDULED_RE =
 
 const MIXED_EARNINGS_RE =
   /\b(beats?\s+on\s+eps\s+but\s+miss|misses?\s+revenue\s+but\s+beats?|mixed\s+results|raises?\s+guidance\s+but|cuts?\s+guidance\s+despite)\b/i;
+
+const HEADLINE_BULL_RE =
+  /\b(approv(?:ed|al)|clearance|award(?:ed)?|wins?\b|contract|partnership|beats?|raises?\s+guidance|buyback|acquisition|merger|upgrade|positive\s+data|breakthrough)\b/i;
+const HEADLINE_BEAR_RE =
+  /\b(offering|dilution|at[- ]the[- ]market|\batm\b|registered\s+direct|prospectus|lawsuit|investigation|misses?|cuts?\s+guidance|bankruptcy|downgrade|delist|reverse\s+split)\b/i;
 
 function floatM(c: Pick<CatalystItem, "floatShares">): number | null {
   if (c.floatShares == null || c.floatShares <= 0) return null;
@@ -232,6 +238,16 @@ export function buildJudgmentV2(
       scoreContributions.push(
         contrib("sentiment_neg", "Negative tone score", -20, "interpretation", `sentiment=${sentiment}`)
       );
+    } else if (sentiment >= 15) {
+      directionScore += 12;
+      scoreContributions.push(
+        contrib("sentiment_pos_mild", "Mild constructive tone", 12, "interpretation", `sentiment=${sentiment}`)
+      );
+    } else if (sentiment <= -15) {
+      directionScore -= 12;
+      scoreContributions.push(
+        contrib("sentiment_neg_mild", "Mild negative tone", -12, "interpretation", `sentiment=${sentiment}`)
+      );
     } else {
       scoreContributions.push(
         contrib("sentiment_neutral", "Neutral tone score", 0, "interpretation", `sentiment=${sentiment}`)
@@ -249,6 +265,20 @@ export function buildJudgmentV2(
     directionScore -= 18;
     scoreContributions.push(
       contrib("bear_type", "Historically adverse type", -18, "interpretation", `type=${type}`)
+    );
+  }
+
+  const headlineText = `${c.headline ?? ""} ${c.aiSummary ?? ""}`;
+  if (HEADLINE_BULL_RE.test(headlineText) && !dilution) {
+    directionScore += 14;
+    scoreContributions.push(
+      contrib("headline_bull", "Constructive headline language", 14, "interpretation", "bullish cues")
+    );
+  }
+  if (HEADLINE_BEAR_RE.test(headlineText)) {
+    directionScore -= 14;
+    scoreContributions.push(
+      contrib("headline_bear", "Adverse headline language", -14, "interpretation", "bearish cues")
     );
   }
 
@@ -307,10 +337,8 @@ export function buildJudgmentV2(
   let directionalImplication: DirectionalImplication;
   if (dilution && positiveTone) directionalImplication = "MIXED";
   else if (mixedEarnings) directionalImplication = "MIXED";
-  else if (directionScore >= 18) directionalImplication = "POSITIVE";
-  else if (directionScore <= -18) directionalImplication = "NEGATIVE";
-  else if (Math.abs(directionScore) < 8 && (sentiment == null || Math.abs(sentiment) < 25))
-    directionalImplication = "UNCLEAR";
+  else if (directionScore >= 12) directionalImplication = "POSITIVE";
+  else if (directionScore <= -12) directionalImplication = "NEGATIVE";
   else if (directionScore > 0) directionalImplication = "POSITIVE";
   else if (directionScore < 0) directionalImplication = "NEGATIVE";
   else directionalImplication = "UNCLEAR";
@@ -501,17 +529,23 @@ export function judgmentV2ToTradeJudgment(j: JudgmentV2): {
     },
   ];
 
-  const summary =
-    j.grade === "go"
-      ? `Go — ${j.catalystStrength.toLowerCase()} / ${j.directionalImplication.toLowerCase()} (V2)`
-      : j.grade === "skip"
-        ? `Skip — ${j.riskFlags[0]?.label ?? j.catalystStrength} (V2)`
-        : `Watch — ${j.timing.toLowerCase()} / ${j.confidence.toLowerCase()} confidence (V2)`;
+  const presented = presentJudgment({ judgment: j });
+
+  const nextStep =
+    j.tradeability === "EXTREMELY_THIN"
+      ? "Quotes may be unreliable — treat as informational only until liquidity improves."
+      : j.riskFlags.some((r) => r.id === "dilution")
+        ? "Highest-priority risk is dilution / offering language — verify the filing before acting on direction."
+        : j.directionalImplication === "NEGATIVE" &&
+            (j.catalystStrength === "STRONG" || j.catalystStrength === "MODERATE")
+          ? "High or medium materiality with negative directional implication — review the event, not a buy signal."
+          : "Review the five dimensions and source evidence. This is not a personalized recommendation.";
 
   return {
     grade: j.grade,
-    label: j.gradeLabel,
-    summary,
+    /** Primary presentation label = materiality (never GO/WATCH/SKIP) */
+    label: presented.materiality,
+    summary: presented.dimensionsLine,
     explanation: `${j.gradeRationale} ${j.disclaimer}`,
     articleReasons:
       articleReasons.length > 0 ? articleReasons : ["See Judgment V2 audit panel for full breakdown"],
@@ -521,12 +555,7 @@ export function judgmentV2ToTradeJudgment(j: JudgmentV2): {
         : j.missingOrUncertain.slice(0, 2).map((m) => `Uncertain: ${m}`),
     checklist,
     confidence: confNum,
-    nextStep:
-      j.grade === "go"
-        ? "If you act, use your own plan and risk limits — this is not a recommendation."
-        : j.grade === "skip"
-          ? "Protect capital. Log the skip if useful for your review."
-          : "Wait for confirmation or clearer evidence. Re-check source filing.",
+    nextStep,
     judgmentVersion: j.version,
     judgmentV2: j,
   };

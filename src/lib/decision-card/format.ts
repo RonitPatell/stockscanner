@@ -71,7 +71,7 @@ export function formatAvail(
   field: AvailableNumber,
   opts?: { digits?: number; suffix?: string; prefix?: string }
 ): string {
-  if (field.availability === "unavailable" || field.value == null) return "unavailable";
+  if (field.availability === "unavailable" || field.value == null) return "—";
   const d = opts?.digits ?? 2;
   const prefix = opts?.prefix ?? "";
   const suffix = opts?.suffix ?? "";

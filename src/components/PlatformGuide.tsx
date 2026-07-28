@@ -51,7 +51,8 @@ export function PlatformGuide({
   onExtrasRequired,
 }: {
   surface?: GuideSurface;
-  onExtrasRequired?: () => void;
+  /** Called when a step needs another destination/panel visible first */
+  onExtrasRequired?: (step: { id: string; target?: string }) => void;
 }) {
   const steps = stepsFor(surface);
   const pathname = usePathname();
@@ -190,7 +191,9 @@ export function PlatformGuide({
       clearHighlight();
       return;
     }
-    if (step?.requiresExtras) onExtrasRequired?.();
+    if (step?.requiresExtras) {
+      onExtrasRequired?.({ id: step.id, target: step.target });
+    }
     const delay = step?.requiresExtras ? 220 : 40;
     const t = window.setTimeout(measure, delay);
     return () => clearTimeout(t);

@@ -14,6 +14,12 @@ export function storyClusterKey(headline: string): string {
     .join("-");
 }
 
+/** Stable key for one ticker + one story (cross-source duplicates share this). */
+export function storyDedupeKey(item: Pick<CatalystItem, "symbol" | "headline" | "storyClusterId">): string {
+  const cluster = item.storyClusterId ?? storyClusterKey(item.headline);
+  return `${item.symbol.toUpperCase()}|${cluster || item.headline.slice(0, 40)}`;
+}
+
 export interface StoryClusterView {
   clusterId: string;
   primary: CatalystItem;
@@ -21,6 +27,16 @@ export interface StoryClusterView {
   symbols: string[];
   sources: string[];
   newsCount: number;
+}
+
+function pickPrimary(cluster: CatalystItem[]): CatalystItem {
+  return [...cluster].sort((a, b) => {
+    const u = (b.urgencyScore ?? 0) - (a.urgencyScore ?? 0);
+    if (u !== 0) return u;
+    const conf = (b.verifiedConfidence ?? 0) - (a.verifiedConfidence ?? 0);
+    if (conf !== 0) return conf;
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  })[0]!;
 }
 
 /** Attach cluster metadata without removing individual article rows */
@@ -41,7 +57,6 @@ export function attachStoryClusters(items: CatalystItem[]): CatalystItem[] {
       (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
     const symbols = [...new Set(cluster.flatMap((c) => [c.symbol, ...(c.relatedSymbols ?? [])]))];
-    const sources = [...new Set(cluster.map((c) => c.source))];
     const headlines: CatalystHeadline[] = sorted.map((c) => ({
       id: c.id,
       headline: c.headline,
@@ -53,10 +68,7 @@ export function attachStoryClusters(items: CatalystItem[]): CatalystItem[] {
       aiSummary: c.aiSummary,
     }));
 
-    const primary =
-      sorted.reduce((best, cur) =>
-        (cur.urgencyScore ?? 0) > (best.urgencyScore ?? 0) ? cur : best
-      ) ?? item;
+    const primary = pickPrimary(cluster);
 
     return {
       ...item,
@@ -68,4 +80,79 @@ export function attachStoryClusters(items: CatalystItem[]): CatalystItem[] {
       aiSummary: primary.aiSummary ?? item.aiSummary,
     };
   });
+}
+
+/**
+ * One feed row per ticker+story. Cross-source syndication becomes a single
+ * row with `headlines` / `newsCount` preserved from attachStoryClusters.
+ */
+export function collapseStoryClusters(items: CatalystItem[]): CatalystItem[] {
+  const attached = attachStoryClusters(items);
+  const byKey = new Map<string, CatalystItem[]>();
+
+  for (const item of attached) {
+    const key = storyDedupeKey(item);
+    const list = byKey.get(key) ?? [];
+    list.push(item);
+    byKey.set(key, list);
+  }
+
+  const collapsed: CatalystItem[] = [];
+  for (const group of byKey.values()) {
+    const primary = pickPrimary(group);
+    if (group.length === 1) {
+      collapsed.push(primary);
+      continue;
+    }
+
+    const sorted = [...group].sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+    const headlineMap = new Map<string, CatalystHeadline>();
+    for (const c of sorted) {
+      for (const h of c.headlines ?? []) {
+        if (!headlineMap.has(h.id)) headlineMap.set(h.id, h);
+      }
+      if (!headlineMap.has(c.id)) {
+        headlineMap.set(c.id, {
+          id: c.id,
+          headline: c.headline,
+          source: c.source,
+          sourceUrl: c.sourceUrl,
+          publishedAt: c.publishedAt,
+          sentimentScore: c.sentimentScore,
+          catalystType: c.catalystType,
+          aiSummary: c.aiSummary,
+        });
+      }
+    }
+    const headlines = [...headlineMap.values()];
+    const sources = [...new Set(sorted.map((c) => c.source))];
+    const related = [
+      ...new Set(sorted.flatMap((c) => c.relatedSymbols ?? [])),
+    ].filter((s) => s !== primary.symbol);
+
+    collapsed.push({
+      ...primary,
+      headlines: headlines.length > 1 ? headlines : primary.headlines,
+      newsCount: Math.max(primary.newsCount ?? 0, headlines.length, group.length),
+      relatedSymbols: related.slice(0, 12),
+      // Prefer richest summary / best confidence across duplicates
+      aiSummary:
+        sorted.find((c) => c.aiSummary)?.aiSummary ?? primary.aiSummary,
+      keyPoints:
+        sorted.find((c) => c.keyPoints && c.keyPoints.length > 0)?.keyPoints ??
+        primary.keyPoints,
+      verifiedConfidence: Math.max(
+        ...sorted.map((c) => c.verifiedConfidence ?? 0),
+        primary.verifiedConfidence ?? 0
+      ),
+      source: sources[0] ?? primary.source,
+    });
+  }
+
+  // Preserve newest-first order of primaries
+  return collapsed.sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
 }

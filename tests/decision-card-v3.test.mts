@@ -157,7 +157,7 @@ test("missing quote data shows unavailable — never substitutes", () => {
   assert.equal(card.tradeability.bidSize.availability, "unavailable");
   assert.equal(card.tradeability.askSize.availability, "unavailable");
   assert.equal(card.tradeability.spreadDollars.availability, "unavailable");
-  assert.equal(formatAvail(card.identity.price), "unavailable");
+  assert.equal(formatAvail(card.identity.price), "—");
 });
 
 test("patchDecisionCardLive updates tape without dropping catalyst facts", () => {

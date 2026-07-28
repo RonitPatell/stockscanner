@@ -5,6 +5,7 @@ import { getCachedFeed } from "@/lib/feed-cache";
 import { feedFingerprint } from "@/lib/feed-fingerprint";
 import { markTracesFirstDelivery } from "@/lib/latency-trace";
 import { recordBrowserStreamHandshake } from "@/lib/system-health";
+import { collapseStoryClusters } from "@/lib/story-cluster";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -61,10 +62,11 @@ export async function GET(req: NextRequest) {
         try {
           const cacheKey = moversOnly ? "movers" : "all";
           const { items } = await getCachedFeed(cacheKey);
-          const catalysts =
+          const catalysts = collapseStoryClusters(
             items.length > 0
               ? items.slice(0, 150)
-              : await getCatalysts(150, { moversOnly });
+              : await getCatalysts(150, { moversOnly })
+          );
           if (catalysts.length === 0) return;
 
           // Reconnect with Last-Event-ID: only emit items newer than cursor

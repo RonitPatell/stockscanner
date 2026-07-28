@@ -5,6 +5,7 @@ import { meetsMinPriority } from "./priority.ts";
 import { isInQuietHours } from "./quiet-hours.ts";
 import type { SquawkSettings, SquawkUtterance } from "./types.ts";
 import { detectRiskOnlyCatalyst } from "../alerts/modes.ts";
+import { presentJudgment } from "../judgment/present.ts";
 
 function sourceQuality(c: CatalystItem): string {
   const tier = (c.sourceTier ?? "").toLowerCase();
@@ -22,27 +23,21 @@ function verifiedFact(c: CatalystItem): string {
     const f = j.verifiedFacts.find((x) => x?.trim());
     if (f) return f.slice(0, 160);
   }
-  // Structured type + grade — never raw aiSummary body
+  const presented = presentJudgment({ judgment: j ?? null });
   const type = c.catalystType ?? "catalyst";
-  const strength = j?.catalystStrength ?? null;
-  const direction = j?.directionalImplication ?? null;
-  const parts = [
+  return [
     `${type.replace(/_/g, " ")} event`,
-    strength ? `strength ${strength.toLowerCase()}` : null,
-    direction ? `implication ${direction.toLowerCase()}` : null,
-  ].filter(Boolean);
-  return parts.join(", ");
+    `materiality ${presented.materiality.toLowerCase()}`,
+    `direction ${presented.direction.toLowerCase()}`,
+  ].join(", ");
 }
 
 function highestRisk(c: CatalystItem): string | null {
-  const flags = c.judgmentV2?.riskFlags ?? [];
-  if (flags.length) {
-    const top = [...flags].sort((a, b) => {
-      const rank = { high: 3, medium: 2, low: 1 };
-      return (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0);
-    })[0];
-    return top?.label ?? top?.id ?? null;
-  }
+  const presented = presentJudgment({
+    judgment: c.judgmentV2 ?? null,
+    dilutionHint: /offering|dilution/i.test(c.catalystType ?? ""),
+  });
+  if (presented.topRisk) return presented.topRisk;
   const tags = c.setupTags ?? [];
   const risk = tags.find((t) => /dilution|offering|halt|trap|warrant/i.test(t));
   if (risk) return risk.replace(/_/g, " ");
@@ -52,9 +47,8 @@ function highestRisk(c: CatalystItem): string | null {
 }
 
 function tradeabilityLabel(c: CatalystItem): string | null {
-  const t = c.judgmentV2?.tradeability;
-  if (t) return String(t).replace(/_/g, " ").toLowerCase();
-  return null;
+  const t = presentJudgment({ judgment: c.judgmentV2 ?? null }).tradeability;
+  return t === "Unknown" ? null : t.toLowerCase();
 }
 
 function contentFingerprint(c: CatalystItem): string {

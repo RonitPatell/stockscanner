@@ -83,6 +83,19 @@ export function UserMenu() {
           >
             <Settings className="w-4 h-4" /> Settings
           </Link>
+          {isSubscribed && (
+            <Link
+              href="/gallery"
+              data-guide="visual-system-gallery-link"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900 transition-colors"
+            >
+              <span className="w-4 h-4 text-center text-[10px] font-bold tt-tone-brand">
+                VS
+              </span>{" "}
+              Visual gallery
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => {

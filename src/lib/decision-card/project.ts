@@ -151,11 +151,32 @@ export function projectDecisionCardV3(
   const dayHigh = live.dayHigh ?? null;
 
   const publishedAt = catalyst.publishedAt ?? null;
-  const firstSeenAt = catalyst.ingestedAt ?? null;
+  const firstSeenAt = catalyst.ingestedAt ?? catalyst.publishedAt ?? null;
   const age = ageSec(publishedAt, now);
 
-  const priceAtPub = enrichment.priceAtPublication ?? null;
-  const priceAtIngest = enrichment.priceAtIngest ?? null;
+  // Prefer measured publication / ingest marks; otherwise estimate a session
+  // reference from current price + day change so move % is never blank when
+  // the feed already shows a price and % move.
+  let priceAtPub = enrichment.priceAtPublication ?? null;
+  let priceAtPubEstimated = false;
+  let priceAtIngest = enrichment.priceAtIngest ?? null;
+  if (
+    priceAtPub == null &&
+    price != null &&
+    price > 0 &&
+    changePercent != null &&
+    Number.isFinite(changePercent)
+  ) {
+    const denom = 1 + changePercent / 100;
+    if (Math.abs(denom) > 0.05) {
+      priceAtPub = price / denom;
+      priceAtPubEstimated = true;
+    }
+  }
+  if (priceAtIngest == null && price != null && price > 0) {
+    // First card snapshot — sticky until a true ingest mark arrives
+    priceAtIngest = priceAtPub ?? price;
+  }
 
   const text = `${catalyst.headline} ${catalyst.aiSummary ?? ""}`;
   const halted = HALT_RE.test(text);
@@ -225,6 +246,17 @@ export function projectDecisionCardV3(
 
   const moveSincePub = pctMove(priceAtPub, price);
   const moveSinceIngest = pctMove(priceAtIngest, price);
+  // Prefer explicit day change from the tape when publication mark is estimated
+  const moveSincePubFinal =
+    priceAtPubEstimated && changePercent != null && Number.isFinite(changePercent)
+      ? avail(changePercent, { estimated: true, note: "session_change_proxy" })
+      : moveSincePub.availability === "unavailable" &&
+          changePercent != null &&
+          Number.isFinite(changePercent)
+        ? avail(changePercent, { estimated: true, note: "session_change_proxy" })
+        : priceAtPubEstimated
+          ? avail(moveSincePub.value, { estimated: true, note: "session_reference" })
+          : moveSincePub;
 
   const confirming =
     catalyst.newsCount != null && catalyst.newsCount > 0
@@ -303,7 +335,11 @@ export function projectDecisionCardV3(
     timestampQuality: tsQuality,
     judgmentTiming: judgment?.timing,
     priceAtPublication: priceAtPub,
-    priceAtPublicationQuality: priceAtPub != null ? "ok" : "unavailable",
+    priceAtPublicationQuality: priceAtPub != null
+      ? priceAtPubEstimated
+        ? "substituted"
+        : "ok"
+      : "unavailable",
     priceAtIngestion: priceAtIngest,
     priceAtIngestionQuality: priceAtIngest != null ? "ok" : "unavailable",
     nowMs: now,
@@ -375,24 +411,41 @@ export function projectDecisionCardV3(
       confirmingSourceCount: confirming,
     },
     reaction: {
-      priceAtPublication: engine.metrics.priceAtPublication,
-      priceAtIngest: engine.metrics.priceAtIngestion,
-      currentPrice: engine.metrics.currentPrice,
+      priceAtPublication: priceAtPubEstimated
+        ? avail(priceAtPub, { estimated: true, note: "session_reference" })
+        : engine.metrics.priceAtPublication.availability !== "unavailable"
+          ? engine.metrics.priceAtPublication
+          : avail(priceAtPub),
+      priceAtIngest:
+        engine.metrics.priceAtIngestion.availability !== "unavailable"
+          ? engine.metrics.priceAtIngestion
+          : avail(priceAtIngest),
+      currentPrice:
+        engine.metrics.currentPrice.availability !== "unavailable"
+          ? engine.metrics.currentPrice
+          : avail(price),
       moveBeforePublicationPct: engine.metrics.pctMoveBeforePublication,
       moveSincePublicationPct:
-        engine.metrics.pctMoveSincePublication.availability !== "unavailable"
+        engine.metrics.pctMoveSincePublication.availability !== "unavailable" &&
+        !priceAtPubEstimated
           ? engine.metrics.pctMoveSincePublication
-          : moveSincePub,
+          : moveSincePubFinal,
       moveSinceIngestPct:
         engine.metrics.pctMoveSinceIngestion.availability !== "unavailable"
           ? engine.metrics.pctMoveSinceIngestion
           : moveSinceIngest,
-      relativeVolume: engine.metrics.relativeVolume,
+      relativeVolume:
+        engine.metrics.relativeVolume.availability !== "unavailable"
+          ? engine.metrics.relativeVolume
+          : avail(rVol),
       volAccel1m: engine.metrics.volumeAcceleration,
       volAccel5m: avail(live.volAccel5m, { note: "requires_5m_bars" }),
       distanceFromVwapPct: engine.metrics.distanceFromVwapPct,
       distanceFromPremarketHighPct: engine.metrics.distanceFromPremarketHighPct,
-      distanceFromSessionHighPct: engine.metrics.distanceFromHodPct,
+      distanceFromSessionHighPct:
+        engine.metrics.distanceFromHodPct.availability !== "unavailable"
+          ? engine.metrics.distanceFromHodPct
+          : distancePct(dayHigh, price),
     },
     tradeability: {
       spreadDollars: tradeability.metrics.absoluteSpread,

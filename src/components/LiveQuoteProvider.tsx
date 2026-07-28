@@ -20,6 +20,37 @@ export interface LiveQuote {
   avgVolume?: number;
   floatShares?: number;
   marketCap?: number;
+  dayHigh?: number;
+}
+
+/** Merge quotes without wiping previously known tape fields. */
+export function mergeLiveQuote(
+  prev: LiveQuote | undefined,
+  next: Partial<LiveQuote> & Pick<LiveQuote, "price" | "changePercent">
+): LiveQuote {
+  return {
+    price: next.price,
+    changePercent: next.changePercent,
+    change: next.change ?? prev?.change ?? 0,
+    rVol: next.rVol ?? prev?.rVol,
+    volume: next.volume ?? prev?.volume,
+    avgVolume: next.avgVolume ?? prev?.avgVolume,
+    floatShares: next.floatShares ?? prev?.floatShares,
+    marketCap: next.marketCap ?? prev?.marketCap,
+    dayHigh: next.dayHigh ?? prev?.dayHigh,
+  };
+}
+
+function mergeQuoteMap(
+  prev: Record<string, LiveQuote>,
+  incoming: Record<string, LiveQuote>
+): Record<string, LiveQuote> {
+  const out = { ...prev };
+  for (const [sym, q] of Object.entries(incoming)) {
+    if (!q || !(q.price > 0)) continue;
+    out[sym] = mergeLiveQuote(prev[sym], q);
+  }
+  return out;
 }
 
 interface LiveQuoteContextValue {
@@ -100,7 +131,7 @@ export function LiveQuoteProvider({ children }: { children: ReactNode }) {
         Object.assign(merged, chunkQuotes);
       }
       if (Object.keys(merged).length === 0) return;
-      setQuotes((prev) => ({ ...prev, ...merged }));
+      setQuotes((prev) => mergeQuoteMap(prev, merged));
     } finally {
       pollInFlightRef.current = false;
     }
@@ -135,7 +166,7 @@ export function LiveQuoteProvider({ children }: { children: ReactNode }) {
         };
         if (data.type === "quotes" && data.quotes) {
           setStreamLive(data.live === true);
-          setQuotes((prev) => ({ ...prev, ...data.quotes }));
+          setQuotes((prev) => mergeQuoteMap(prev, data.quotes!));
         }
       } catch {
         /* ignore malformed */

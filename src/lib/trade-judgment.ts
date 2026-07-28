@@ -1,9 +1,10 @@
 import type { CatalystItem } from "@/types";
 import { isDilutionCatalyst } from "./action-playbook";
 import { buildJudgmentV2, judgmentV2ToTradeJudgment } from "./judgment/build-v2";
+import { presentJudgment } from "./judgment/present";
 import { isJudgmentV2Enabled, type JudgmentV2 } from "./judgment/types";
 
-/** Trader-facing grade — the only three answers that matter. */
+/** Trader-facing grade — kept for API/DB compatibility; not primary UI. */
 export type TradeGrade = "go" | "watch" | "skip";
 
 export interface ChecklistItem {
@@ -16,7 +17,7 @@ export interface ChecklistItem {
 
 export interface TradeJudgment {
   grade: TradeGrade;
-  /** Short badge text: GO · WATCH · SKIP */
+  /** Presentation primary label (materiality) — never GO/LONG/SHORT as sole meaning */
   label: string;
   /** One-line plain English for the row */
   summary: string;
@@ -267,21 +268,16 @@ function buildTradeJudgmentV1(
   const checksPassed = checklist.filter((x) => x.pass).length;
   const hardFails = !checklist.find((x) => x.id === "not-dilution")!.pass;
 
-  // ── Final grade ─────────────────────────────────
+  // ── Final grade (stored) + presentation (display) ─
   const combined = articleScore + tapeScore;
   let grade: TradeGrade;
-  let label: string;
-  let summary: string;
   let nextStep: string;
   let confidence: number;
 
   if (hardFails || dilution || (veryExtended && sentiment < 50)) {
     grade = "skip";
-    label = "SKIP";
-    summary = dilution
-      ? "Skip — dilution / offering risk"
-      : "Skip — odds favor a red chase";
-    nextStep = "Log it as a skip. Do not market-buy the spike.";
+    nextStep =
+      "Log as skipped. Review evidence before risking capital on the spike.";
     confidence = Math.min(95, 70 + (dilution ? 15 : 0) + (veryExtended ? 10 : 0));
   } else if (
     combined >= 35 &&
@@ -291,38 +287,50 @@ function buildTradeJudgmentV1(
     (heavyVol || absMove >= 2 || urgency >= 45)
   ) {
     grade = "go";
-    label = "GO";
-    summary = "Go — story + tape look aligned (still manage risk)";
-    nextStep = "Only enter with a clear level and an exit if it fails. This is not a guarantee.";
-    confidence = Math.min(88, 55 + combined / 3 + (heavyVol ? 8 : 0));
+    nextStep =
+      "Review levels and evidence. This is not a buy instruction or guarantee.";
+    confidence = Math.min(88, 55 + checksPassed / 3 + (heavyVol ? 8 : 0));
   } else if (combined <= -20 || checksPassed <= 2) {
     grade = "skip";
-    label = "SKIP";
-    summary = "Skip — too many red flags vs reward";
     nextStep = "Wait for a cleaner setup or move on.";
     confidence = Math.min(85, 50 + Math.abs(combined) / 2);
   } else {
     grade = "watch";
-    label = "WATCH";
-    summary = "Watch — let it prove itself before risking money";
-    nextStep = "Set an alert or watchlist. Re-grade after a pullback or fresh confirmation.";
+    nextStep =
+      "Set an alert or watchlist. Re-check after a pullback or fresh confirmation.";
     confidence = Math.min(75, 40 + checksPassed * 6);
   }
 
+  const presented = presentJudgment({
+    catalystStrength:
+      grade === "go"
+        ? "STRONG"
+        : grade === "skip" && dilution
+          ? "MODERATE"
+          : grade === "skip"
+            ? "WEAK"
+            : "MODERATE",
+    directionalImplication:
+      BEAR_TYPES.has(type) || sentiment <= -20
+        ? "NEGATIVE"
+        : BULL_TYPES.has(type) || sentiment >= 20
+          ? "POSITIVE"
+          : "UNCLEAR",
+    tradeability: "ACCEPTABLE",
+    dilutionHint: dilution,
+    legacyGrade: grade,
+  });
+
   const explanation = [
-    grade === "go"
-      ? "We only mark GO when the news type is constructive and the stock’s current trading doesn’t look like a chase trap."
-      : grade === "skip"
-        ? "SKIP means capital protection: the article, the tape, or both say the easy money is already gone or the setup is toxic."
-        : "WATCH means the story might matter, but something is missing — confirmation, level, or cleaner timing.",
-    "",
-    "This uses the headline/catalyst analysis plus how the company is performing today (move %, relative volume, float, and history when available). It is a decision aid — not financial advice and not a promise of green trades.",
+    "Judgment dimensions separate materiality (attention) from directional implication (catalyst tone).",
+    "Legacy GO/WATCH/SKIP values remain for compatibility and are not buy/sell instructions.",
+    "This uses the headline/catalyst analysis plus how the company is performing today (move %, relative volume, float, and history when available). It is a decision aid — not financial advice.",
   ].join(" ");
 
   return {
     grade,
-    label,
-    summary,
+    label: presented.materiality,
+    summary: presented.dimensionsLine,
     explanation,
     articleReasons: articleReasons.slice(0, 4),
     performanceReasons: performanceReasons.slice(0, 4),

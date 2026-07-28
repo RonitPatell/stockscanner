@@ -140,6 +140,8 @@ export async function GET(req: NextRequest) {
               changePercent: quote.dp ?? 0,
               change: quote.d ?? 0,
               rVol: estimateRvolFromMove(quote.dp ?? 0) ?? undefined,
+              dayHigh:
+                typeof quote.h === "number" && quote.h > 0 ? quote.h : undefined,
             };
           } catch {
             /* skip */

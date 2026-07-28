@@ -52,21 +52,24 @@ function Field({
   className?: string;
 }) {
   const unavailable = field.availability === "unavailable" || field.value == null;
+  if (unavailable) return null;
+  const note =
+    field.availability === "estimated"
+      ? " (est.)"
+      : field.availability === "stale"
+        ? " (stale)"
+        : "";
   return (
     <div className={cn("min-w-0", className)}>
       <div className="text-[9px] uppercase tracking-wider text-[--text-muted] truncate">
         {label}
       </div>
       <div
-        className={cn(
-          "font-mono text-[11px] tabular-nums truncate",
-          unavailable ? "text-[--text-muted] italic" : "text-[--text-primary]"
-        )}
+        className="font-mono text-[11px] tabular-nums truncate text-[--text-primary]"
         title={field.note}
       >
-        {unavailable
-          ? "unavailable"
-          : formatAvail(field, { digits, suffix })}
+        {formatAvail(field, { digits, suffix })}
+        {note}
       </div>
     </div>
   );
@@ -88,7 +91,7 @@ const LiveIdentityTape = memo(function LiveIdentityTape({
   return (
     <div className="flex items-baseline gap-2 font-mono tabular-nums shrink-0">
       <span className="text-[13px] text-[--text-primary]">
-        {price != null ? formatPrice(price) : "unavailable"}
+        {price != null ? formatPrice(price) : "—"}
       </span>
       <span
         className={cn(
@@ -183,6 +186,7 @@ export function DecisionCardV3({
       avgVolume: q.avgVolume,
       rVol: q.rVol,
       floatShares: q.floatShares,
+      dayHigh: q.dayHigh,
     });
   }, [baseModel, liveQuotes, catalyst.symbol]);
 
@@ -278,7 +282,7 @@ export function DecisionCardV3({
           </div>
           {!compact && (
             <div className="text-[10px] text-[--text-muted] truncate">
-              {model.identity.companyName || "unavailable"}
+              {model.identity.companyName || model.identity.symbol}
               {model.identity.exchange ? ` · ${model.identity.exchange}` : ""}
             </div>
           )}
@@ -302,7 +306,16 @@ export function DecisionCardV3({
                   model.reactionStage.stage === "UNKNOWN" && "text-rose-300"
                 )}
               >
-                · {model.reactionStage.stage}
+                ·{" "}
+                {model.reactionStage.stage === "EARLY"
+                  ? "Early"
+                  : model.reactionStage.stage === "ACTIVE"
+                    ? "Active"
+                    : model.reactionStage.stage === "EXTENDED"
+                      ? "Extended"
+                      : model.reactionStage.stage === "STALE"
+                        ? "Stale"
+                        : "Unknown"}
               </span>
             </div>
           )}
@@ -429,7 +442,7 @@ export function DecisionCardV3({
                 <div className="font-mono text-[11px]">
                   {model.catalyst.providerPublishedAt
                     ? new Date(model.catalyst.providerPublishedAt).toLocaleTimeString()
-                    : "unavailable"}
+                    : "—"}
                 </div>
               </div>
               <div>
@@ -437,7 +450,7 @@ export function DecisionCardV3({
                 <div className="font-mono text-[11px]">
                   {model.catalyst.firstSeenAt
                     ? new Date(model.catalyst.firstSeenAt).toLocaleTimeString()
-                    : "unavailable"}
+                    : "—"}
                 </div>
               </div>
               <Field
@@ -497,7 +510,17 @@ export function DecisionCardV3({
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-[--text-muted]">Liquidity</div>
-                <div className="font-mono text-[11px]">{model.tradeability.liquidity}</div>
+                <div className="font-mono text-[11px]">
+                  {model.tradeability.liquidity === "LIQUID"
+                    ? "Liquid"
+                    : model.tradeability.liquidity === "ACCEPTABLE"
+                      ? "Acceptable"
+                      : model.tradeability.liquidity === "THIN"
+                        ? "Thin"
+                        : model.tradeability.liquidity === "EXTREMELY_THIN"
+                          ? "Extremely thin"
+                          : "Unknown"}
+                </div>
               </div>
               <Field label="Quote age (sec)" field={model.tradeability.quoteFreshnessSec} digits={0} />
               <Field label="Session halts" field={model.tradeability.sessionHaltCount} digits={0} />

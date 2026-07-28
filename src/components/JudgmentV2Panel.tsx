@@ -111,16 +111,57 @@ export function JudgmentV2Panel({ catalyst }: { catalyst: CatalystItem }) {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <AxisChip label="Strength" value={judgment.catalystStrength} />
-        <AxisChip label="Direction" value={judgment.directionalImplication} tone={dirTone} />
         <AxisChip
-          label="Timing"
-          value={judgment.timing}
+          label="Materiality"
+          value={
+            judgment.catalystStrength === "STRONG"
+              ? "High"
+              : judgment.catalystStrength === "MODERATE"
+                ? "Medium"
+                : judgment.catalystStrength === "WEAK"
+                  ? "Low"
+                  : "Not material"
+          }
+        />
+        <AxisChip
+          label="Direction"
+          value={
+            judgment.directionalImplication === "POSITIVE"
+              ? "Positive"
+              : judgment.directionalImplication === "NEGATIVE"
+                ? "Negative"
+                : judgment.directionalImplication === "MIXED"
+                  ? "Mixed"
+                  : "Unclear"
+          }
+          tone={dirTone}
+        />
+        <AxisChip
+          label="Reaction"
+          value={
+            judgment.timing === "STALE"
+              ? "Stale"
+              : judgment.timing === "SCHEDULED"
+                ? "Early"
+                : judgment.timing === "IMMEDIATE" || judgment.timing === "TODAY"
+                  ? "Active"
+                  : "Unknown"
+          }
           tone={judgment.timing === "STALE" ? "warn" : "neutral"}
         />
         <AxisChip
           label="Tradeability"
-          value={judgment.tradeability}
+          value={
+            judgment.tradeability === "EXTREMELY_THIN"
+              ? "Extremely thin"
+              : judgment.tradeability === "THIN"
+                ? "Thin"
+                : judgment.tradeability === "LIQUID"
+                  ? "Liquid"
+                  : judgment.tradeability === "ACCEPTABLE"
+                    ? "Acceptable"
+                    : "Unknown"
+          }
           tone={
             judgment.tradeability === "EXTREMELY_THIN" || judgment.tradeability === "THIN"
               ? "warn"
@@ -128,8 +169,11 @@ export function JudgmentV2Panel({ catalyst }: { catalyst: CatalystItem }) {
           }
         />
         <AxisChip label="Confidence" value={judgment.confidence} />
-        <AxisChip label="Desk grade" value={judgment.gradeLabel} />
       </div>
+      <p className="text-[10px] text-zinc-500">
+        Materiality is whether the event warrants attention. Direction is catalyst
+        implication only — not a buy or sell instruction.
+      </p>
 
       {judgment.changeLog.length > 0 && (
         <div className="text-[11px] text-amber-200/90 border border-amber-500/20 rounded-lg px-2 py-1.5">
@@ -137,7 +181,7 @@ export function JudgmentV2Panel({ catalyst }: { catalyst: CatalystItem }) {
           {judgment.changeLog.slice(-3).map((c, i) => (
             <p key={`${c.at}-${i}`}>
               {new Date(c.at).toLocaleString()} — {c.reason}
-              {c.previousGrade ? ` (was ${c.previousGrade.toUpperCase()})` : ""}
+              {c.previousGrade ? ` (prior review class ${c.previousGrade})` : ""}
             </p>
           ))}
         </div>

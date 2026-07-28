@@ -188,6 +188,9 @@ async function dispatchForRule(
             sentimentLabel: catalyst.sentimentLabel,
             price: catalyst.price,
             changePercent: catalyst.changePercent,
+            judgmentV2: catalyst.judgmentV2 ?? null,
+            catalystStrength: catalyst.judgmentV2?.catalystStrength,
+            directionalImplication: catalyst.judgmentV2?.directionalImplication,
           });
           await prisma.alertLog
             .create({
@@ -342,6 +345,9 @@ async function dispatchForRule(
         sentimentLabel: catalyst.sentimentLabel,
         price: catalyst.price,
         changePercent: catalyst.changePercent,
+        judgmentV2: catalyst.judgmentV2 ?? null,
+        catalystStrength: catalyst.judgmentV2?.catalystStrength,
+        directionalImplication: catalyst.judgmentV2?.directionalImplication,
       });
       await prisma.alertLog
         .create({

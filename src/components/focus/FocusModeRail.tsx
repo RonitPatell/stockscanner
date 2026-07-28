@@ -159,8 +159,8 @@ export function FocusModeRail({
                 </div>
                 <p className="text-[11px] text-[--text-secondary] line-clamp-2 mt-0.5">
                   {c.catalystType?.replace(/_/g, " ") ?? "catalyst"}
-                  {c.judgmentV2?.grade
-                    ? ` · ${c.judgmentV2.grade.toUpperCase()}`
+                  {c.judgmentV2
+                    ? ` · ${c.judgmentV2.directionalImplication === "POSITIVE" ? "Positive" : c.judgmentV2.directionalImplication === "NEGATIVE" ? "Negative" : c.judgmentV2.directionalImplication === "MIXED" ? "Mixed" : "Unclear"}`
                     : ""}
                   {c.price != null ? ` · ${formatPrice(c.price)}` : ""}
                   {c.rVol != null ? ` · RVol ${c.rVol.toFixed(1)}` : ""}

@@ -4,36 +4,37 @@
    DESIGN TOKENS
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 :root {
-  /* â”€â”€ NIGHT DESK â”€â”€
-     Warm-ink canvas + cool-graphite panels. The tension between the
-     warm page and the neutral steel surfaces is the brand. */
+  /* Night desk — warm-ink canvas + cool-graphite panels */
   --bg: #0b0a08;
   --bg-panel: #131313;
   --bg-panel-hover: #181818;
   --bg-elevated: #1b1b1a;
   --bg-ink: #090807;
   --bg-graphite: #101112;
+  --bg-sunken: #0d0c0a;
+  --bg-selected: rgba(94, 200, 212, 0.06);
 
-  /* Borders â€” warm graphite hairlines */
+  /* Borders — neutral structure; coloured borders = critical only */
   --border: rgba(214, 200, 174, 0.1);
   --border-medium: rgba(214, 200, 174, 0.16);
   --border-strong: rgba(214, 200, 174, 0.28);
   --hairline: rgba(214, 200, 174, 0.085);
+  --border-critical: rgba(232, 184, 74, 0.55);
 
-  /* Text */
+  /* Text hierarchy */
   --text-primary: #f2efe9;
   --text-secondary: #a49d90;
   --text-tertiary: #6f6a5f;
   --text-muted: #4a463e;
 
-  /* Single voltage accent â€” emerald, reserved for actions + live state */
+  /* Emerald = actions / live; brand nav = purple */
   --accent: #16c784;
   --accent-bright: #3ddc97;
   --accent-dim: #0f9f68;
   --accent-glow: rgba(22, 199, 132, 0.2);
   --accent-subtle: rgba(22, 199, 132, 0.08);
 
-  /* Semantic market colors */
+  /* Semantic status — pair with text/icons; never colour alone */
   --bull: #16c784;
   --bull-dim: rgba(22, 199, 132, 0.14);
   --bear: #f07167;
@@ -43,26 +44,66 @@
   --info: #6bb3ff;
   --cyan: #5ec8d4;
   --cyan-dim: rgba(94, 200, 212, 0.1);
+  --brand: #a78bfa;
+  --brand-dim: rgba(167, 139, 250, 0.12);
+  --brand-border: rgba(167, 139, 250, 0.28);
 
-  /* Tighter radii = more institutional (Brex / Bloomberg marketing) */
+  --tone-positive: var(--bull);
+  --tone-negative: var(--bear);
+  --tone-risk: var(--warn);
+  --tone-system: var(--cyan);
+  --tone-meta: var(--text-secondary);
+  --tone-brand: var(--brand);
+
+  /* 8px spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --gap: var(--space-2);
+
   --radius-panel: 6px;
   --radius-inner: 4px;
   --radius-pill: 999px;
-  --gap: 10px;
+  --radius-badge: 4px;
 
-  /* Motion */
+  --shadow-none: none;
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-overlay: 0 28px 80px rgba(0, 0, 0, 0.55);
+  --shadow-accent: 0 8px 36px rgba(22, 199, 132, 0.28);
+
+  --text-page: 1.375rem;
+  --text-section: 1.125rem;
+  --text-feed: 0.9375rem;
+  --text-body: 0.875rem;
+  --text-meta: 0.75rem;
+  --text-label: 0.6875rem;
+  --leading-headline: 1.45;
+  --leading-body: 1.4;
+  --leading-tight: 1.25;
+
+  --icon-xs: 12px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+
+  --row-pad-y: var(--space-2);
+  --row-pad-x: 12px;
+  --card-pad: var(--space-3);
+  --section-gap: var(--space-4);
+  --badge-height: 22px;
+  --badge-pad-x: 8px;
+  --feed-row-min-height: 88px;
+
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-snap: cubic-bezier(0.3, 0.9, 0.3, 1);
   --dur-fast: 160ms;
   --dur-med: 320ms;
   --dur-slow: 700ms;
 
-  /* Elevation */
-  --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.4);
-  --shadow-raised: 0 28px 80px rgba(0, 0, 0, 0.55);
-  --shadow-accent: 0 8px 36px rgba(22, 199, 132, 0.28);
-
-  /* Tailwind compat aliases */
   --background: var(--bg);
   --foreground: var(--text-primary);
   --card: var(--bg-panel);
@@ -110,10 +151,218 @@ body {
 
 ::selection { background: rgba(22, 199, 132, 0.28); }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRADER VISUAL SYSTEM UTILITIES
+   Typography, tones, badges, feed selection, status — presentation only.
+═══════════════════════════════════════════════════════════════════════════ */
+
+.tt-page-title {
+  font-size: clamp(1.25rem, 1.1rem + 0.4vw, 1.5rem); /* 20–24px */
+  font-weight: 600;
+  line-height: var(--leading-headline);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.tt-section-title {
+  font-size: clamp(1rem, 0.95rem + 0.2vw, 1.125rem); /* 16–18px */
+  font-weight: 600;
+  line-height: var(--leading-headline);
+  color: var(--text-primary);
+}
+
+.tt-feed-primary {
+  font-size: var(--text-feed);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+}
+
+.tt-feed-headline {
+  font-size: var(--text-body);
+  line-height: var(--leading-headline);
+  color: var(--text-primary);
+}
+
+.tt-meta {
+  font-size: var(--text-meta);
+  line-height: var(--leading-body);
+  color: var(--text-secondary);
+}
+
+.tt-label {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.tt-num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.tt-tone-positive { color: var(--tone-positive); }
+.tt-tone-negative { color: var(--tone-negative); }
+.tt-tone-risk { color: var(--tone-risk); }
+.tt-tone-system { color: var(--tone-system); }
+.tt-tone-meta { color: var(--tone-meta); }
+.tt-tone-brand { color: var(--tone-brand); }
+
+.tt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--badge-height);
+  padding: 0 var(--badge-pad-x);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  font-size: var(--text-meta);
+  line-height: 1;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.tt-badge[data-tone="positive"] {
+  color: var(--tone-positive);
+  background: var(--bull-dim);
+  border-color: transparent;
+}
+.tt-badge[data-tone="negative"] {
+  color: var(--tone-negative);
+  background: var(--bear-dim);
+  border-color: transparent;
+}
+.tt-badge[data-tone="risk"] {
+  color: var(--tone-risk);
+  background: var(--warn-dim);
+  border-color: transparent;
+}
+.tt-badge[data-tone="system"] {
+  color: var(--tone-system);
+  background: var(--cyan-dim);
+  border-color: transparent;
+}
+.tt-badge[data-tone="brand"] {
+  color: var(--tone-brand);
+  background: var(--brand-dim);
+  border-color: transparent;
+}
+.tt-badge[data-tone="meta"] {
+  color: var(--text-secondary);
+}
+
+.tt-feed-row {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  padding: var(--row-pad-y) var(--row-pad-x);
+  min-height: var(--feed-row-min-height);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  transition: background var(--dur-fast) ease;
+}
+.tt-feed-row:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+.tt-feed-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(94, 200, 212, 0.35);
+}
+/* Selected: left rail + soft fill — no bright full outline */
+.tt-feed-row[data-selected="true"] {
+  background: var(--bg-selected);
+}
+.tt-feed-row[data-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--tone-system);
+  border-radius: 0 2px 2px 0;
+}
+
+.tt-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-meta);
+  color: var(--text-secondary);
+}
+.tt-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.tt-status[data-state="live"] .tt-status-dot { background: var(--tone-positive); }
+.tt-status[data-state="live"] { color: var(--tone-positive); }
+.tt-status[data-state="connecting"] .tt-status-dot { background: var(--tone-system); }
+.tt-status[data-state="disconnected"] .tt-status-dot { background: var(--tone-negative); }
+.tt-status[data-state="disconnected"] { color: var(--tone-negative); }
+.tt-status[data-state="warn"] .tt-status-dot { background: var(--tone-risk); }
+.tt-status[data-state="warn"] { color: var(--tone-risk); }
+
+.tt-risk-alert {
+  border: 1px solid var(--border-critical);
+  background: var(--warn-dim);
+  border-radius: var(--radius-inner);
+  padding: var(--space-2) var(--space-3);
+}
+
+.tt-empty,
+.tt-loading,
+.tt-error {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.tt-error {
+  border-color: var(--border-critical);
+  color: var(--text-primary);
+}
+
+.tt-skeleton {
+  height: 10px;
+  border-radius: var(--radius-inner);
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: tt-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes tt-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.tt-icon-xs { width: var(--icon-xs); height: var(--icon-xs); }
+.tt-icon-sm { width: var(--icon-sm); height: var(--icon-sm); }
+.tt-icon-md { width: var(--icon-md); height: var(--icon-md); }
+.tt-icon-lg { width: var(--icon-lg); height: var(--icon-lg); }
+
+.tt-stack-section { display: flex; flex-direction: column; gap: var(--section-gap); }
+.tt-stack-card { display: flex; flex-direction: column; gap: var(--space-3); }
+.tt-stack-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.tt-inline-tight { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
    DESK SURFACE SYSTEM
    The "desk-*" classes form the product UI vocabulary.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════════════════════════════════ */
 
 /* â”€â”€ Shell (full desk wrapper) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-shell {
@@ -127,24 +376,31 @@ body {
 /* â”€â”€ Panel card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .desk-panel {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(36, 38, 41, 0.4), transparent 72px),
-    var(--bg-panel);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  /* inner top highlight */
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.035),
-    0 12px 38px rgba(0,0,0,0.32);
+  box-shadow: var(--shadow-panel);
   overflow: hidden;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .desk-panel:has(:hover) {
-  border-color: var(--border-strong);
+  border-color: var(--border-medium);
+}
+
+/* Primary surfaces only (feed host, drawer) — not every side panel */
+.desk-panel--raised {
+  background:
+    linear-gradient(180deg, rgba(36, 38, 41, 0.35), transparent 72px),
+    var(--bg-panel);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.045),
-    0 14px 42px rgba(0,0,0,0.38);
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    var(--shadow-raised);
+}
+
+.desk-panel--flat {
+  box-shadow: var(--shadow-none);
+  background: var(--bg-sunken);
 }
 
 /* â”€â”€ Panel header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

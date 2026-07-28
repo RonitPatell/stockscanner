@@ -17,6 +17,29 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { CatalystCard } from "./CatalystCard";
 import { DecisionCardV3 } from "./decision-card/DecisionCardV3";
 import { isDecisionCardV3Enabled } from "@/lib/decision-card/flags";
+import { isDashboardShellV3Enabled } from "@/lib/dashboard-shell";
+import { CatalystFeedRowV3 } from "./catalyst-feed/CatalystFeedRowV3";
+import { FeedShortcutsHelpButton } from "./catalyst-feed/FeedShortcutsHelpButton";
+import {
+  collectRuleMatchedIds,
+  FEED_V3_ROW_HEIGHT_PX,
+  loadFeedV3Prefs,
+  mergeFeedByPresentation,
+  orderByFocusRank,
+  type FeedV3DisplayPrefs,
+} from "@/lib/catalyst-feed-v3";
+import { collapseStoryClusters } from "@/lib/story-cluster";
+import {
+  createDeliveryHealth,
+  onDeliveryError,
+  onDeliveryEvent,
+  onDeliveryOpen,
+  selectFocusActive,
+  selectFocusPriority,
+  shouldWarnDisconnect,
+  type DeliveryHealth,
+} from "@/lib/focus-mode";
+import { showFocusCatalystNotification } from "@/lib/squawk";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -30,25 +53,18 @@ import {
 } from "./LiveQuoteProvider";
 import { useAudioSquawk } from "@/hooks/useAudioSquawk";
 import { SquawkControls } from "./squawk/SquawkControls";
-import {
-  createDeliveryHealth,
-  onDeliveryError,
-  onDeliveryEvent,
-  onDeliveryOpen,
-  selectFocusActive,
-  shouldWarnDisconnect,
-  type DeliveryHealth,
-} from "@/lib/focus-mode";
-import { showFocusCatalystNotification } from "@/lib/squawk";
+import { FocusCatalystRowV2 } from "./focus/FocusCatalystRowV2";
 
-export type ScannerTab = "all" | "premarket" | "watchlist";
+export type ScannerTab = "all" | "premarket" | "watchlist" | "strategy";
 
 const POLL_MS = 12_000;
 const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
 const ROW_ESTIMATE_PX = 72;
 const DECISION_CARD_V3 = isDecisionCardV3Enabled();
+const FEED_V3 = isDashboardShellV3Enabled();
 const MUTE_KEY = "tt-muted-symbols-v1";
 const DC3_ROW_ESTIMATE_PX = 96;
+const FOCUS_V2_ROW_HEIGHT_PX = 128;
 
 async function safeJsonFetch<T>(url: string): Promise<T | null> {
   try {
@@ -68,6 +84,13 @@ export function LiveScanner({
   initialWatchlist = [],
   initialFilters = null,
   focusCompact = false,
+  focusModeV2 = false,
+  focusFilterOpenSignal = 0,
+  focusEmptyActions,
+  onFocusedCatalystChange,
+  onLastEventAtChange,
+  onCatalystActivate,
+  focusCatalystId = null,
 }: {
   embedded?: boolean;
   tab?: ScannerTab;
@@ -77,6 +100,23 @@ export function LiveScanner({
   initialFilters?: ScannerFilters | null;
   /** Focus Mode: max 5 ranked catalysts + delivery warnings + squawk rail */
   focusCompact?: boolean;
+  /** Focus Mode V2 minimal chrome */
+  focusModeV2?: boolean;
+  /** Increment to open filters from parent Focus chrome */
+  focusFilterOpenSignal?: number;
+  focusEmptyActions?: {
+    onEditRules?: () => void;
+    onShowAll?: () => void;
+    onReviewWatchlist?: () => void;
+  };
+  /** Notify shell when keyboard/row focus changes */
+  onFocusedCatalystChange?: (catalyst: CatalystItem | null) => void;
+  /** Notify shell of last feed/SSE event time */
+  onLastEventAtChange?: (at: Date | null) => void;
+  /** Open context drawer (Enter / row activate) */
+  onCatalystActivate?: (catalyst: CatalystItem) => void;
+  /** Keep keyboard focus on this catalyst (deep-link / open drawer) */
+  focusCatalystId?: string | null;
 }) {
   const [catalysts, setCatalysts] = useState<CatalystItem[]>(initialCatalysts);
   const [loading, setLoading] = useState(initialCatalysts.length > 0 ? false : true);
@@ -99,6 +139,75 @@ export function LiveScanner({
   const [focusIndex, setFocusIndex] = useState(0);
   const [hotkeyExpanded, setHotkeyExpanded] = useState(false);
   const [showSquawk, setShowSquawk] = useState(false);
+  const [feedPrefs, setFeedPrefs] = useState<FeedV3DisplayPrefs>(() =>
+    loadFeedV3Prefs()
+  );
+  const [ruleMatchedIds, setRuleMatchedIds] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  // Sync external search / filter overrides from dashboard shell
+  useEffect(() => {
+    if (!initialFilters) return;
+    setFilters((prev) => ({
+      ...prev,
+      ...initialFilters,
+      search: initialFilters.search ?? prev.search,
+    }));
+  }, [initialFilters?.search]);
+
+  useEffect(() => {
+    onLastEventAtChange?.(lastUpdate);
+  }, [lastUpdate, onLastEventAtChange]);
+
+  useEffect(() => {
+    if (!FEED_V3) return;
+    const onPrefs = () => setFeedPrefs(loadFeedV3Prefs());
+    window.addEventListener("tt-feed-v3-prefs", onPrefs);
+    return () => window.removeEventListener("tt-feed-v3-prefs", onPrefs);
+  }, []);
+
+  useEffect(() => {
+    if (!focusModeV2 || !focusFilterOpenSignal) return;
+    setShowFilters(true);
+  }, [focusFilterOpenSignal, focusModeV2]);
+
+  useEffect(() => {
+    if (!focusModeV2) return;
+    const onExport = () => exportCsvRef.current?.();
+    const onRefresh = () => void fetchCatalystsRef.current?.();
+    const onSquawk = () => setShowSquawk(true);
+    window.addEventListener("tt-focus-export", onExport);
+    window.addEventListener("tt-focus-refresh", onRefresh);
+    window.addEventListener("tt-focus-squawk-settings", onSquawk);
+    return () => {
+      window.removeEventListener("tt-focus-export", onExport);
+      window.removeEventListener("tt-focus-refresh", onRefresh);
+      window.removeEventListener("tt-focus-squawk-settings", onSquawk);
+    };
+  }, [focusModeV2]);
+
+  useEffect(() => {
+    if (!FEED_V3 && !focusModeV2) return;
+    let cancelled = false;
+    void fetch("/api/alert-strategies")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const strategies = d.strategies ?? d;
+        const ids = collectRuleMatchedIds(
+          catalystsRef.current,
+          strategies,
+          Date.now()
+        );
+        setRuleMatchedIds(ids);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [lastUpdate, focusModeV2]);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const prevSymbolsRef = useRef<Set<string>>(
@@ -110,6 +219,8 @@ export function LiveScanner({
   const catalystsRef = useRef<CatalystItem[]>(initialCatalysts);
   const catalystFetchInFlightRef = useRef(false);
   const catalystGenRef = useRef(0);
+  const exportCsvRef = useRef<(() => void) | null>(null);
+  const fetchCatalystsRef = useRef<(() => Promise<void>) | null>(null);
   const hotkeyRef = useRef({
     filtered: [] as CatalystItem[],
     focusIndex: 0,
@@ -117,6 +228,7 @@ export function LiveScanner({
     toggleWatchlist: async (_symbol: string) => {},
     toggleMute: (_symbol: string) => {},
     openEvidence: (_c: CatalystItem) => {},
+    activateCatalyst: (_c: CatalystItem) => {},
   });
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -212,7 +324,14 @@ export function LiveScanner({
       );
       if (fresh.length === 0 && catalystsRef.current.length > 0) return;
 
-      for (const c of fresh) {
+      const { next: merged, changedIds } = FEED_V3
+        ? mergeFeedByPresentation(catalystsRef.current, fresh)
+        : { next: fresh, changedIds: fresh.map((c) => c.id) };
+      const next = collapseStoryClusters(merged);
+      const changed = new Set(changedIds);
+
+      for (const c of next) {
+        if (!changed.has(c.id) && prevIdsRef.current.has(c.id)) continue;
         const isNew = !prevIdsRef.current.has(c.id);
         const prev = catalystsRef.current.find((x) => x.id === c.id);
         const enriched =
@@ -220,16 +339,16 @@ export function LiveScanner({
           (prev!.changePercent !== c.changePercent ||
             prev!.rVol !== c.rVol ||
             prev!.judgmentV2?.grade !== c.judgmentV2?.grade);
-        if (isNew || enriched) {
+        if (isNew || enriched || changed.has(c.id)) {
           squawk.pushCatalyst(c);
           if (focusCompact && isNew) {
             showFocusCatalystNotification(c);
           }
         }
       }
-      prevIdsRef.current = new Set(fresh.map((c) => c.id));
+      prevIdsRef.current = new Set(next.map((c) => c.id));
 
-      setCatalysts(fresh.map((c) => applyLiveQuote(c, liveQuotes)));
+      setCatalysts(next.map((c) => applyLiveQuote(c, liveQuotes)));
       setLastUpdate(new Date());
       setConnected(true);
       setDeliveryHealth((h) => onDeliveryEvent(h, { at: Date.now() }));
@@ -404,20 +523,67 @@ export function LiveScanner({
           if (nowMs - new Date(c.publishedAt).getTime() > MAX_FEED_AGE_MS) return false;
           if (tab === "premarket" && !c.isPremarket) return false;
           if (tab === "watchlist" && !watchSet.has(c.symbol.toUpperCase())) return false;
-          if (DECISION_CARD_V3 && mutedSet.has(c.symbol.toUpperCase())) return false;
+          if (tab === "strategy" && !ruleMatchedIds.has(c.id)) return false;
+          if (!FEED_V3 && DECISION_CARD_V3 && mutedSet.has(c.symbol.toUpperCase())) return false;
           return applyFilters(c, filters);
         })
         .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+      if (focusModeV2 && focusCompact) {
+        return selectFocusPriority(base, {
+          watchlist: watchSet,
+          nowMs,
+          ruleMatchedIds,
+        });
+      }
+
+      if (FEED_V3) {
+        const ranked = orderByFocusRank(base, {
+          watchlist: watchSet,
+          nowMs,
+          ruleMatchedIds,
+        });
+        if (focusCompact) {
+          return selectFocusActive(ranked, {
+            watchlist: watchSet,
+            nowMs,
+            ruleMatchedIds,
+          });
+        }
+        return ranked;
+      }
+
       if (!focusCompact) return base;
-      return selectFocusActive(base, { watchlist: watchSet, nowMs });
+      return selectFocusActive(base, {
+        watchlist: watchSet,
+        nowMs,
+      });
     },
-    [catalysts, nowMs, tab, watchSet, mutedSet, filters, focusCompact]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- watchSet derived from watchlist
+    [
+      catalysts,
+      tab,
+      watchSet,
+      filters,
+      nowMs,
+      focusCompact,
+      focusModeV2,
+      mutedSet,
+      ruleMatchedIds,
+    ]
   );
 
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => (DECISION_CARD_V3 ? DC3_ROW_ESTIMATE_PX : ROW_ESTIMATE_PX),
+    estimateSize: () =>
+      focusModeV2
+        ? FOCUS_V2_ROW_HEIGHT_PX
+        : FEED_V3
+          ? FEED_V3_ROW_HEIGHT_PX
+          : DECISION_CARD_V3
+            ? DC3_ROW_ESTIMATE_PX
+            : ROW_ESTIMATE_PX,
     overscan: 8,
   });
 
@@ -429,21 +595,48 @@ export function LiveScanner({
       toggleWatchlist,
       toggleMute,
       openEvidence: (c: CatalystItem) => {
+        if (FEED_V3) {
+          onCatalystActivate?.(c);
+          return;
+        }
         setHotkeyExpanded(true);
         const el = document.querySelector(
           `[data-focus-idx="${focusIndex}"]`
         ) as HTMLElement | null;
         el?.focus();
-        // Expand evidence: DecisionCard opens on Enter; force expand already set
         void c;
       },
+      activateCatalyst: (c: CatalystItem) => {
+        onCatalystActivate?.(c);
+      },
     };
-  }, [filtered, focusIndex, onTabChange, toggleWatchlist, toggleMute]);
+  }, [
+    filtered,
+    focusIndex,
+    onTabChange,
+    toggleWatchlist,
+    toggleMute,
+    onCatalystActivate,
+  ]);
+
+  useEffect(() => {
+    const c = filtered[focusIndex] ?? null;
+    onFocusedCatalystChange?.(c ?? null);
+  }, [filtered, focusIndex, onFocusedCatalystChange]);
 
   useEffect(() => {
     setFocusIndex(0);
     setHotkeyExpanded(false);
   }, [tab, moversOnly, filters.search]);
+
+  // Align keyboard focus with deep-linked / drawer-selected catalyst
+  // (runs after tab reset so deep-link wins when drawer is open)
+  useEffect(() => {
+    if (!focusCatalystId) return;
+    const idx = filtered.findIndex((c) => c.id === focusCatalystId);
+    if (idx < 0) return;
+    setFocusIndex((prev) => (prev === idx ? prev : idx));
+  }, [focusCatalystId, filtered]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -489,17 +682,22 @@ export function LiveScanner({
         setTab("watchlist");
         return;
       }
-      if (e.key === "m" || e.key === "M") {
-        e.preventDefault();
-        setMoversOnly((v) => !v);
-        return;
-      }
       if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         setShowFilters((v) => !v);
         return;
       }
+      if (!FEED_V3 && (e.key === "m" || e.key === "M")) {
+        e.preventDefault();
+        setMoversOnly((v) => !v);
+        return;
+      }
       if (rows.length === 0) return;
+      if (FEED_V3 && (e.key === "m" || e.key === "M") && rows[idx]) {
+        e.preventDefault();
+        muteFn(rows[idx].symbol);
+        return;
+      }
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
         setFocusIndex((i) => Math.min(rows.length - 1, i + 1));
@@ -514,7 +712,14 @@ export function LiveScanner({
       }
       if (e.key === "Enter") {
         e.preventDefault();
+        if (FEED_V3) {
+          if (rows[idx]) hotkeyRef.current.activateCatalyst(rows[idx]);
+          return;
+        }
         setHotkeyExpanded((v) => !v);
+        if (rows[idx]) {
+          hotkeyRef.current.activateCatalyst(rows[idx]);
+        }
         return;
       }
       if ((e.key === "w" || e.key === "W") && rows[idx]) {
@@ -522,8 +727,8 @@ export function LiveScanner({
         void toggleWl(rows[idx].symbol);
         return;
       }
-      if (DECISION_CARD_V3 && rows[idx]) {
-        if (e.key === "o" || e.key === "O") {
+      if (DECISION_CARD_V3 || FEED_V3) {
+        if (e.key === "s" || e.key === "S" || e.key === "o" || e.key === "O") {
           e.preventDefault();
           const url = rows[idx].sourceUrl;
           if (url) window.open(url, "_blank", "noopener,noreferrer");
@@ -546,7 +751,7 @@ export function LiveScanner({
         if (e.key === "e" || e.key === "E") {
           e.preventDefault();
           openEvidence(rows[idx]);
-          setHotkeyExpanded(true);
+          if (!FEED_V3) setHotkeyExpanded(true);
           return;
         }
       }
@@ -565,7 +770,13 @@ export function LiveScanner({
 
   const isPremarket = catalysts.some((c) => c.isPremarket);
   const tabLabel =
-    tab === "premarket" ? "Premarket" : tab === "watchlist" ? "Watchlist" : "News Feed";
+    tab === "premarket"
+      ? "Premarket"
+      : tab === "watchlist"
+        ? "Watchlist"
+        : tab === "strategy"
+          ? "Strategy Matches"
+          : "News Feed";
 
   const exportCsv = useCallback(() => {
     const rows = filtered.slice(0, 200).map((c) => ({
@@ -610,8 +821,12 @@ export function LiveScanner({
     URL.revokeObjectURL(url);
   }, [filtered]);
 
+  exportCsvRef.current = exportCsv;
+  fetchCatalystsRef.current = fetchCatalysts;
+
   return (
     <div className={cn("flex flex-col min-h-0", embedded ? "h-full" : "space-y-3")}>
+      {!focusModeV2 && (
       <div
         className={cn(
           "scanner-toolbar flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0",
@@ -725,6 +940,39 @@ export function LiveScanner({
           </Button>
         </div>
       </div>
+      )}
+
+      {focusModeV2 && (
+        <div className="shrink-0 px-3 py-2 border-b border-[--border] flex flex-wrap items-center gap-2">
+          <div
+            className="flex items-center gap-1.5"
+            data-testid="focus-connection"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full",
+                connected ? "bg-emerald-400 animate-pulse" : "bg-red-400"
+              )}
+              aria-hidden
+            />
+            <span className="text-[11px] text-zinc-400">
+              {connected ? "Live" : "Disconnected"}
+            </span>
+          </div>
+          <Button
+            variant={showSquawk || squawk.settings.enabled ? "default" : "secondary"}
+            size="sm"
+            className="h-8 text-xs ml-auto"
+            data-testid="focus-squawk-toggle"
+            onClick={() => setShowSquawk((v) => !v)}
+            aria-expanded={showSquawk}
+          >
+            Squawk
+          </Button>
+        </div>
+      )}
 
       {shouldWarnDisconnect(deliveryHealth) && deliveryHealth.warning && (
         <div
@@ -755,7 +1003,7 @@ export function LiveScanner({
         </div>
       )}
 
-      {focusCompact && (
+      {focusCompact && !focusModeV2 && (
         <p className="mx-3 sm:mx-4 text-[10px] text-[--text-muted]" data-guide="focus-mode-rail">
           Focus Mode: top 5 by watchlist match, freshness & materiality (not predicted
           profit). Hotkeys O source · T TradingView · W watchlist · U mute · E evidence.
@@ -863,25 +1111,74 @@ export function LiveScanner({
           !embedded && "desk-panel"
         )}
       >
-        <div className="hidden sm:grid grid-cols-[80px_48px_54px_58px_44px_44px_1fr_54px_28px] gap-2 px-4 py-2.5 border-b border-[--border] bg-white/[0.018] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
-          <span>Ticker</span>
-          <span className="text-center">Grade</span>
-          <span className="text-center">Chg</span>
-          <span className="text-right">Price</span>
-          <span className="text-center">RVol</span>
-          <span className="text-center">Sent</span>
-          <span>Headline</span>
-          <span className="text-right">Newest</span>
-          <span />
-        </div>
+        {!FEED_V3 && !focusModeV2 && (
+          <div className="hidden sm:grid grid-cols-[80px_48px_54px_58px_44px_44px_1fr_54px_28px] gap-2 px-4 py-2.5 border-b border-[--border] bg-white/[0.018] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
+            <span>Ticker</span>
+            <span className="text-center">Grade</span>
+            <span className="text-center">Chg</span>
+            <span className="text-right">Price</span>
+            <span className="text-center">RVol</span>
+            <span className="text-center">Sent</span>
+            <span>Headline</span>
+            <span className="text-right">Newest</span>
+            <span />
+          </div>
+        )}
+        {FEED_V3 && !focusModeV2 && (
+          <div className="hidden sm:flex items-center gap-3 px-3 py-2 border-b border-[--border] bg-white/[0.018] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
+            <span className="w-[4.5rem]">Ticker</span>
+            <span className="w-[4.75rem]">Move</span>
+            <span>Direction</span>
+            <span className="ml-auto">Age</span>
+          </div>
+        )}
 
         {loading && catalysts.length === 0 ? (
           <div className="p-4 space-y-2">
-            {Array.from({ length: 10 }).map((_, i) => (
+            {Array.from({ length: focusModeV2 ? 5 : 10 }).map((_, i) => (
               <div key={i} className="h-12 bg-white/[0.03] animate-pulse rounded-xl" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
+          focusModeV2 ? (
+            <div
+              className="text-center py-12 px-4 space-y-4"
+              data-testid="focus-empty-state"
+            >
+              <p className="text-sm text-zinc-300">
+                No priority catalysts match your current rules.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="focus-empty-edit-rules"
+                  onClick={() => focusEmptyActions?.onEditRules?.()}
+                >
+                  Edit Focus rules
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="focus-empty-show-all"
+                  onClick={() => focusEmptyActions?.onShowAll?.()}
+                >
+                  Show all live news
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="focus-empty-watchlist"
+                  onClick={() => focusEmptyActions?.onReviewWatchlist?.()}
+                >
+                  Review watchlist
+                </Button>
+              </div>
+            </div>
+          ) : (
           <div className="text-center py-12 text-zinc-500">
             <Moon className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">
@@ -896,6 +1193,7 @@ export function LiveScanner({
                     : "No catalysts match your filters"}
             </p>
           </div>
+          )
         ) : (
           <div ref={listRef} className="scanner-list flex-1 min-h-0 overflow-y-auto">
             <div
@@ -922,7 +1220,24 @@ export function LiveScanner({
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    {DECISION_CARD_V3 ? (
+                    {focusModeV2 ? (
+                      <FocusCatalystRowV2
+                        catalyst={catalyst}
+                        highlighted={idx === focusIndex}
+                        nowMs={nowMs}
+                        onActivate={(c) => onCatalystActivate?.(c)}
+                      />
+                    ) : FEED_V3 ? (
+                      <CatalystFeedRowV3
+                        catalyst={catalyst}
+                        highlighted={idx === focusIndex}
+                        inWatchlist={watchSet.has(catalyst.symbol.toUpperCase())}
+                        muted={mutedSet.has(catalyst.symbol.toUpperCase())}
+                        prefs={feedPrefs}
+                        nowMs={nowMs}
+                        onActivate={(c) => onCatalystActivate?.(c)}
+                      />
+                    ) : DECISION_CARD_V3 ? (
                       <DecisionCardV3
                         catalyst={catalyst}
                         density={focusCompact ? "compact" : "standard"}
@@ -953,11 +1268,16 @@ export function LiveScanner({
         )}
       </div>
 
-      {embedded && (
+      {embedded && !FEED_V3 && (
         <p className="scanner-hotkeys text-[9px] text-zinc-600 text-center shrink-0 px-2 pb-1">
           j/k navigate · Enter expand · w watchlist
           {DECISION_CARD_V3 ? " · o source · t TradingView · u mute" : ""} · 1/2/3 tabs · / search · m movers
         </p>
+      )}
+      {!embedded && FEED_V3 && (
+        <div className="shrink-0 px-2 pb-1 flex justify-center">
+          <FeedShortcutsHelpButton />
+        </div>
       )}
     </div>
   );

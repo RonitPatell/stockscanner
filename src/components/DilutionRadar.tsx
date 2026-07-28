@@ -73,7 +73,22 @@ export function DilutionRadar({ className }: { className?: string }) {
             <div key={raw.id} className="px-3 py-1.5">
               <div className="flex items-center gap-2 text-[11px]">
                 <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-                <span className="font-mono font-bold text-white">{raw.symbol}</span>
+                <a
+                  href={`?view=feed&cid=${encodeURIComponent(raw.id)}`}
+                  data-testid="dilution-open-catalyst"
+                  className="font-mono font-bold text-white hover:underline"
+                  title={`Open ${raw.symbol} in feed`}
+                  onClick={(e) => {
+                    // Full navigation so Shell V3 re-reads ?cid= deep-link
+                    e.preventDefault();
+                    const u = new URL(window.location.href);
+                    u.searchParams.set("view", "feed");
+                    u.searchParams.set("cid", raw.id);
+                    window.location.assign(u.toString());
+                  }}
+                >
+                  {raw.symbol}
+                </a>
                 {raw.status && (
                   <span className="text-[9px] uppercase tracking-wide text-amber-500/70">
                     {raw.status}
@@ -97,9 +112,11 @@ export function DilutionRadar({ className }: { className?: string }) {
                     rel="noopener noreferrer"
                     className="shrink-0 text-amber-400/80 hover:text-amber-300"
                     title="Open SEC evidence"
+                    data-testid="dilution-filing-link"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <ExternalLink className="w-3 h-3" />
+                    <span className="sr-only">Open SEC evidence for {raw.symbol}</span>
                   </a>
                 )}
                 <button

@@ -11,15 +11,19 @@ import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { UserMenu } from "@/components/UserMenu";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { BrandHomeLink } from "@/components/BrandHomeLink";
+import { isDashboardShellV3Enabled } from "@/lib/dashboard-shell";
 import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ subscribed?: string }>;
+  searchParams: Promise<{ subscribed?: string; view?: string; shell?: string }>;
 }) {
   const session = await auth();
   const params = await searchParams;
+  const shellV3 =
+    params.shell === "v3" ||
+    (params.shell !== "legacy" && isDashboardShellV3Enabled());
 
   let isSubscribed = false;
   let initialCatalysts: CatalystItem[] = [];
@@ -41,8 +45,6 @@ export default async function DashboardPage({
       isSubscribed = hasActiveSubscription(user ?? undefined);
 
       if (isSubscribed) {
-        // Prefer warm caches so HTML paints with data immediately.
-        // Never block the page on a cold getCatalysts() — client SSE/poll fills in.
         const [cached, scannerSnap] = await Promise.all([
           getCachedFeed("all"),
           getCachedScannerSnapshot(),
@@ -95,33 +97,47 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="dashboard-page desk-shell min-h-screen xl:h-screen flex flex-col overflow-y-auto xl:overflow-hidden bg-[var(--background)]">
-      <header className="shrink-0 relative z-[110] border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-xl">
-        <div className="max-w-[1680px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
-          <BrandHomeLink />
+    <div
+      className={
+        shellV3
+          ? "dashboard-page desk-shell min-h-screen h-screen flex flex-col overflow-hidden bg-[var(--background)]"
+          : "dashboard-page desk-shell min-h-screen xl:h-screen flex flex-col overflow-y-auto xl:overflow-hidden bg-[var(--background)]"
+      }
+    >
+      {!shellV3 && (
+        <header className="shrink-0 relative z-[110] border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-xl">
+          <div className="max-w-[1680px] mx-auto px-3 sm:px-4 h-12 flex items-center justify-between">
+            <BrandHomeLink />
 
-          <div className="flex items-center gap-2">
-            {session ? (
-              <>
-                <Link
-                  href="/desk"
-                  className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden sm:inline transition-colors"
-                >
-                  Prop Desk
-                </Link>
-                {!isSubscribed && (
-                  <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
-                )}
-                <UserMenu />
-              </>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {session ? (
+                <>
+                  <Link
+                    href="/desk"
+                    className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden sm:inline transition-colors"
+                  >
+                    Prop Desk
+                  </Link>
+                  {!isSubscribed && (
+                    <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
+                  )}
+                  <UserMenu />
+                </>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="dashboard-main flex-1 min-h-0 max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-3 overflow-visible xl:overflow-hidden">
+      <main
+        className={
+          shellV3
+            ? "dashboard-main flex-1 min-h-0 w-full overflow-hidden"
+            : "dashboard-main flex-1 min-h-0 max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-3 overflow-visible xl:overflow-hidden"
+        }
+      >
         {params.subscribed === "true" && isSubscribed && (
-          <div className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 shrink-0">
+          <div className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 shrink-0 mx-3 mt-2">
             Subscription active — welcome to TrustTicker Pro!
           </div>
         )}
@@ -134,6 +150,7 @@ export default async function DashboardPage({
             initialWatchlist={initialWatchlist}
             initialFilters={initialFilters}
             initialScanner={initialScanner}
+            shellV3={shellV3}
           />
         ) : (
           <div className="text-center py-20 max-w-md mx-auto">

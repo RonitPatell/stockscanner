@@ -20,6 +20,19 @@
     "test:analogue": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/analogue.test.mts",
     "test:alert-strategy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/alert-strategy.test.mts",
     "test:reliability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/reliability.test.mts",
+    "test:dashboard-shell": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/dashboard-shell.test.mts",
+    "test:catalyst-feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/catalyst-feed-v3.test.mts",
+    "test:judgment-present": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/judgment-presentation.test.mts",
+    "test:focus-mode": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/focus-mode-v2.test.mts",
+    "test:decision-drawer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/decision-drawer.test.mts",
+    "test:visual-system": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/visual-system.test.mts",
+    "test:e2e": "playwright test",
+    "test:e2e:focus": "playwright test e2e/focus-mode-v2.spec.ts",
+    "test:e2e:dashboard": "playwright test e2e/dashboard-shell.spec.ts",
+    "test:e2e:decision-drawer": "playwright test e2e/decision-drawer.spec.ts",
+    "test:e2e:visual": "playwright test e2e/visual-system.spec.ts --project=desktop",
+    "test:e2e:visual:update": "playwright test e2e/visual-system.spec.ts --project=desktop --update-snapshots",
+    "test:e2e:workflow": "node scripts/run-workflow-audit.mjs",
     "quote:stream": "node scripts/quote-stream.mjs",
     "realtime:worker": "node scripts/realtime-worker.mjs",
     "postinstall": "prisma generate"
@@ -46,6 +59,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

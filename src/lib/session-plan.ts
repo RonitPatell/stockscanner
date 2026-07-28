@@ -1,16 +1,24 @@
 import { getCachedFeed } from "@/lib/feed-cache";
 import { buildActionPlaybook, isDilutionCatalyst } from "@/lib/action-playbook";
+import { presentJudgment, presentSessionBias } from "@/lib/judgment/present";
 import type { CatalystItem } from "@/types";
 
 export interface SessionSetup {
   symbol: string;
   headline: string;
+  /** Legacy playbook bias — kept for API compatibility */
   bias: string;
   action: string;
   invalidation: string;
   conviction: number;
   antiFomoScore: number;
   changePercent: number | null | undefined;
+  /** Presentation dimensions — not buy/sell instructions */
+  directionLabel: string;
+  reviewLabel: string;
+  materialityLabel: string;
+  tradeabilityLabel: string;
+  topRiskLabel: string | null;
 }
 
 export interface SessionSkip {
@@ -19,6 +27,10 @@ export interface SessionSkip {
   reason: string;
   antiFomoScore: number;
   changePercent: number | null | undefined;
+  directionLabel: string;
+  reviewLabel: string;
+  materialityLabel: string;
+  topRiskLabel: string | null;
 }
 
 export interface SessionPlan {
@@ -41,6 +53,27 @@ function uniqueBySymbol<T extends { c: CatalystItem }>(rows: T[]): T[] {
   return out;
 }
 
+function presentSetup(c: CatalystItem, bias: string, action: string) {
+  const biasP = presentSessionBias(bias);
+  const p = presentJudgment({
+    judgment: c.judgmentV2 ?? null,
+    dilutionHint: isDilutionCatalyst(c),
+  });
+  return {
+    directionLabel: biasP.direction !== "Unclear" ? biasP.direction : p.direction,
+    reviewLabel: biasP.reviewLabel,
+    materialityLabel: p.materiality,
+    tradeabilityLabel: p.tradeability,
+    topRiskLabel: p.topRisk,
+    actionDisplay: action
+      .replace(/\bLong bias\b/gi, "Positive direction")
+      .replace(/\bShort bias\b/gi, "Negative direction")
+      .replace(/\bSkip \/ Fade bias\b/gi, "Capital caution")
+      .replace(/\bprefer short\b/gi, "watch for failed reclaim")
+      .replace(/\bTrade with the news\b/gi, "Review with the news impulse"),
+  };
+}
+
 export async function buildSessionPlan(): Promise<SessionPlan> {
   const { items } = await getCachedFeed("all");
   const recent = items.slice(0, 80) as CatalystItem[];
@@ -58,16 +91,24 @@ export async function buildSessionPlan(): Promise<SessionPlan> {
       .sort((a, b) => b.playbook.conviction - a.playbook.conviction)
   )
     .slice(0, 3)
-    .map(({ c, playbook }) => ({
-      symbol: c.symbol,
-      headline: c.headline,
-      bias: playbook.bias,
-      action: playbook.action,
-      invalidation: playbook.invalidation,
-      conviction: playbook.conviction,
-      antiFomoScore: playbook.antiFomoScore,
-      changePercent: c.changePercent,
-    }));
+    .map(({ c, playbook }) => {
+      const p = presentSetup(c, playbook.bias, playbook.action);
+      return {
+        symbol: c.symbol,
+        headline: c.headline,
+        bias: playbook.bias,
+        action: p.actionDisplay,
+        invalidation: playbook.invalidation,
+        conviction: playbook.conviction,
+        antiFomoScore: playbook.antiFomoScore,
+        changePercent: c.changePercent,
+        directionLabel: p.directionLabel,
+        reviewLabel: p.reviewLabel,
+        materialityLabel: p.materialityLabel,
+        tradeabilityLabel: p.tradeabilityLabel,
+        topRiskLabel: p.topRiskLabel,
+      };
+    });
 
   const setupSymbols = new Set(setups.map((s) => s.symbol.toUpperCase()));
 
@@ -83,18 +124,26 @@ export async function buildSessionPlan(): Promise<SessionPlan> {
       .sort((a, b) => b.playbook.antiFomoScore - a.playbook.antiFomoScore)
   )
     .slice(0, 2)
-    .map(({ c, playbook }) => ({
-      symbol: c.symbol,
-      headline: c.headline,
-      reason: playbook.action,
-      antiFomoScore: playbook.antiFomoScore,
-      changePercent: c.changePercent,
-    }));
+    .map(({ c, playbook }) => {
+      const p = presentSetup(c, "avoid", playbook.action);
+      return {
+        symbol: c.symbol,
+        headline: c.headline,
+        reason: p.actionDisplay,
+        antiFomoScore: playbook.antiFomoScore,
+        changePercent: c.changePercent,
+        directionLabel: p.directionLabel,
+        reviewLabel: p.reviewLabel,
+        materialityLabel: p.materialityLabel,
+        topRiskLabel: p.topRiskLabel,
+      };
+    });
 
   return {
     generatedAt: new Date().toISOString(),
     setups,
     skips,
-    mantra: "Trade the plan. Skip the trap. One good idea beats ten headlines.",
+    mantra:
+      "Review material events. Separate direction from attention. Prefer caution over FOMO.",
   };
 }

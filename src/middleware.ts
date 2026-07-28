@@ -24,6 +24,8 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/settings/:path*",
+    "/gallery",
+    "/gallery/:path*",
     "/desk/:path*",
     "/api/:path*",
   ],

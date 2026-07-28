@@ -12,12 +12,13 @@ import { formatPercent } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Today’s Setups & Skips — TrustTicker",
+  title: "Today’s Review Plan — TrustTicker",
   description:
-    "Free daily catalyst plan: 3 setups and 2 skips. See what to trade and what to avoid — then unlock live Pro.",
+    "Free daily catalyst plan: review candidates and capital-caution names. Informational — not buy or sell instructions.",
   openGraph: {
-    title: "Today’s Setups & Skips — TrustTicker",
-    description: "3 setups. 2 skips. Trade the plan, skip the trap.",
+    title: "Today’s Review Plan — TrustTicker",
+    description:
+      "Material review candidates and capital caution — direction separated from attention.",
   },
 };
 
@@ -79,10 +80,11 @@ export default async function TodayPage() {
       <main className="max-w-3xl mx-auto px-4 py-14 sm:py-16">
         <p className="mk-tick !text-emerald-400 mb-4">Free for everyone</p>
         <h1 className="mk-display text-3xl sm:text-4xl mb-3">
-          Today’s 3 setups &amp; 2 skips
+          Today’s review plan
         </h1>
         <p className="text-[var(--text-secondary)] mb-2 max-w-xl">
-          Public daily plan — what to focus on, what to avoid. Updated{" "}
+          Public daily plan — material events to review, and capital-caution names.
+          Direction is not a buy or sell instruction. Updated{" "}
           <span className="text-[var(--text-primary)]">{updated} ET</span>.
         </p>
         {latency.sampleSize > 0 && (
@@ -93,10 +95,10 @@ export default async function TodayPage() {
 
         <section className="mb-8 border mk-hairline bg-emerald-500/[0.04]">
           <div className="px-5 py-3 border-b mk-hairline">
-            <h2 className="mk-tick !text-emerald-400">Setups</h2>
+            <h2 className="mk-tick !text-emerald-400">Review candidates</h2>
           </div>
           {plan.setups.length === 0 ? (
-            <p className="text-sm text-zinc-500 px-5 py-4">No high-conviction setups in the current feed.</p>
+            <p className="text-sm text-zinc-500 px-5 py-4">No material review candidates in the current feed.</p>
           ) : (
             <ul className="divide-y divide-[var(--hairline)]">
               {plan.setups.map((s) => (
@@ -108,9 +110,14 @@ export default async function TodayPage() {
                     >
                       {s.symbol}
                     </Link>
-                    <span className="text-[10px] uppercase tracking-wide text-emerald-400/90 border border-emerald-500/25 px-1.5 py-0.5">
-                      {s.bias}
+                    <span className="text-[10px] uppercase tracking-wide text-cyan-300/90 border border-cyan-500/25 px-1.5 py-0.5">
+                      {s.directionLabel ?? s.bias}
                     </span>
+                    {s.materialityLabel && (
+                      <span className="text-[10px] text-zinc-500">
+                        {s.materialityLabel} materiality
+                      </span>
+                    )}
                     {s.changePercent != null && (
                       <span className="font-mono text-xs text-zinc-500">
                         {formatPercent(s.changePercent)}
@@ -127,10 +134,10 @@ export default async function TodayPage() {
 
         <section className="mb-10 border mk-hairline bg-amber-500/[0.04]">
           <div className="px-5 py-3 border-b mk-hairline">
-            <h2 className="mk-tick !text-amber-400/90">Skips</h2>
+            <h2 className="mk-tick !text-amber-400/90">Capital caution</h2>
           </div>
           {plan.skips.length === 0 ? (
-            <p className="text-sm text-zinc-500 px-5 py-4">No dilution / FOMO skips flagged right now.</p>
+            <p className="text-sm text-zinc-500 px-5 py-4">No dilution / capital-caution names flagged right now.</p>
           ) : (
             <ul className="divide-y divide-[var(--hairline)]">
               {plan.skips.map((s) => (
@@ -143,7 +150,7 @@ export default async function TodayPage() {
                       {s.symbol}
                     </Link>
                     <span className="text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-500/25 px-1.5 py-0.5">
-                      skip
+                      caution
                     </span>
                   </div>
                   <p className="text-sm text-zinc-300 mb-1">{s.headline}</p>
