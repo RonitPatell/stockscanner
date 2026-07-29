@@ -42,12 +42,16 @@ export function CheckoutButton({
         return;
       }
 
+      // Already subscribed → billing portal (url present with 409)
       if (data.url) {
         window.location.href = data.url;
         return;
       }
 
-      setError(data.error || "Could not start checkout. Verify Stripe keys and price ID.");
+      setError(
+        data.error ||
+          "Could not start checkout. Verify Stripe keys and price ID."
+      );
     } catch {
       setError("Network error. Please try again.");
     } finally {

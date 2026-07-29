@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import {
+  enforceSingleOpenSubscription,
+  getStripe,
+} from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { recordTrialClaims } from "@/lib/trial-claims";
 import { track } from "@/lib/analytics/track";
@@ -30,15 +33,43 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.userId;
       if (userId && session.subscription) {
-        const sub = await getStripe().subscriptions.retrieve(session.subscription as string);
-        const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+        const customerId =
+          typeof session.customer === "string"
+            ? session.customer
+            : session.customer?.id ?? null;
+        const prior = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { subscriptionId: true },
+        });
+
+        // Safety net: never leave two open subs on one customer
+        let sub: Stripe.Subscription | null = null;
+        if (customerId) {
+          // Prefer the subscription already on the user; otherwise keep oldest open.
+          sub = await enforceSingleOpenSubscription(
+            customerId,
+            prior?.subscriptionId ?? null
+          );
+        }
+        if (!sub) {
+          sub = await getStripe().subscriptions.retrieve(
+            session.subscription as string
+          );
+        }
+
+        const periodEnd = (
+          sub as Stripe.Subscription & { current_period_end?: number }
+        ).current_period_end;
         const user = await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionId: sub.id,
             subscriptionStatus: sub.status,
             hasUsedTrial: true,
-            subscriptionEndsAt: periodEnd ? new Date(periodEnd * 1000) : undefined,
+            ...(customerId ? { stripeCustomerId: customerId } : {}),
+            subscriptionEndsAt: periodEnd
+              ? new Date(periodEnd * 1000)
+              : undefined,
           },
           select: {
             email: true,

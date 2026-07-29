@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createCheckoutSession, getOrCreateStripeCustomer } from "@/lib/stripe";
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  getOrCreateStripeCustomer,
+  listOpenSubscriptions,
+} from "@/lib/stripe";
 import { hasTrialClaim } from "@/lib/trial-claims";
 import { track } from "@/lib/analytics/track";
+import { isOpenSubscriptionStatus } from "@/lib/subscription";
+import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const ip = clientIp(req);
+  const rl = await rateLimit(`stripe-checkout:${session.user.id}:${ip}`, 10, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many checkout attempts. Try again shortly." },
+      { status: 429, headers: rateLimitHeaders(rl, 10) }
+    );
   }
 
   try {
@@ -22,6 +38,8 @@ export async function POST(req: NextRequest) {
         email: true,
         phoneNumber: true,
         stripeCustomerId: true,
+        subscriptionId: true,
+        subscriptionStatus: true,
         hasUsedTrial: true,
       },
     });
@@ -42,11 +60,29 @@ export async function POST(req: NextRequest) {
       user.stripeCustomerId
     );
 
-    if (!user.stripeCustomerId) {
+    if (!user.stripeCustomerId || user.stripeCustomerId !== customerId) {
       await prisma.user.update({
         where: { id: user.id },
         data: { stripeCustomerId: customerId },
       });
+    }
+
+    // Block second subscription: DB status and live Stripe customer check
+    const openOnStripe = await listOpenSubscriptions(customerId);
+    const alreadyOpen =
+      isOpenSubscriptionStatus(user.subscriptionStatus) || openOnStripe.length > 0;
+
+    if (alreadyOpen) {
+      const portal = await createBillingPortalSession(customerId);
+      return NextResponse.json(
+        {
+          error:
+            "You already have an active subscription. Manage or change it in billing — a second subscription was not created.",
+          code: "ALREADY_SUBSCRIBED",
+          url: portal.url,
+        },
+        { status: 409 }
+      );
     }
 
     // Trial abuse: account flag + durable email/phone hash claims (no phone required at signup)

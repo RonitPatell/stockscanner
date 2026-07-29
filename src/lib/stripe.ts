@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { isOpenSubscriptionStatus } from "./subscription";
 
 let _stripe: Stripe | null = null;
 
@@ -14,6 +15,49 @@ export function getStripe() {
     });
   }
   return _stripe;
+}
+
+/** Open (billable) subscriptions for a Stripe customer — at most one should exist. */
+export async function listOpenSubscriptions(
+  customerId: string
+): Promise<Stripe.Subscription[]> {
+  const stripe = getStripe();
+  const open: Stripe.Subscription[] = [];
+  for (const status of ["active", "trialing", "past_due", "unpaid"] as const) {
+    const page = await stripe.subscriptions.list({
+      customer: customerId,
+      status,
+      limit: 20,
+    });
+    open.push(...page.data);
+  }
+  // Dedupe by id (status filters are disjoint, but be safe)
+  const byId = new Map(open.map((s) => [s.id, s]));
+  return [...byId.values()].sort((a, b) => a.created - b.created);
+}
+
+/**
+ * If a customer somehow has multiple open subs, keep one and cancel the rest.
+ * Prefers `preferSubscriptionId` when it is still open; otherwise the oldest.
+ */
+export async function enforceSingleOpenSubscription(
+  customerId: string,
+  preferSubscriptionId?: string | null
+): Promise<Stripe.Subscription | null> {
+  const open = await listOpenSubscriptions(customerId);
+  if (open.length === 0) return null;
+  const keep =
+    open.find((s) => s.id === preferSubscriptionId) ?? open[0]!;
+  const stripe = getStripe();
+  for (const sub of open) {
+    if (sub.id === keep.id) continue;
+    try {
+      await stripe.subscriptions.cancel(sub.id);
+    } catch (err) {
+      console.error("Failed to cancel duplicate subscription", sub.id, err);
+    }
+  }
+  return keep;
 }
 
 export const SUBSCRIPTION_PRICE = 19.99; // USD per month (display only — Stripe charges STRIPE_PRICE_ID)
@@ -85,9 +129,25 @@ export async function getOrCreateStripeCustomer(
 ) {
   if (existingCustomerId) return existingCustomerId;
 
+  // Reuse an existing Stripe customer with this email (Stripe does not unique emails).
+  const listed = await getStripe().customers.list({ email, limit: 5 });
+  const match =
+    listed.data.find((c) => !c.deleted && c.metadata?.userId === userId) ??
+    listed.data.find((c) => !c.deleted);
+  if (match) {
+    if (!match.metadata?.userId) {
+      await getStripe().customers.update(match.id, {
+        metadata: { ...match.metadata, userId },
+      });
+    }
+    return match.id;
+  }
+
   const customer = await getStripe().customers.create({
     email,
     metadata: { userId },
   });
   return customer.id;
 }
+
+export { isOpenSubscriptionStatus };

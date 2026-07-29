@@ -3,6 +3,23 @@ export interface SubscriptionAccess {
   subscriptionEndsAt?: Date | string | null;
 }
 
+/** Stripe / DB statuses that mean an open billable subscription (block second checkout). */
+export const OPEN_SUBSCRIPTION_STATUSES = [
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+] as const;
+
+export function isOpenSubscriptionStatus(
+  status: string | null | undefined
+): boolean {
+  return (
+    status != null &&
+    (OPEN_SUBSCRIPTION_STATUSES as readonly string[]).includes(status)
+  );
+}
+
 /** User keeps scanner access while trialing, active, or until a paid period ends after cancel. */
 export function hasActiveSubscription(
   statusOrUser: string | null | undefined | SubscriptionAccess
