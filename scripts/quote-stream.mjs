@@ -59,6 +59,10 @@ const YAHOO_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+/** Yahoo v7 quotes require cookie + crumb; datacenter IPs often get 401/429 without them. */
+let yahooAuth = { cookie: "", crumb: "", fetchedAt: 0 };
+let yahooFailLogAt = 0;
+
 const CORE_SYMBOLS = [
   "SPY",
   "QQQ",
@@ -236,6 +240,8 @@ function rowToQuote(row) {
   const volume = row.regularMarketVolume ?? row.preMarketVolume;
   const avgVolume = row.averageDailyVolume3Month ?? row.averageDailyVolume10Day;
 
+  const dayHigh = row.regularMarketDayHigh;
+
   return {
     price,
     changePercent,
@@ -243,6 +249,7 @@ function rowToQuote(row) {
     volume: volume || undefined,
     avgVolume: avgVolume || undefined,
     rVol: computeRvol(volume, avgVolume),
+    dayHigh: typeof dayHigh === "number" && dayHigh > 0 ? dayHigh : undefined,
   };
 }
 
@@ -305,17 +312,33 @@ async function fetchYahooBatch(symbols) {
   console.warn(new Date().toISOString(), "yahoo batch failed for", symbols.length, "symbols");
 }
 
+function symbolHeat(sym) {
+  const q = localQuotes[sym];
+  if (!q) return 0;
+  const rVol = Number(q.rVol) || 0;
+  const move = Math.abs(Number(q.changePercent) || 0);
+  const vol = Number(q.volume) || 0;
+  const volScore = vol > 0 ? Math.log10(vol) : 0;
+  // Heavy volume / large movers get polled every cycle
+  return rVol * 12 + move * 1.5 + volScore;
+}
+
 async function yahooPollLoop() {
   const all = await loadWatchSymbols();
   if (all.length === 0) return;
 
-  const start = yahooOffset % all.length;
-  const batch = [];
-  for (let i = 0; i < YAHOO_BATCH && i < all.length; i++) {
-    batch.push(all[(start + i) % all.length]);
+  // Always refresh the hottest names; rotate the rest so volume stays live.
+  const ranked = [...all].sort((a, b) => symbolHeat(b) - symbolHeat(a));
+  const hot = ranked.filter((s) => symbolHeat(s) >= 8).slice(0, 16);
+  const rest = ranked.filter((s) => !hot.includes(s));
+  const start = yahooOffset % Math.max(1, rest.length);
+  const rotate = [];
+  for (let i = 0; i < YAHOO_BATCH - hot.length && i < rest.length; i++) {
+    rotate.push(rest[(start + i) % rest.length]);
   }
-  yahooOffset = (start + batch.length) % all.length;
+  yahooOffset = rest.length ? (start + rotate.length) % rest.length : 0;
 
+  const batch = [...new Set([...hot, ...rotate])];
   await fetchYahooBatch(batch);
 }
 

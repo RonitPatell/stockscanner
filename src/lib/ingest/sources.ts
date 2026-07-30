@@ -23,6 +23,14 @@ const TIER0_INTERVALS: AdaptiveIntervals = {
   overnight: 90_000,
 };
 
+/** Paid Benzinga wire — fastest licensed path (not free RSS). */
+const BENZINGA_INTERVALS: AdaptiveIntervals = {
+  premarket: 6_000,
+  regular: 5_000,
+  afterhours: 12_000,
+  overnight: 45_000,
+};
+
 const SEC_INTERVALS: AdaptiveIntervals = {
   premarket: 20_000,
   regular: 15_000,
@@ -106,14 +114,15 @@ export const INGEST_SOURCES: SourceDefinition[] = [
   {
     id: "benzinga_api",
     name: "Benzinga API",
-    tier: 1,
+    /** Tier 0 when keyed — primary Stock-Titan-class paid wire */
+    tier: 0,
     provider: "benzinga_api",
-    partition: "tier1:bzapi",
+    partition: "tier0:bzapi",
     featureFlag: "INGEST_SOURCE_BENZINGA_API_ENABLED",
     requiresEnv: "BENZINGA_API_KEY",
-    intervals: TIER1_INTERVALS,
-    rateLimit: { max: 30, windowMs: 60_000 },
-    circuit: DEFAULT_CIRCUIT,
+    intervals: BENZINGA_INTERVALS,
+    rateLimit: { max: 60, windowMs: 60_000 },
+    circuit: { failureThreshold: 4, coolDownMs: 2 * 60_000 },
   },
   {
     id: "finnhub_market",
@@ -201,7 +210,7 @@ export async function fetchSourceArticles(
     case "pr_newswire":
       return fetchPrNewswirePRs();
     case "benzinga_api":
-      return fetchBenzingaApiNews(50);
+      return fetchBenzingaApiNews(80);
     case "finnhub_market":
       return fetchFinnhubMarketNewsForIngest();
     case "finnhub_company":

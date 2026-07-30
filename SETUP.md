@@ -252,27 +252,48 @@ Run this 24/7 on a cheap VPS / Railway / Fly (or your PC while testing). Free Ra
 
 On Railway there is **no `.env` file** — set variables in the Railway dashboard (`CRON_SECRET`, `NEXT_PUBLIC_APP_URL`). Do not commit `.env`. Locally, `scripts/ingest-worker.mjs` still loads `.env` if it exists.
 
-### Free path to StockTitan-like news (no paid wire yet)
+### Realtime desk (Stock-Titan-class) — paid Benzinga + always-on workers
 
-Stock Titan’s product is mostly **official company PRs + SEC filings**, not Yahoo analyst fluff. TrustTicker’s free ultra wire matches that mix:
+Stock Titan does **not** license their internal feed. Do not scrape them.
+The industry equivalent used by retail desks (e.g. Webull) is **Benzinga Newsfeed + Press Releases**.
+
+| Piece | What to buy / run | Role |
+|--------|-------------------|------|
+| **Benzinga Cloud** | `BENZINGA_API_KEY` from [benzinga.com/apis](https://www.benzinga.com/apis/) | Realtime equities news + press releases (Tier 0, ~5s poll) |
+| **Always-on worker** | Railway / Fly / VPS: `npm run realtime:worker` | Priority ingest + Yahoo volume/quote stream |
+| **Redis** | Upstash | Shared quote + feed cache across Vercel + workers |
+| **Finnhub** (optional) | `FINNHUB_API_KEY` | Extra tick stream on top of Yahoo volume |
+
+**Required env on the worker + Vercel:**
+
+```bash
+BENZINGA_API_KEY=...
+CRON_SECRET=...                 # same on Vercel + worker
+NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+FINNHUB_API_KEY=...             # optional
+```
+
+**Start command (Railway/Fly):**
+
+```bash
+npm run realtime:worker
+```
+
+That runs `ingest:priority` (Benzinga Tier 0 + SEC/PR wires) and `quote:stream` (volume/RVol for heavy names). Cursor/`npm run dev` alone will **not** keep this alive.
+
+**Honest latency:** with Benzinga keyed + worker up, expect **seconds** from publish on most wires. Free RSS/SEC remains as backup coverage.
+
+### Free path (no Benzinga key)
 
 | Source | Cost | Role |
 |--------|------|------|
-| PR Newswire / Business Wire / GlobeNewswire RSS | $0 | Same official press releases Stock Titan emphasizes |
-| SEC EDGAR Atom (8-K, Form 4, 424B5) | $0 | Near-real-time filings from the SEC itself |
-| Benzinga / MarketWatch / CNBC RSS | $0 | Fast market headlines |
-| Finnhub general news | $0 | Extra coverage (60 calls/min free) |
-| Yahoo per-ticker RSS | $0 | Background only (slower / noisier) |
+| PR Newswire / Business Wire / GlobeNewswire RSS | $0 | Official press releases |
+| SEC EDGAR Atom | $0 | Filings |
+| Benzinga public RSS / Finnhub / Yahoo | $0 | Slower / noisier backup |
 
-**What you must run:** `npm run ingest:worker` always-on. Without it you’re stuck on Vercel’s ~60s cron.
-
-**Honest latency:** free RSS often lands **tens of seconds to a few minutes** after publish. That can still feel “live” on the desk if your poll cycle is ~2s. It will **not** beat a paid low-latency API every time.
-
-**When MRR allows a paid upgrade (first dollar spent on news):**
-1. `BENZINGA_API_KEY` — Benzinga News API (often the cheapest “seconds from publish” step)
-2. Later: a dedicated press-release / news wire if you need true Stock Titan Gold-tier speed
-
-Do **not** scrape Stock Titan. Use the same free official sources they surface.
+Without `BENZINGA_API_KEY` + `realtime:worker`, expect **tens of seconds to minutes** of publisher lag and weaker volume.
 
 ### 4. Live quotes without Redis
 
