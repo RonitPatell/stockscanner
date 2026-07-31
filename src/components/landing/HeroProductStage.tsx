@@ -196,7 +196,9 @@ export function HeroProofRail({
 }: {
   initial?: {
     avgSec: number | null;
+    p50Sec?: number | null;
     under3mRate: number | null;
+    under30sRate?: number | null;
     sampleSize: number;
     feedCount: number;
     fastestSec?: number | null;
@@ -210,10 +212,19 @@ export function HeroProofRail({
       .then((r) => (r.ok ? r.json() : null))
       .then((d: PublicStats | null) => {
         if (!d?.latency) return;
+        const lat = d.latency as {
+          avgSec: number | null;
+          p50Sec?: number | null;
+          under3mRate?: number | null;
+          under30sRate?: number | null;
+          sampleSize: number;
+        };
         setStats({
-          avgSec: d.latency.avgSec,
-          under3mRate: d.latency.under3mRate ?? null,
-          sampleSize: d.latency.sampleSize,
+          avgSec: lat.p50Sec ?? lat.avgSec,
+          p50Sec: lat.p50Sec ?? lat.avgSec,
+          under3mRate: lat.under30sRate ?? lat.under3mRate ?? null,
+          under30sRate: lat.under30sRate ?? null,
+          sampleSize: lat.sampleSize,
           feedCount: d.feed?.itemCount ?? 0,
           fastestSec: null,
         });
@@ -224,25 +235,32 @@ export function HeroProofRail({
   if (!stats || stats.sampleSize <= 0) return null;
 
   function fmtSec(sec: number) {
-    return sec >= 120 ? `${Math.round(sec / 60)}m` : `${Math.round(sec)}s`;
+    if (sec < 60) return `${Math.round(sec)}s`;
+    if (sec < 120) return `${Math.round(sec)}s`;
+    return `${(sec / 60).toFixed(1)}m`;
   }
 
+  const deskSec = (stats as { p50Sec?: number | null }).p50Sec ?? stats.avgSec;
+  const under30 =
+    (stats as { under30sRate?: number | null }).under30sRate ??
+    stats.under3mRate;
+
   const rows: { label: string; value: string }[] = [];
-  if (stats.avgSec != null) rows.push({ label: "Avg ingest", value: fmtSec(stats.avgSec) });
-  if (stats.under3mRate != null && stats.under3mRate > 0)
-    rows.push({ label: "Under 3 min", value: `${stats.under3mRate}%` });
-  if (stats.sampleSize) rows.push({ label: "Sample (24h)", value: String(stats.sampleSize) });
+  if (deskSec != null) rows.push({ label: "Desk speed (p50)", value: fmtSec(deskSec) });
+  if (under30 != null && under30 > 0)
+    rows.push({ label: "Under 30s", value: `${under30}%` });
+  if (stats.sampleSize) rows.push({ label: "Wire sample (24h)", value: String(stats.sampleSize) });
   if (stats.feedCount) rows.push({ label: "In feed now", value: String(stats.feedCount) });
   if (rows.length === 0) return null;
 
   return (
     <aside
       className="landing-fade-up landing-delay-4 border-l border-[var(--border-medium)] pl-6"
-      aria-label="Measured latency"
+      aria-label="Measured desk speed"
     >
       <p className="mk-tick mb-4 !text-emerald-400 flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
-        Measured (last 24h)
+        Desk speed (last 24h)
       </p>
       <dl className="space-y-4">
         {rows.slice(0, 4).map((r) => (

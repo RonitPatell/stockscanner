@@ -60,9 +60,9 @@ export function hashStr(s: string): string {
   return Math.abs(h).toString(36);
 }
 
-/** Short in-process cache — wire ticks every ~2s; publishers rarely update faster. */
+/** Short in-process cache — free RSS rarely updates sub-second; keep ticks honest. */
 const rssXmlCache = new Map<string, { xml: string; ts: number }>();
-const RSS_XML_CACHE_MS = 8_000;
+const RSS_XML_CACHE_MS = 4_000;
 
 export async function fetchRssXml(
   url: string,

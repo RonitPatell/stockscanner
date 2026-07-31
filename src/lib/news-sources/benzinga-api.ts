@@ -97,6 +97,8 @@ async function fetchBenzingaPage(opts: {
     "https://api.benzinga.com/api/v2/news";
 
   const url = new URL(base);
+  // Cloud keys authenticate via query token (Authorization: token … returns anonymous 401 for many plans)
+  url.searchParams.set("token", key);
   url.searchParams.set(
     "pageSize",
     String(Math.min(100, Math.max(1, opts.limit)))
@@ -115,7 +117,6 @@ async function fetchBenzingaPage(opts: {
   const res = await fetch(url.toString(), {
     headers: {
       Accept: "application/json",
-      Authorization: `token ${key}`,
     },
     cache: "no-store",
     signal: AbortSignal.timeout(5_000),

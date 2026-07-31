@@ -285,31 +285,179 @@ async function loadWatchSymbols() {
     .slice(0, 200);
 }
 
+function cookieFromResponse(res) {
+  if (typeof res.headers.getSetCookie === "function") {
+    return res.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .filter(Boolean)
+      .join("; ");
+  }
+  const single = res.headers.get("set-cookie");
+  if (!single) return "";
+  // Multiple cookies may be comma-joined; keep name=value pairs
+  return single
+    .split(/,(?=[^;]+?=)/)
+    .map((c) => c.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+async function ensureYahooAuth(force = false) {
+  if (
+    !force &&
+    yahooAuth.cookie &&
+    yahooAuth.crumb &&
+    Date.now() - yahooAuth.fetchedAt < 6 * 60 * 60_000
+  ) {
+    return yahooAuth;
+  }
+
+  // 1) Consent / session cookie (body is often 404 — cookie is what matters)
+  const boot = await fetch("https://fc.yahoo.com", {
+    headers: YAHOO_HEADERS,
+    redirect: "manual",
+    signal: AbortSignal.timeout(8_000),
+  });
+  let cookie = cookieFromResponse(boot);
+  if (!cookie) {
+    // Some edges set cookie only on query host
+    const boot2 = await fetch("https://query1.finance.yahoo.com/", {
+      headers: YAHOO_HEADERS,
+      redirect: "manual",
+      signal: AbortSignal.timeout(8_000),
+    });
+    cookie = cookieFromResponse(boot2);
+  }
+  if (!cookie) {
+    throw new Error("Yahoo session cookie missing (fc.yahoo.com)");
+  }
+
+  // 2) Crumb token
+  const crumbRes = await fetch(
+    "https://query1.finance.yahoo.com/v1/test/getcrumb",
+    {
+      headers: { ...YAHOO_HEADERS, Cookie: cookie },
+      signal: AbortSignal.timeout(8_000),
+    }
+  );
+  const crumb = (await crumbRes.text()).trim();
+  if (!crumbRes.ok || !crumb || crumb.length > 200 || crumb.includes(" ")) {
+    throw new Error(
+      `Yahoo crumb failed HTTP ${crumbRes.status}: ${crumb.slice(0, 80)}`
+    );
+  }
+
+  yahooAuth = { cookie, crumb, fetchedAt: Date.now() };
+  console.log(new Date().toISOString(), "yahoo auth refreshed (cookie+crumb)");
+  return yahooAuth;
+}
+
+async function fetchFinnhubFallback(symbols) {
+  if (!FINNHUB_KEY) return false;
+  let ok = 0;
+  const list = symbols.filter((s) => s !== "VIX").slice(0, 12);
+  for (const sym of list) {
+    try {
+      const res = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${encodeURIComponent(FINNHUB_KEY)}`,
+        { signal: AbortSignal.timeout(4_000) }
+      );
+      if (!res.ok) continue;
+      const q = await res.json();
+      if (!q?.c || q.c <= 0) continue;
+      const existing = localQuotes[sym] || {};
+      queueQuote(sym, {
+        price: q.c,
+        change: q.d ?? 0,
+        changePercent: q.dp ?? 0,
+        // Keep last known volume/RVol — Finnhub /quote has no volume
+        volume: existing.volume,
+        avgVolume: existing.avgVolume,
+        rVol: existing.rVol,
+        dayHigh: q.h > 0 ? q.h : existing.dayHigh,
+      });
+      ok++;
+      await new Promise((r) => setTimeout(r, 350));
+    } catch {
+      /* skip */
+    }
+  }
+  return ok > 0;
+}
+
 async function fetchYahooBatch(symbols) {
   if (symbols.length === 0) return;
   const joined = symbols.map(toYahooSymbol).join(",");
-  const urls = [
-    `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(joined)}`,
-    `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(joined)}`,
-  ];
-  for (const url of urls) {
+  const hosts = ["query2.finance.yahoo.com", "query1.finance.yahoo.com"];
+  let lastErr = "";
+
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(url, { headers: YAHOO_HEADERS, signal: AbortSignal.timeout(6_000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const rows = data?.quoteResponse?.result;
-      if (!Array.isArray(rows) || rows.length === 0) continue;
-      for (const row of rows) {
-        const sym = fromYahooSymbol(row.symbol);
-        const quote = rowToQuote(row);
-        if (quote) queueQuote(sym, quote);
+      const auth = await ensureYahooAuth(attempt > 0);
+      for (const host of hosts) {
+        const url = `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(joined)}&crumb=${encodeURIComponent(auth.crumb)}`;
+        try {
+          const res = await fetch(url, {
+            headers: { ...YAHOO_HEADERS, Cookie: auth.cookie },
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (res.status === 401 || res.status === 403) {
+            lastErr = `HTTP ${res.status} Unauthorized/Forbidden`;
+            yahooAuth = { cookie: "", crumb: "", fetchedAt: 0 };
+            break; // refresh auth and retry outer
+          }
+          if (res.status === 429) {
+            lastErr = "HTTP 429 Too Many Requests";
+            continue;
+          }
+          if (!res.ok) {
+            lastErr = `HTTP ${res.status}`;
+            continue;
+          }
+          const data = await res.json();
+          const errDesc = data?.quoteResponse?.error?.description;
+          if (errDesc) {
+            lastErr = errDesc;
+            if (/crumb|cookie|unauthorized/i.test(errDesc)) {
+              yahooAuth = { cookie: "", crumb: "", fetchedAt: 0 };
+              break;
+            }
+            continue;
+          }
+          const rows = data?.quoteResponse?.result;
+          if (!Array.isArray(rows) || rows.length === 0) {
+            lastErr = "empty result";
+            continue;
+          }
+          for (const row of rows) {
+            const sym = fromYahooSymbol(row.symbol);
+            const quote = rowToQuote(row);
+            if (quote) queueQuote(sym, quote);
+          }
+          return;
+        } catch (err) {
+          lastErr = err?.message || String(err);
+        }
       }
-      return;
-    } catch {
-      /* try next host */
+    } catch (err) {
+      lastErr = err?.message || String(err);
+      yahooAuth = { cookie: "", crumb: "", fetchedAt: 0 };
     }
   }
-  console.warn(new Date().toISOString(), "yahoo batch failed for", symbols.length, "symbols");
+
+  // Finnhub keeps prices alive when Yahoo blocks cloud IPs
+  const usedFh = await fetchFinnhubFallback(symbols);
+  const now = Date.now();
+  if (now - yahooFailLogAt > 30_000) {
+    yahooFailLogAt = now;
+    console.warn(
+      new Date().toISOString(),
+      `yahoo batch failed for ${symbols.length} symbols (${lastErr || "unknown"})${
+        usedFh ? " — Finnhub price fallback ok" : FINNHUB_KEY ? " — Finnhub fallback also empty" : " — set FINNHUB_API_KEY for fallback"
+      }`
+    );
+  }
 }
 
 function symbolHeat(sym) {

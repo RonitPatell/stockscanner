@@ -66,10 +66,10 @@ const onRailway = Boolean(
  * Defaults are honest session-scale values, not a marketing "2s" claim.
  */
 const DEFAULT_TIER_MS = {
-  0: Number(process.env.INGEST_TIER_0_MS || 12_000),
-  1: Number(process.env.INGEST_TIER_1_MS || 20_000),
-  2: Number(process.env.INGEST_TIER_2_MS || 45_000),
-  3: Number(process.env.INGEST_TIER_3_MS || 90_000),
+  0: Number(process.env.INGEST_TIER_0_MS || 8_000),
+  1: Number(process.env.INGEST_TIER_1_MS || 10_000),
+  2: Number(process.env.INGEST_TIER_2_MS || 30_000),
+  3: Number(process.env.INGEST_TIER_3_MS || 60_000),
 };
 
 if (!SECRET) {

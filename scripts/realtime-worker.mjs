@@ -1,21 +1,18 @@
 /**
  * Always-on desk workers: priority news ingest + live quote/volume stream.
  *
- * Stock Titan does not sell their feed. With BENZINGA_API_KEY set, Tier-0
- * Benzinga News + Press Releases is the licensed realtime wire. Quotes/volume
- * come from Yahoo batch (+ optional Finnhub WS).
+ * Railway start command (Settings → Deploy → Custom Start Command):
+ *   node scripts/realtime-worker.mjs
+ * (or: npm run realtime:worker)
  *
- * Deploy on Railway / Fly / VPS (not inside Cursor):
- *   npm run realtime:worker
- *
- * Required env:
+ * Required env on Railway:
  *   CRON_SECRET
- *   NEXT_PUBLIC_APP_URL          (production Vercel URL)
- *   BENZINGA_API_KEY             (paid — realtime news)
- *   UPSTASH_REDIS_REST_URL/TOKEN (strongly recommended)
- *   FINNHUB_API_KEY              (optional — tick stream)
+ *   NEXT_PUBLIC_APP_URL   ← must be your public Vercel URL, NOT localhost
+ *   UPSTASH_REDIS_*       (recommended)
+ *   FINNHUB_API_KEY       (recommended — company + market news)
  */
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
@@ -44,62 +41,154 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const children = [];
-
-function start(script, label) {
-  const child = spawn("node", [script], {
-    cwd: root,
-    stdio: "inherit",
-    env: process.env,
-  });
-  children.push(child);
-  child.on("exit", (code, signal) => {
-    console.error(
-      `${label} exited code=${code ?? "?"} signal=${signal ?? "-"} — shutting down desk workers`
-    );
-    for (const c of children) {
-      try {
-        c.kill("SIGTERM");
-      } catch {
-        /* ignore */
-      }
+function normalizeBaseUrl(raw) {
+  let base = (raw || "").trim().replace(/\/+$/, "");
+  try {
+    const u = new URL(base);
+    if (u.hostname === "trustticker.com") {
+      u.hostname = "www.trustticker.com";
+      base = u.toString().replace(/\/+$/, "");
     }
-    process.exit(code ?? 1);
-  });
-  return child;
+  } catch {
+    /* keep */
+  }
+  return base;
 }
 
-if (!process.env.BENZINGA_API_KEY?.trim()) {
-  console.warn(
-    "[realtime] BENZINGA_API_KEY is not set — news will be free RSS/SEC only (not Stock-Titan-class speed)."
+const onRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RAILWAY_PROJECT_ID ||
+    process.env.RAILWAY_SERVICE_ID
+);
+
+const BASE = normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL);
+const SECRET = (process.env.CRON_SECRET || "")
+  .trim()
+  .replace(/^['"]/, "")
+  .replace(/['"]$/, "")
+  .trim();
+
+const problems = [];
+if (!SECRET) problems.push("CRON_SECRET is missing");
+if (!BASE) {
+  problems.push("NEXT_PUBLIC_APP_URL is missing");
+} else if (onRailway && /localhost|127\.0\.0\.1/i.test(BASE)) {
+  problems.push(
+    `NEXT_PUBLIC_APP_URL is "${BASE}" — on Railway it must be your public site URL (https://www.trustticker.com), not localhost`
   );
 }
-if (!process.env.CRON_SECRET?.trim()) {
-  console.error("[realtime] CRON_SECRET is required.");
-  process.exit(1);
-}
-if (!process.env.NEXT_PUBLIC_APP_URL?.trim()) {
-  console.error("[realtime] NEXT_PUBLIC_APP_URL is required (your Vercel URL).");
+if (problems.length) {
+  for (const p of problems) console.error(`[realtime] ${p}`);
+  console.error(
+    onRailway
+      ? "[realtime] Set these in Railway → service → Variables, then redeploy."
+      : "[realtime] Fix .env and retry."
+  );
   process.exit(1);
 }
 
-console.log(
-  "Starting realtime desk workers (priority ingest + quote/volume stream)…"
-);
-start("scripts/priority-ingest-worker.mjs", "ingest:priority");
-start("scripts/quote-stream.mjs", "quote:stream");
+if (!process.env.FINNHUB_API_KEY?.trim()) {
+  console.warn(
+    "[realtime] FINNHUB_API_KEY is not set — Finnhub market/company news skipped (PR wires + Yahoo + RSS still run)."
+  );
+}
 
-function shutdown(sig) {
-  console.log(`Received ${sig} — stopping workers`);
+/**
+ * Railway (and many PaaS) expect something listening on $PORT.
+ * Without this, the deploy looks "crashed" even if workers were fine.
+ */
+const PORT = Number(process.env.PORT || 8080);
+const startedAt = Date.now();
+const healthServer = createServer((req, res) => {
+  if (req.url === "/health" || req.url === "/" || req.url === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        ok: true,
+        service: "trustticker-realtime-worker",
+        appUrl: BASE,
+        uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+        children: children.map((c) => ({
+          label: c.label,
+          pid: c.proc.pid,
+          restarts: c.restarts,
+        })),
+      })
+    );
+    return;
+  }
+  res.writeHead(404);
+  res.end("not found");
+});
+healthServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`[realtime] health server on :${PORT} (Railway keep-alive)`);
+});
+
+const children = [];
+const MAX_RESTARTS = 20;
+
+function start(script, label) {
+  const entry = { label, proc: null, restarts: 0 };
+  const launch = () => {
+    const proc = spawn("node", [script], {
+      cwd: root,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_APP_URL: BASE,
+        CRON_SECRET: SECRET,
+      },
+    });
+    entry.proc = proc;
+    proc.on("exit", (code, signal) => {
+      console.error(
+        `[realtime] ${label} exited code=${code ?? "?"} signal=${signal ?? "-"}`
+      );
+      if (draining) return;
+      entry.restarts += 1;
+      if (entry.restarts > MAX_RESTARTS) {
+        console.error(
+          `[realtime] ${label} restarted too many times — shutting down`
+        );
+        shutdown("restart-limit");
+        return;
+      }
+      const delay = Math.min(30_000, 1_000 * entry.restarts);
+      console.error(`[realtime] restarting ${label} in ${delay}ms…`);
+      setTimeout(launch, delay);
+    });
+  };
+  children.push(entry);
+  launch();
+  return entry;
+}
+
+let draining = false;
+
+function shutdown(reason) {
+  if (draining) return;
+  draining = true;
+  console.log(`[realtime] shutting down (${reason})`);
   for (const c of children) {
     try {
-      c.kill("SIGTERM");
+      c.proc?.kill("SIGTERM");
     } catch {
       /* ignore */
     }
   }
-  setTimeout(() => process.exit(0), 3_000).unref();
+  try {
+    healthServer.close();
+  } catch {
+    /* ignore */
+  }
+  setTimeout(() => process.exit(reason === "restart-limit" ? 1 : 0), 2_500).unref();
 }
+
+console.log(
+  `[realtime] starting desk workers → app ${BASE}${onRailway ? " (Railway)" : ""}`
+);
+start("scripts/priority-ingest-worker.mjs", "ingest:priority");
+start("scripts/quote-stream.mjs", "quote:stream");
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

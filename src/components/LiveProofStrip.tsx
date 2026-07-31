@@ -40,14 +40,16 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
     return () => clearInterval(t);
   }, []);
 
-  const avg = stats?.latency.avgSec;
+  const avg = stats?.latency.p50Sec ?? stats?.latency.avgSec;
   const fastest = stats?.latency.fastestSec;
   const recent = stats?.recentWins ?? [];
   const formatIngest = (sec: number) =>
-    sec >= 120 ? `${Math.round(sec / 60)}m` : `${Math.round(sec)}s`;
-  const showUnder3m =
-    (stats?.latency.under3mRate ?? stats?.latency.under60sRate) != null &&
-    (stats?.latency.under3mRate ?? stats?.latency.under60sRate ?? 0) > 0;
+    sec >= 120 ? `${(sec / 60).toFixed(1)}m` : `${Math.round(sec)}s`;
+  const underRate =
+    stats?.latency.under30sRate ??
+    stats?.latency.under3mRate ??
+    stats?.latency.under60sRate;
+  const showUnder3m = underRate != null && underRate > 0;
 
   return (
     <div
@@ -69,7 +71,7 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           {avg != null && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
               <Clock className="w-3 h-3" />
-              Avg ingest{" "}
+              Desk p50{" "}
               <strong className="text-emerald-400 font-mono font-medium">{formatIngest(avg)}</strong>
               {stats?.latency.sampleSize ? (
                 <span className="text-zinc-600"> · n={stats.latency.sampleSize}</span>
@@ -78,10 +80,8 @@ export function LiveProofStrip({ className, compact }: { className?: string; com
           )}
           {showUnder3m && (
             <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
-              <strong className="text-emerald-400 font-medium">
-                {stats?.latency.under3mRate ?? stats?.latency.under60sRate}%
-              </strong>{" "}
-              under 3m
+              <strong className="text-emerald-400 font-medium">{underRate}%</strong>{" "}
+              under 30s
             </span>
           )}
           {fastest != null && (

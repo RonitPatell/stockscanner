@@ -693,3 +693,21 @@ model ServiceCreditAuditLog {
   @@index([actorUserId])
   @@index([createdAt])
 }
+
+/// Direct messages to the founder (help / suggestions / feature requests).
+model FounderMessage {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  name      String?
+  topic     String   @default("help") // help | suggestion | request | other
+  message   String
+  pagePath  String?
+  userAgent String?
+  status    String   @default("new") // new | read | replied
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+}

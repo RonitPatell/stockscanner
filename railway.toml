@@ -1,0 +1,9 @@
+# Railway worker service — Settings → Deploy can also set this.
+# Use a SEPARATE Railway service from any web app; start only the desk workers.
+
+[deploy]
+startCommand = "node scripts/realtime-worker.mjs"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+healthcheckPath = "/health"
+healthcheckTimeout = 30

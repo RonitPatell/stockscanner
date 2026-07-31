@@ -6,7 +6,6 @@ import { fetchGlobeNewswirePRs } from "./news-sources/globenewswire";
 import { fetchBusinessWirePRs } from "./news-sources/businesswire";
 import { fetchPrNewswirePRs } from "./news-sources/prnewswire";
 import { fetchMarketRssNews, fetchFastMarketRssNews, fetchSlowMarketRssNews, fetchYahooTickerNews } from "./news-sources/market-rss";
-import { fetchBenzingaApiNews } from "./news-sources/benzinga-api";
 import { finnhubFetch, finnhubFetchLive } from "./finnhub-queue";
 import { resolveFinnhubKey } from "./finnhub-key";
 import { isLikelyStockNews, resolveArticleSymbol, articleIsAboutSymbol } from "./news-verifier";
@@ -229,9 +228,9 @@ function dedupeWireArticles(articles: NewsArticle[], maxAgeMs: number): NewsArti
 }
 
 /**
- * StockTitan-style free wire (always-on worker ~2s):
- * official PR wires + SEC EDGAR + fast market RSS + optional Benzinga API + Finnhub general.
- * Yahoo per-ticker RSS is deliberately on the extended path (slower / noisier).
+ * Free realtime wire (always-on worker):
+ * official PR wires + SEC EDGAR + editorial RSS + Yahoo tickers + Finnhub.
+ * No paid news vendor (Benzinga removed from the desk path).
  */
 export async function fetchUltraFastWireNews(
   _priorityTickers: string[]
@@ -239,7 +238,6 @@ export async function fetchUltraFastWireNews(
   const firstFetchedAt = new Date();
   const key = resolveFinnhubKey();
   const [
-    benzingaApi,
     marketRss,
     prnPRs,
     businessWirePRs,
@@ -247,7 +245,6 @@ export async function fetchUltraFastWireNews(
     secFilings,
     marketNews,
   ] = await Promise.all([
-    fetchBenzingaApiNews(50),
     fetchFastMarketRssNews(),
     fetchPrNewswirePRs(),
     fetchBusinessWirePRs(),
@@ -259,7 +256,6 @@ export async function fetchUltraFastWireNews(
   return annotateFetchedArticles(
     dedupeWireArticles(
       [
-        ...benzingaApi,
         ...prnPRs,
         ...businessWirePRs,
         ...globePRs,
@@ -268,22 +264,22 @@ export async function fetchUltraFastWireNews(
         ...marketNews,
       ],
       2 * 60 * 60 * 1000
-    ).slice(0, 180),
+    ).slice(0, 220),
     { firstFetchedAt, fetchCompletedAt: new Date() }
   );
 }
 
-/** Yahoo + slow RSS + per-symbol Finnhub — background; PRs/SEC already on ultra */
+/** Yahoo + company Finnhub + commentary — extended path (breadth). */
 export async function fetchExtendedWireNews(
   priorityTickers: string[]
 ): Promise<NewsArticle[]> {
   const firstFetchedAt = new Date();
   const key = resolveFinnhubKey();
   const [yahooNews, slowRss, companyNews] = await Promise.all([
-    fetchYahooTickerNews(40, priorityTickers),
+    fetchYahooTickerNews(24, priorityTickers.slice(0, 16)),
     fetchSlowMarketRssNews(),
     key
-      ? fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 40))
+      ? fetchFinnhubCompanyNewsForSymbols(key, priorityTickers.slice(0, 16))
       : Promise.resolve([]),
   ]);
 

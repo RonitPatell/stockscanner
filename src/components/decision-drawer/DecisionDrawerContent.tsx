@@ -35,6 +35,8 @@ import {
 } from "../LiveQuoteProvider";
 import { AnaloguePanel } from "../decision-card/AnaloguePanel";
 import { DecisionFeedbackButtons } from "../trader-feedback/DecisionFeedbackButtons";
+import { TradingViewMiniChart } from "../TradingViewMiniChart";
+import { buildTraderCall } from "@/lib/trader-call";
 
 function Row({
   label,
@@ -393,6 +395,24 @@ export function DecisionDrawerContent({
       ? formatPercent(model.identity.changePercent.value)
       : dayChange;
 
+  const traderCall = buildTraderCall({
+    changePercent: model.identity.changePercent.value,
+    moveSincePub: model.reaction.moveSincePublicationPct.value,
+    stage: model.reactionStage.stage,
+    riskLabels: risks.map((r) => r.label),
+    dollarVolume: model.tradeability.dollarVolume.value,
+    rvol: model.reaction.relativeVolume.value,
+  });
+
+  const callTone =
+    traderCall.kind === "LOOK"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : traderCall.kind === "WAIT"
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-100"
+        : traderCall.kind === "SKIP"
+          ? "border-red-500/40 bg-red-500/10 text-red-200"
+          : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]";
+
   return (
     <div
       className={cn("flex h-full min-h-0 flex-col", className)}
@@ -468,9 +488,61 @@ export function DecisionDrawerContent({
             )}
           </div>
         </div>
+
+        <div
+          className={cn(
+            "mt-2.5 rounded border px-2.5 py-2",
+            callTone
+          )}
+          data-guide="decision-drawer-call"
+          data-testid="trader-call-strip"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[12px] font-semibold tracking-tight">
+              {traderCall.title}
+            </p>
+            {(model.identity.changePercent.value != null ||
+              model.reaction.moveSincePublicationPct.value != null) && (
+              <p className="font-mono text-[12px] tabular-nums font-bold">
+                {formatPercent(
+                  model.reaction.moveSincePublicationPct.value ??
+                    model.identity.changePercent.value ??
+                    0
+                )}{" "}
+                <span className="text-[10px] font-normal opacity-80">
+                  live
+                </span>
+              </p>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug opacity-90">
+            {traderCall.reason}
+          </p>
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-wide opacity-80">
+            Next → {traderCall.nextStep}
+          </p>
+          <p className="mt-1 text-[9px] opacity-60">
+            Informational only — not a buy or sell order.
+          </p>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <section
+          className="border-b border-[var(--border)] px-3 py-2.5"
+          data-guide="decision-drawer-chart"
+          data-drawer-section="chart"
+        >
+          <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            Live chart · 1m
+          </h3>
+          <TradingViewMiniChart
+            symbol={model.identity.symbol}
+            exchange={exchange}
+            height={240}
+          />
+        </section>
+
         <Section title="1 · Event" guide="decision-drawer-event">
           <Row
             label="Company"

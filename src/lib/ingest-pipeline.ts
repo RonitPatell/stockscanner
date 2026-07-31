@@ -30,11 +30,21 @@ export interface IngestPipelineResult {
   mode?: "priority" | "legacy";
 }
 
+async function ensureFeedCacheWarm(): Promise<void> {
+  const cached = await getCachedFeed("all");
+  if (cached.items.length === 0) {
+    await refreshPublicFeedCache();
+  }
+}
+
 async function ingestCollected(
   articles: NewsArticle[],
   wireOnly: boolean
 ): Promise<number> {
-  if (articles.length === 0) return 0;
+  if (articles.length === 0) {
+    await ensureFeedCacheWarm();
+    return 0;
+  }
   const batch = await ingestAndAnalyzeNews({
     wireOnly,
     articles,
@@ -42,12 +52,15 @@ async function ingestCollected(
   });
   if (batch.newCount > 0) {
     await refreshPublicFeedCache();
+  } else {
+    // Restart / empty memory cache: rebuild from DB even when every article was a dupe
+    await ensureFeedCacheWarm();
   }
   return batch.newCount;
 }
 
 /**
- * Fast path — Tier 0 (SEC + issuer wires) + Tier 1 (licensed/API).
+ * Fast path — Tier 0 (SEC + issuer wires) + Tier 1 (Finnhub / Yahoo / editorial RSS).
  * Preserves WirePipelineResult shape for cron/worker compatibility.
  */
 export async function runWirePipeline(): Promise<WirePipelineResult> {
@@ -165,7 +178,10 @@ export async function runPriorityTierTick(
   tier: IngestTier
 ): Promise<TierRunResult> {
   const wireOnly = tier <= 1;
-  return runTierIngest(tier, {
+  const result = await runTierIngest(tier, {
     ingestArticles: (articles) => ingestCollected(articles, wireOnly),
   });
+  // Tier-0 is the heartbeat — keep the public feed warm after each wake
+  if (tier === 0) await ensureFeedCacheWarm();
+  return result;
 }

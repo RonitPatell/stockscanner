@@ -144,30 +144,74 @@ export interface IngestLatencyStats {
   p90Sec: number | null;
   sampleSize: number;
   under15sRate: number | null;
-  /** Share of live catches within 60s of publish. */
   under60sRate: number | null;
-  /** Share of live catches within 3 minutes — primary marketing metric. */
-  under3mRate: number | null;
-  /** @deprecated Use under60sRate */
+  /** Desk processing under 30s (preferred public bar). */
   under30sRate: number | null;
+  /**
+   * @deprecated Older clients — mirrors under60sRate (desk/wire speed),
+   * not blended editorial RSS publish-age.
+   */
+  under3mRate: number | null;
   fastestSec: number | null;
+  /** What the numbers measure — never blend editorial RSS publish-age into this. */
+  metric: "desk_processing" | "wire_catch" | "insufficient_samples";
+  note: string;
+}
+
+const WIRE_SOURCES = [
+  "GlobeNewswire",
+  "Business Wire",
+  "PR Newswire",
+  "SEC EDGAR",
+  "Yahoo Finance",
+] as const;
+
+function packDelayStats(
+  delaysSec: number[]
+): Omit<IngestLatencyStats, "metric" | "note"> {
+  const delays = [...delaysSec].sort((a, b) => a - b);
+  const empty = {
+    avgSec: null as number | null,
+    p50Sec: null as number | null,
+    p90Sec: null as number | null,
+    sampleSize: 0,
+    under15sRate: null as number | null,
+    under60sRate: null as number | null,
+    under3mRate: null as number | null,
+    under30sRate: null as number | null,
+    fastestSec: null as number | null,
+  };
+  if (delays.length === 0) return empty;
+
+  const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
+  const p50 = delays[Math.floor(delays.length * 0.5)] ?? null;
+  const p90 = delays[Math.floor(delays.length * 0.9)] ?? null;
+  const under15 = delays.filter((d) => d <= 15).length / delays.length;
+  const under30 = delays.filter((d) => d <= 30).length / delays.length;
+  const under60 = delays.filter((d) => d <= 60).length / delays.length;
+  const under60sRate = Math.round(under60 * 1000) / 10;
+
+  return {
+    avgSec: Math.round(avg * 10) / 10,
+    p50Sec: Math.round((p50 ?? 0) * 10) / 10,
+    p90Sec: Math.round((p90 ?? 0) * 10) / 10,
+    sampleSize: delays.length,
+    under15sRate: Math.round(under15 * 1000) / 10,
+    under60sRate,
+    under30sRate: Math.round(under30 * 1000) / 10,
+    under3mRate: under60sRate,
+    fastestSec: delays[0] ?? null,
+  };
 }
 
 /**
- * Reproducible aggregated ingest latency — includes all finite delays in-window.
- * Does not cherry-pick the fastest live-race subset for public stats.
- * Prefer LatencyTrace cohorts (/api/latency-proof, /status) for processing vs upstream split.
+ * Public desk-speed stats — TrustTicker processing / wire catch only.
+ * Never averages editorial RSS publish→DB age (that produced bogus ~49m "ingest" numbers).
  */
-export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencyStats> {
+export async function getIngestLatencyStats(
+  hours = 24
+): Promise<IngestLatencyStats> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-
-  const rows = await prisma.catalyst.findMany({
-    where: { createdAt: { gte: since } },
-    select: { publishedAt: true, createdAt: true },
-    take: 2_000,
-    orderBy: { createdAt: "desc" },
-  });
-
   const empty: IngestLatencyStats = {
     avgSec: null,
     p50Sec: null,
@@ -178,40 +222,77 @@ export async function getIngestLatencyStats(hours = 24): Promise<IngestLatencySt
     under3mRate: null,
     under30sRate: null,
     fastestSec: null,
+    metric: "insufficient_samples",
+    note: "Not enough wire samples in the last 24h yet.",
   };
 
-  if (rows.length === 0) return empty;
+  const traces = await prisma.latencyTrace.findMany({
+    where: {
+      createdAt: { gte: since },
+      metricCohort: { in: ["actionable_breaking", "urgent_filing"] },
+      processingLatencyMs: { not: null },
+      NOT: { timestampQuality: { in: ["MISSING", "INVALID"] } },
+    },
+    select: { processingLatencyMs: true },
+    take: 2_000,
+    orderBy: { createdAt: "desc" },
+  });
 
-  // Retain all finite non-negative delays (including poor performers). Cap absurd clock skew.
-  const ABSURD_SEC = 24 * 60 * 60;
-  const delays = rows
-    .map((r) => Math.max(0, (r.createdAt.getTime() - r.publishedAt.getTime()) / 1000))
-    .filter((d) => Number.isFinite(d) && d <= ABSURD_SEC)
-    .sort((a, b) => a - b);
+  const processingSec = traces
+    .map((t) => (t.processingLatencyMs ?? NaN) / 1000)
+    .filter((d) => Number.isFinite(d) && d >= 0 && d <= 120);
 
-  if (delays.length === 0) return empty;
+  if (processingSec.length >= 8) {
+    return {
+      ...packDelayStats(processingSec),
+      metric: "desk_processing",
+      note: "Median TrustTicker processing time after a wire item is fetched (PR/SEC/breaking). Not publisher RSS age.",
+    };
+  }
 
-  const avg = delays.reduce((a, b) => a + b, 0) / delays.length;
-  const p50 = delays[Math.floor(delays.length * 0.5)] ?? null;
-  const p90 = delays[Math.floor(delays.length * 0.9)] ?? null;
-  const under15 = delays.filter((d) => d <= 15).length / delays.length;
-  const under60 = delays.filter((d) => d <= 60).length / delays.length;
-  const under3m = delays.filter((d) => d <= 180).length / delays.length;
+  const rows = await prisma.catalyst.findMany({
+    where: {
+      createdAt: { gte: since },
+      source: { in: [...WIRE_SOURCES] },
+      quarantined: false,
+    },
+    select: { publishedAt: true, createdAt: true },
+    take: 2_000,
+    orderBy: { createdAt: "desc" },
+  });
 
-  const under60sRate = Math.round(under60 * 1000) / 10;
-  const under3mRate = Math.round(under3m * 1000) / 10;
+  const WIRE_CATCH_CAP_SEC = 10 * 60;
+  const catchSec = rows
+    .map((r) =>
+      Math.max(0, (r.createdAt.getTime() - r.publishedAt.getTime()) / 1000)
+    )
+    .filter((d) => Number.isFinite(d) && d <= WIRE_CATCH_CAP_SEC);
 
-  return {
-    avgSec: Math.round(avg * 10) / 10,
-    p50Sec: Math.round((p50 ?? 0) * 10) / 10,
-    p90Sec: Math.round((p90 ?? 0) * 10) / 10,
-    sampleSize: delays.length,
-    under15sRate: Math.round(under15 * 1000) / 10,
-    under60sRate,
-    under3mRate,
-    under30sRate: under60sRate,
-    fastestSec: delays[0] ?? null,
-  };
+  if (catchSec.length >= 8) {
+    return {
+      ...packDelayStats(catchSec),
+      metric: "wire_catch",
+      note: "PR/SEC/Yahoo catch delay (publish → desk), capped at 10m. Editorial RSS excluded.",
+    };
+  }
+
+  if (processingSec.length > 0) {
+    return {
+      ...packDelayStats(processingSec),
+      metric: "desk_processing",
+      note: "Limited sample — TrustTicker processing after fetch.",
+    };
+  }
+
+  if (catchSec.length > 0) {
+    return {
+      ...packDelayStats(catchSec),
+      metric: "wire_catch",
+      note: "Limited sample — wire catch only.",
+    };
+  }
+
+  return empty;
 }
 
 export async function getCatalystsForSymbol(symbol: string, limit = 20) {

@@ -44,8 +44,8 @@ npm run quote:stream
 See [docs/PRIORITY_INGEST.md](./docs/PRIORITY_INGEST.md) for locks, feature flags,
 SEC rate limits, and honest interval guidance.
 
-Also set `BENZINGA_API_KEY` when you have a licensed key. The Trust Status bar shows
-**measured** wire cycle — not a hardcoded marketing number.
+Set `FINNHUB_API_KEY` when you have one (market + company news on the wire tier).
+The Trust Status bar shows **measured** wire cycle — not a hardcoded marketing number.
 
 Without workers, expect ~60s wire cadence + publisher lag. Be honest with traders.
 Do **not** claim a two-second poll unless it is explicitly configured, sustainable,
@@ -252,27 +252,25 @@ Run this 24/7 on a cheap VPS / Railway / Fly (or your PC while testing). Free Ra
 
 On Railway there is **no `.env` file** — set variables in the Railway dashboard (`CRON_SECRET`, `NEXT_PUBLIC_APP_URL`). Do not commit `.env`. Locally, `scripts/ingest-worker.mjs` still loads `.env` if it exists.
 
-### Realtime desk (Stock-Titan-class) — paid Benzinga + always-on workers
+### Realtime desk — free wires + always-on workers
 
 Stock Titan does **not** license their internal feed. Do not scrape them.
-The industry equivalent used by retail desks (e.g. Webull) is **Benzinga Newsfeed + Press Releases**.
+TrustTicker uses **issuer PR wires + SEC + Finnhub + Yahoo ticker RSS + editorial RSS** (no Benzinga).
 
 | Piece | What to buy / run | Role |
 |--------|-------------------|------|
-| **Benzinga Cloud** | `BENZINGA_API_KEY` from [benzinga.com/apis](https://www.benzinga.com/apis/) | Realtime equities news + press releases (Tier 0, ~5s poll) |
 | **Always-on worker** | Railway / Fly / VPS: `npm run realtime:worker` | Priority ingest + Yahoo volume/quote stream |
 | **Redis** | Upstash | Shared quote + feed cache across Vercel + workers |
-| **Finnhub** (optional) | `FINNHUB_API_KEY` | Extra tick stream on top of Yahoo volume |
+| **Finnhub** | `FINNHUB_API_KEY` | Market + company news on the wire tier |
 
 **Required env on the worker + Vercel:**
 
 ```bash
-BENZINGA_API_KEY=...
 CRON_SECRET=...                 # same on Vercel + worker
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
-FINNHUB_API_KEY=...             # optional
+FINNHUB_API_KEY=...             # recommended
 ```
 
 **Start command (Railway/Fly):**
@@ -281,19 +279,17 @@ FINNHUB_API_KEY=...             # optional
 npm run realtime:worker
 ```
 
-That runs `ingest:priority` (Benzinga Tier 0 + SEC/PR wires) and `quote:stream` (volume/RVol for heavy names). Cursor/`npm run dev` alone will **not** keep this alive.
+That runs `ingest:priority` (PR/SEC Tier 0 + Finnhub/Yahoo/editorial Tier 1) and `quote:stream`. Cursor/`npm run dev` alone will **not** keep this alive.
 
-**Honest latency:** with Benzinga keyed + worker up, expect **seconds** from publish on most wires. Free RSS/SEC remains as backup coverage.
-
-### Free path (no Benzinga key)
+**Honest latency:** with the worker up, expect **tens of seconds** from publisher update on free RSS/PR wires — not a sub-second licensed newsfeed.
 
 | Source | Cost | Role |
 |--------|------|------|
 | PR Newswire / Business Wire / GlobeNewswire RSS | $0 | Official press releases |
 | SEC EDGAR Atom | $0 | Filings |
-| Benzinga public RSS / Finnhub / Yahoo | $0 | Slower / noisier backup |
+| Finnhub / Yahoo / MarketWatch / CNBC | $0 | Market + per-ticker + editorial |
 
-Without `BENZINGA_API_KEY` + `realtime:worker`, expect **tens of seconds to minutes** of publisher lag and weaker volume.
+Without `realtime:worker`, expect ~60s Vercel cron cadence and weaker volume.
 
 ### 4. Live quotes without Redis
 

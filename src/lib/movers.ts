@@ -11,17 +11,20 @@ export const FRESH_PR_WINDOW_MS = 4 * 60 * 60 * 1000;
 export const FRESH_NEWS_WINDOW_MS = 3 * 60 * 60 * 1000;
 export const FRESH_PR_MIN_MOVE = 1.0;
 
-const PR_SOURCES = new Set(["GlobeNewswire", "Business Wire"]);
+const PR_SOURCES = new Set(["GlobeNewswire", "Business Wire", "PR Newswire"]);
 const LIVE_NEWS_SOURCES = new Set([
   "GlobeNewswire",
   "Business Wire",
-  "Benzinga",
+  "PR Newswire",
+  "Yahoo Finance",
   "Reuters",
   "CNBC",
   "Bloomberg",
   "MarketWatch",
+  "Investing.com",
   "The Motley Fool",
   "Seeking Alpha",
+  "Nasdaq",
 ]);
 
 export function isMoverCatalyst(c: {

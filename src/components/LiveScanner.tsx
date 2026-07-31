@@ -58,7 +58,8 @@ import { FocusCatalystRowV2 } from "./focus/FocusCatalystRowV2";
 export type ScannerTab = "all" | "premarket" | "watchlist" | "strategy";
 
 const POLL_MS = 12_000;
-const MAX_FEED_AGE_MS = 24 * 60 * 60 * 1000;
+/** Match server feed window — session news only. */
+const MAX_FEED_AGE_MS = 8 * 60 * 60 * 1000;
 const ROW_ESTIMATE_PX = 72;
 const DECISION_CARD_V3 = isDecisionCardV3Enabled();
 const FEED_V3 = isDashboardShellV3Enabled();

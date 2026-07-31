@@ -101,7 +101,9 @@ function fmtTs(iso: string) {
 
 export interface LandingLatency {
   avgSec: number | null;
+  p50Sec?: number | null;
   under3mRate: number | null;
+  under30sRate?: number | null;
   sampleSize: number;
   feedCount: number;
   fastestSec?: number | null;
@@ -370,21 +372,26 @@ export function MarketingLanding({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
                 {[
                   {
-                    label: "Avg ingest",
-                    value:
-                      latency?.avgSec != null
-                        ? latency.avgSec >= 120
-                          ? `${Math.round(latency.avgSec / 60)}m`
-                          : `${Math.round(latency.avgSec)}s`
-                        : "—",
+                    label: "Desk speed (p50)",
+                    value: (() => {
+                      const sec = latency?.p50Sec ?? latency?.avgSec;
+                      if (sec == null) return "—";
+                      return sec >= 120
+                        ? `${(sec / 60).toFixed(1)}m`
+                        : `${Math.round(sec)}s`;
+                    })(),
                   },
                   {
-                    label: "Under 3 min",
+                    label: "Under 30s",
                     value:
-                      latency?.under3mRate != null ? `${latency.under3mRate}%` : "—",
+                      latency?.under30sRate != null
+                        ? `${latency.under30sRate}%`
+                        : latency?.under3mRate != null
+                          ? `${latency.under3mRate}%`
+                          : "—",
                   },
                   {
-                    label: "24h sample",
+                    label: "Wire sample",
                     value: latency?.sampleSize ? String(latency.sampleSize) : "—",
                   },
                   {

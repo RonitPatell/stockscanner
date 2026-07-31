@@ -101,7 +101,7 @@ export function TrustStatusBar({ className }: { className?: string }) {
 
       {health.avgIngestDelaySec != null && (
         <span className="desk-pill text-[12px] hidden lg:inline-flex">
-          Avg ingest {health.avgIngestDelaySec}s
+          Desk p50 {health.avgIngestDelaySec}s
         </span>
       )}
     </div>

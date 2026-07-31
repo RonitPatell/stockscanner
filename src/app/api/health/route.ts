@@ -6,6 +6,7 @@ import {
   getSystemHealth,
   setFeedMeta,
 } from "@/lib/system-health";
+import { getIngestLatencyStats } from "@/lib/speed-wins";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,9 @@ export async function GET() {
 
   const health = getSystemHealth(isScaleMode());
   const freshness = classifyFeedHealth(health);
+  const latency = await getIngestLatencyStats(24).catch(() => null);
+  const avgIngestDelaySec =
+    latency?.p50Sec ?? latency?.avgSec ?? health.avgIngestDelaySec ?? null;
 
   return NextResponse.json(
     {
@@ -33,6 +37,10 @@ export async function GET() {
       feedSource: health.feedSource === "none" ? "none" : "ok",
       pipelineInFlight: health.pipelineInFlight,
       wireInFlight: health.wireInFlight,
+      /** Desk/wire p50 seconds — not editorial RSS publish age */
+      avgIngestDelaySec:
+        avgIngestDelaySec != null ? Math.round(avgIngestDelaySec) : null,
+      latencyMetric: latency?.metric ?? null,
     },
     {
       headers: {

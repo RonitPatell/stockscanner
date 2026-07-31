@@ -2,51 +2,74 @@
 
 ## Honest scope
 
-- **Stock Titan does not sell their feed.** You cannot plug “Stock Titan’s method” in via an API key.
-- TrustTicker’s paid path is **Benzinga News + Press Releases** (same class of licensed wire other retail platforms use) plus **always-on workers** for poll cadence and Yahoo volume.
+- **Stock Titan does not sell their feed.** There is no licensed “Stock Titan API.”
+- TrustTicker’s default path is **free issuer wires + SEC + Finnhub + Yahoo ticker RSS + editorial RSS**, with **always-on workers** for poll cadence and Yahoo volume.
 - Closing Cursor stops local processes. Production must run on **Vercel (app) + Railway/Fly/VPS (workers)**.
 
-## Buy / configure
+## Paid news options (if you want faster than free RSS)
 
-1. Get a Benzinga Cloud key with **Newsfeed** and **Press Releases** entitlements:  
-   https://www.benzinga.com/apis/
-2. Set on **Vercel** and the **worker** service:
+| Vendor | Env | Honest cadence | Notes |
+|--------|-----|----------------|-------|
+| **Polygon / Massive News** | `POLYGON_API_KEY` | ~hourly on Stocks plans | Wired as Tier-1 `polygon_news` when keyed |
+| **Finnhub** (you likely have) | `FINNHUB_API_KEY` | seconds–minutes | Market + company news on wire tier |
+| **Benzinga Cloud** | — | ~seconds | Not used by TrustTicker (by product choice) |
+| **Finlight / Marketaux / Alpha Vantage News** | — | REST poll | Not wired yet; evaluate if Polygon isn’t enough |
+
+**5-second publish→desk is only honest with a licensed low-latency wire + always-on worker.** Free PR RSS is usually tens of seconds. Public “Desk speed” metrics measure TrustTicker processing / wire catch — **not** hour-old editorial RSS age.
+
+## Configure
+
+Set on **Vercel** and the **worker** service:
 
 | Variable | Required |
 |----------|----------|
-| `BENZINGA_API_KEY` | yes (for Titan-class news) |
 | `CRON_SECRET` | yes |
 | `NEXT_PUBLIC_APP_URL` | yes (public HTTPS app URL) |
 | `UPSTASH_REDIS_REST_URL` / `TOKEN` | strongly recommended |
-| `FINNHUB_API_KEY` | optional (tick stream) |
-| `BENZINGA_CHANNELS` | optional extra channels |
-| `BENZINGA_INCLUDE_PRS` | default on; set `0` to disable PR pass |
+| `FINNHUB_API_KEY` | recommended (market + company news) |
 
-3. Worker start command:
+Worker start command (Railway → **Settings → Deploy → Custom Start Command**):
 
 ```bash
-npm run realtime:worker
+node scripts/realtime-worker.mjs
 ```
+
+Also set **Variables** on that Railway service (not only Vercel):
+
+| Variable | Value |
+|----------|--------|
+| `CRON_SECRET` | same as Vercel |
+| `NEXT_PUBLIC_APP_URL` | `https://www.trustticker.com` (**not** `http://localhost:3000`) |
+| `UPSTASH_REDIS_REST_URL` / `TOKEN` | recommended |
+| `FINNHUB_API_KEY` | recommended |
+
+If logs show `npm error command sh -c node scripts/realtime-worker.mjs`, scroll **above** that line — the real reason is usually missing env or `NEXT_PUBLIC_APP_URL=localhost`. The worker listens on `$PORT/health` so Railway healthchecks do not kill it.
 
 ## What runs
 
 | Process | Script | Cadence |
 |---------|--------|---------|
-| Priority ingest | `scripts/priority-ingest-worker.mjs` | Benzinga Tier 0 ~5s RTH; SEC/PR wires; slower RSS tiers |
+| Priority ingest | `scripts/priority-ingest-worker.mjs` | Tier 0 PR/SEC ~8s; Tier 1 Finnhub/Yahoo/editorial ~10s |
 | Quote / volume | `scripts/quote-stream.mjs` | Yahoo ~1.2s batches; heavy RVol/% names every cycle |
 
 Vercel crons (`/api/cron/wire`, `/api/cron/ingest`) remain a **safety net** only (~1–2 min). They are not the realtime path.
 
+## Feed rules
+
+- Stock-related headlines only (ticker resolved + about that symbol).
+- Duplicate stories collapse to one row (`story-cluster`).
+- Feed window is **~8 hours** (session news), not a day-old archive.
+
 ## Verify
 
-1. Worker logs show Benzinga ticks without `401` / `403`.
-2. `/admin/ingest` (if admin) shows `benzinga_api` healthy.
-3. Dashboard feed: new headlines appear within seconds of Benzinga publish.
+1. Worker logs show tier 0/1 ticks with `sourcesSucceeded` > 0.
+2. `/admin/ingest` (if admin) shows PR wires, Finnhub, Yahoo, RSS healthy.
+3. Dashboard feed: new ticker headlines appear as publishers update (usually tens of seconds on free RSS).
 4. Hot names show updating **volume / RVol** (Yahoo batch), not stuck estimates.
 
 ## If news is slow or empty
 
-- Missing `BENZINGA_API_KEY` → free RSS only.
 - Worker not running → Vercel cron only (~60s).
-- Auth errors → wrong key or plan without News/PR entitlement.
+- Missing `FINNHUB_API_KEY` → Finnhub skipped; PR/SEC/Yahoo/RSS still run.
 - Redis free-tier capped → quotes may pause; upgrade Upstash or rely on HTTP ingest mode.
+- Publishers lag → free RSS is not a sub-second licensed wire; expect seconds-to-tens-of-seconds.

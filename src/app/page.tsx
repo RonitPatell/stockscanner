@@ -38,9 +38,13 @@ export default async function HomePage() {
     getPublicCaseStudies(1).catch(() => []),
     getIngestLatencyStats(24).catch(() => ({
       avgSec: null,
+      p50Sec: null,
       under3mRate: null,
+      under30sRate: null,
       sampleSize: 0,
       fastestSec: null,
+      metric: "insufficient_samples" as const,
+      note: "",
     })),
     getSpeedWins(5, 72, "fastest").catch(() => []),
     getCachedFeed("all").catch(() => ({ items: [], meta: null })),
@@ -48,8 +52,10 @@ export default async function HomePage() {
 
   const caseStudy = cases[0] ?? null;
   const landingLatency = {
-    avgSec: latency.avgSec,
-    under3mRate: latency.under3mRate ?? null,
+    avgSec: latency.p50Sec ?? latency.avgSec,
+    p50Sec: latency.p50Sec ?? latency.avgSec,
+    under3mRate: latency.under30sRate ?? latency.under3mRate ?? null,
+    under30sRate: latency.under30sRate ?? null,
     sampleSize: latency.sampleSize,
     feedCount: feed.items?.length ?? 0,
     fastestSec: latency.fastestSec ?? null,

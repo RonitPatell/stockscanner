@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/Providers";
 import { CookieNotice } from "@/components/CookieNotice";
+import { FounderChat } from "@/components/FounderChat";
 import "./globals.css";
 
 /**
@@ -55,7 +56,10 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text-primary)]"
         suppressHydrationWarning
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <FounderChat />
+        </Providers>
         <CookieNotice />
         <Analytics />
       </body>

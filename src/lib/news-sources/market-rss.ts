@@ -5,12 +5,14 @@ import { getNextTickerBatch } from "./active-tickers";
 import { fetchRssXml, hashStr, parseRssItems } from "./rss-utils";
 import { stampFromRssPubDate } from "../latency-trace";
 
-/** Broad market/news RSS feeds — symbol resolved from headline when present */
+/** Broad market/news RSS — free editorial only (no Benzinga). */
 const FAST_MARKET_FEEDS: { url: string; source: string }[] = [
-  { url: "https://www.benzinga.com/feed", source: "Benzinga" },
   { url: "https://feeds.marketwatch.com/marketwatch/marketpulse/", source: "MarketWatch" },
-  { url: "https://www.cnbc.com/id/15839135/device/rss/rss.html", source: "CNBC" },
+  { url: "https://feeds.marketwatch.com/marketwatch/bulletins/", source: "MarketWatch" },
   { url: "https://feeds.marketwatch.com/marketwatch/topstories/", source: "MarketWatch" },
+  { url: "https://www.cnbc.com/id/15839135/device/rss/rss.html", source: "CNBC" },
+  { url: "https://www.cnbc.com/id/10000664/device/rss/rss.html", source: "CNBC" },
+  { url: "https://www.investing.com/rss/news_25.rss", source: "Investing.com" },
 ];
 
 const SLOW_MARKET_FEEDS: { url: string; source: string }[] = [
@@ -65,7 +67,7 @@ async function fetchRssFeedBatch(
   return articles;
 }
 
-/** Benzinga + MarketWatch + CNBC — polled every few seconds */
+/** MarketWatch + CNBC + Investing.com — polled on the wire tier */
 export async function fetchFastMarketRssNews(): Promise<NewsArticle[]> {
   return fetchRssFeedBatch(FAST_MARKET_FEEDS, new Set());
 }
@@ -112,11 +114,21 @@ export async function fetchYahooTickerNews(
         if (seen.has(key)) continue;
         seen.add(key);
 
-        // Prefer ticker named in headline; else map to a chunk symbol via $TICKER / (TICKER)
-        const symbol =
-          resolveArticleSymbol(item.title, item.description.slice(0, 300))?.symbol ?? "";
-        if (!symbol || !isValidTickerFormat(symbol)) continue;
-        if (!articleIsAboutSymbol(symbol, item.title, item.description.slice(0, 300))) continue;
+        const summary = item.description.slice(0, 300);
+        if (isNonStockArticle(item.title, summary)) continue;
+
+        // Prefer ticker named in headline; else attribute to a requested feed symbol
+        let symbol =
+          resolveArticleSymbol(item.title, summary)?.symbol ?? "";
+        if (!symbol || !isValidTickerFormat(symbol)) {
+          const matches = chunk.filter((s) =>
+            articleIsAboutSymbol(s, item.title, summary)
+          );
+          if (matches.length === 1) symbol = matches[0]!;
+          else continue;
+        } else if (!articleIsAboutSymbol(symbol, item.title, summary)) {
+          continue;
+        }
 
         const stamp = stampFromRssPubDate(item.pubDate);
         const id = `yh-${hashStr(key)}`;
@@ -127,7 +139,7 @@ export async function fetchYahooTickerNews(
           source: "Yahoo Finance",
           url: item.link || undefined,
           publishedAt: stamp.publishedAt,
-          summary: item.description.slice(0, 300),
+          summary,
           trace: { ...stamp.trace, providerItemId: id },
         });
       }

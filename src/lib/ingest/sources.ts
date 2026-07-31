@@ -3,12 +3,12 @@ import { fetchSecWireFilings } from "../news-sources/sec-edgar.ts";
 import { fetchGlobeNewswirePRs } from "../news-sources/globenewswire.ts";
 import { fetchBusinessWirePRs } from "../news-sources/businesswire.ts";
 import { fetchPrNewswirePRs } from "../news-sources/prnewswire.ts";
-import { fetchBenzingaApiNews } from "../news-sources/benzinga-api.ts";
 import {
   fetchFastMarketRssNews,
   fetchSlowMarketRssNews,
   fetchYahooTickerNews,
 } from "../news-sources/market-rss.ts";
+import { fetchPolygonNews } from "../news-sources/polygon-news.ts";
 import {
   fetchFinnhubMarketNewsForIngest,
   fetchFinnhubCompanyNewsForIngest,
@@ -16,47 +16,41 @@ import {
 import { getPriorityTickers } from "../priority-tickers.ts";
 import type { AdaptiveIntervals, SourceDefinition } from "./types.ts";
 
+/** Free issuer PR wires — primary realtime path (no paid news vendor). */
 const TIER0_INTERVALS: AdaptiveIntervals = {
-  premarket: 12_000,
-  regular: 10_000,
+  premarket: 10_000,
+  regular: 8_000,
+  afterhours: 20_000,
+  overnight: 60_000,
+};
+
+const SEC_INTERVALS: AdaptiveIntervals = {
+  premarket: 15_000,
+  regular: 12_000,
   afterhours: 30_000,
   overnight: 90_000,
 };
 
-/** Paid Benzinga wire — fastest licensed path (not free RSS). */
-const BENZINGA_INTERVALS: AdaptiveIntervals = {
-  premarket: 6_000,
-  regular: 5_000,
-  afterhours: 12_000,
-  overnight: 45_000,
-};
-
-const SEC_INTERVALS: AdaptiveIntervals = {
-  premarket: 20_000,
-  regular: 15_000,
-  afterhours: 45_000,
-  overnight: 120_000,
-};
-
+/** Finnhub + editorial RSS + Yahoo tickers — wire path with Tier 0. */
 const TIER1_INTERVALS: AdaptiveIntervals = {
-  premarket: 20_000,
-  regular: 15_000,
-  afterhours: 45_000,
-  overnight: 120_000,
+  premarket: 12_000,
+  regular: 10_000,
+  afterhours: 25_000,
+  overnight: 75_000,
 };
 
 const TIER2_INTERVALS: AdaptiveIntervals = {
-  premarket: 45_000,
-  regular: 40_000,
-  afterhours: 90_000,
-  overnight: 240_000,
+  premarket: 35_000,
+  regular: 30_000,
+  afterhours: 75_000,
+  overnight: 180_000,
 };
 
 const TIER3_INTERVALS: AdaptiveIntervals = {
-  premarket: 90_000,
-  regular: 75_000,
-  afterhours: 180_000,
-  overnight: 300_000,
+  premarket: 75_000,
+  regular: 60_000,
+  afterhours: 150_000,
+  overnight: 240_000,
 };
 
 const DEFAULT_CIRCUIT = { failureThreshold: 5, coolDownMs: 5 * 60_000 };
@@ -112,19 +106,6 @@ export const INGEST_SOURCES: SourceDefinition[] = [
     circuit: DEFAULT_CIRCUIT,
   },
   {
-    id: "benzinga_api",
-    name: "Benzinga API",
-    /** Tier 0 when keyed — primary Stock-Titan-class paid wire */
-    tier: 0,
-    provider: "benzinga_api",
-    partition: "tier0:bzapi",
-    featureFlag: "INGEST_SOURCE_BENZINGA_API_ENABLED",
-    requiresEnv: "BENZINGA_API_KEY",
-    intervals: BENZINGA_INTERVALS,
-    rateLimit: { max: 60, windowMs: 60_000 },
-    circuit: { failureThreshold: 4, coolDownMs: 2 * 60_000 },
-  },
-  {
     id: "finnhub_market",
     name: "Finnhub Market",
     tier: 1,
@@ -137,29 +118,62 @@ export const INGEST_SOURCES: SourceDefinition[] = [
     circuit: DEFAULT_CIRCUIT,
   },
   {
+    id: "rss_fast",
+    name: "Fast editorial RSS",
+    /** Wire-tier — MarketWatch/CNBC/Investing (no Benzinga). */
+    tier: 1,
+    provider: "rss_fast",
+    partition: "tier1:rss_fast",
+    featureFlag: "INGEST_SOURCE_RSS_FAST_ENABLED",
+    intervals: TIER1_INTERVALS,
+    rateLimit: { max: 20, windowMs: 60_000 },
+    circuit: DEFAULT_CIRCUIT,
+  },
+  {
+    id: "polygon_news",
+    name: "Polygon / Massive News",
+    /** Optional paid enrichment — vendor cadence is ~hourly on Stocks plans. */
+    tier: 1,
+    provider: "polygon",
+    partition: "tier1:polygon",
+    featureFlag: "INGEST_SOURCE_POLYGON_NEWS_ENABLED",
+    requiresEnv: "POLYGON_API_KEY",
+    intervals: {
+      premarket: 60_000,
+      regular: 60_000,
+      afterhours: 120_000,
+      overnight: 300_000,
+    },
+    rateLimit: { max: 20, windowMs: 60_000 },
+    circuit: DEFAULT_CIRCUIT,
+  },
+
+  {
     id: "finnhub_company",
     name: "Finnhub Company",
-    tier: 1,
+    /** Heavier per-symbol API — keep off the fast wire wake. */
+    tier: 2,
     provider: "finnhub",
-    partition: "tier1:fh_co",
+    partition: "tier2:fh_co",
     featureFlag: "INGEST_SOURCE_FINNHUB_COMPANY_ENABLED",
     requiresEnv: "FINNHUB_API_KEY",
     intervals: {
-      premarket: 45_000,
-      regular: 40_000,
-      afterhours: 90_000,
-      overnight: 180_000,
+      premarket: 35_000,
+      regular: 30_000,
+      afterhours: 75_000,
+      overnight: 150_000,
     },
     rateLimit: { max: 50, windowMs: 60_000 },
     circuit: DEFAULT_CIRCUIT,
   },
   {
-    id: "rss_fast",
-    name: "Fast editorial RSS",
+    id: "yahoo_ticker",
+    name: "Yahoo Finance tickers",
+    /** Rotating per-symbol RSS — breadth without blocking Tier 1. */
     tier: 2,
-    provider: "rss_fast",
-    partition: "tier2:rss_fast",
-    featureFlag: "INGEST_SOURCE_RSS_FAST_ENABLED",
+    provider: "yahoo",
+    partition: "tier2:yahoo",
+    featureFlag: "INGEST_SOURCE_YAHOO_TICKER_ENABLED",
     intervals: TIER2_INTERVALS,
     rateLimit: { max: 12, windowMs: 60_000 },
     circuit: DEFAULT_CIRCUIT,
@@ -171,17 +185,6 @@ export const INGEST_SOURCES: SourceDefinition[] = [
     provider: "rss_slow",
     partition: "tier3:rss_slow",
     featureFlag: "INGEST_SOURCE_RSS_SLOW_ENABLED",
-    intervals: TIER3_INTERVALS,
-    rateLimit: { max: 8, windowMs: 60_000 },
-    circuit: DEFAULT_CIRCUIT,
-  },
-  {
-    id: "yahoo_ticker",
-    name: "Yahoo Finance tickers",
-    tier: 3,
-    provider: "yahoo",
-    partition: "tier3:yahoo",
-    featureFlag: "INGEST_SOURCE_YAHOO_TICKER_ENABLED",
     intervals: TIER3_INTERVALS,
     rateLimit: { max: 10, windowMs: 60_000 },
     circuit: DEFAULT_CIRCUIT,
@@ -209,19 +212,19 @@ export async function fetchSourceArticles(
       return fetchBusinessWirePRs();
     case "pr_newswire":
       return fetchPrNewswirePRs();
-    case "benzinga_api":
-      return fetchBenzingaApiNews(80);
     case "finnhub_market":
       return fetchFinnhubMarketNewsForIngest();
     case "finnhub_company":
       return fetchFinnhubCompanyNewsForIngest();
     case "rss_fast":
       return fetchFastMarketRssNews();
+    case "polygon_news":
+      return fetchPolygonNews(50);
     case "rss_slow":
       return fetchSlowMarketRssNews();
     case "yahoo_ticker": {
       const priority = await getPriorityTickers();
-      return fetchYahooTickerNews(40, priority);
+      return fetchYahooTickerNews(24, priority.slice(0, 16));
     }
     default:
       return [];

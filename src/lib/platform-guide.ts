@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 30;
+export const PLATFORM_GUIDE_VERSION = 32;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -86,8 +86,8 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "news-feed",
     target: "news-feed",
     title: "Standard Feed",
-    body: "Collapsed rows show ticker, % move, direction (with icon), age, headline, then at most three context badges (risk · reaction · tradeability). Materiality and verification detail live in the Decision Drawer. Selected row uses a soft fill + left rail — not a bright outline.",
-    tip: "Press ? for shortcuts · Visual gallery: /gallery",
+    body: "Live stock news (last ~8 hours). Open a row: you get a plain Look / Wait / Skip call, live % move, and a 1-minute TradingView chart — then Event → Reaction → Risks. Duplicate stories collapse to one row.",
+    tip: "Press ? for shortcuts · Talk to founder (bottom-right) for help or requests",
   },
   {
     id: "visual-system",
@@ -171,6 +171,6 @@ export const DESK_GUIDE_STEPS: GuideStep[] = [
     id: "desk-feed",
     target: "news-feed",
     title: "Live feed",
-    body: "Same catalyst scanner with hotkeys. Expand rows for playbooks and paper stamps.",
+    body: "Same realtime stock-news scanner (last ~8 hours, deduped stories) with hotkeys. Expand rows for playbooks and paper stamps.",
   },
 ];

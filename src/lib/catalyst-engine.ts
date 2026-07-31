@@ -49,12 +49,17 @@ const LAST_GOOD_TTL_MS = 3 * 60 * 1000;
 
 const WIRE_BURST_MS = 3_000;
 const FULL_INGEST_MS = 45_000;
-const MAX_NEW_INGEST_PER_CYCLE = 30;
-const MAX_WIRE_BURST_NEW = 40;
-const INGEST_SCAN_WINDOW = 150;
+const MAX_NEW_INGEST_PER_CYCLE = 40;
+const MAX_WIRE_BURST_NEW = 80;
+const INGEST_SCAN_WINDOW = 180;
 const MAX_CATALYSTS_SHOWN = 300;
-const MAX_NEWS_AGE_MS = 24 * 60 * 60 * 1000;
-const RECENT_NEWS_MS = 45 * 60 * 1000;
+/** Feed shows session news only — not a day-old archive. */
+const FEED_MAX_AGE_MS = 8 * 60 * 60 * 1000;
+/** Keep DB rows longer for review / autopsy; feed eligibility uses FEED_MAX_AGE_MS. */
+const PURGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RECENT_NEWS_MS = 90 * 60 * 1000;
+/** Free RSS/PR publishers often lag a few minutes; keep wire path accepting them. */
+const WIRE_RECENT_MS = 45 * 60 * 1000;
 const FEED_CACHE_MS = isScaleMode() ? 1_500 : 2_500;
 
 /** Structural / relevance gates (no price requirement). */
@@ -63,7 +68,7 @@ function isFeedEligibleCatalyst(c: CatalystItem): boolean {
   if (!isLikelyStockNews(c.headline, c.aiSummary ?? undefined)) return false;
   if (!articleIsAboutSymbol(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
   if (isKnownFalsePositive(c.symbol, c.headline, c.aiSummary ?? undefined)) return false;
-  if (Date.now() - new Date(c.publishedAt).getTime() > MAX_NEWS_AGE_MS) return false;
+  if (Date.now() - new Date(c.publishedAt).getTime() > FEED_MAX_AGE_MS) return false;
   return true;
 }
 
@@ -202,7 +207,7 @@ async function enrichItemsWithQuotes(items: CatalystItem[]): Promise<CatalystIte
 async function purgeStaleCatalysts(): Promise<void> {
   try {
     await prisma.catalyst.deleteMany({
-      where: { publishedAt: { lt: new Date(Date.now() - MAX_NEWS_AGE_MS) } },
+      where: { publishedAt: { lt: new Date(Date.now() - PURGE_MAX_AGE_MS) } },
     });
   } catch {
     /* ignore */
@@ -226,8 +231,8 @@ export async function ingestAndAnalyzeNews(
       : await fetchMarketNews({ fast: options.fast !== false }));
   const results: CatalystItem[] = [];
   const quoteCache = new Map<string, Awaited<ReturnType<typeof fetchQuote>>>();
-  const cutoff = Date.now() - MAX_NEWS_AGE_MS;
-  const wireRecentCutoff = Date.now() - 8 * 60 * 1000;
+  const cutoff = Date.now() - FEED_MAX_AGE_MS;
+  const wireRecentCutoff = Date.now() - WIRE_RECENT_MS;
   const maxNew = wireOnly ? MAX_WIRE_BURST_NEW : MAX_NEW_INGEST_PER_CYCLE;
   const concurrency = wireOnly ? 15 : 5;
 
@@ -666,7 +671,7 @@ export async function ingestAndAnalyzeNews(
   const freshNews = news
     .filter((a) => a.publishedAt.getTime() >= cutoff)
     .filter((a) => !wireOnly || a.publishedAt.getTime() >= wireRecentCutoff)
-    .slice(0, wireOnly ? 80 : INGEST_SCAN_WINDOW);
+    .slice(0, wireOnly ? 140 : INGEST_SCAN_WINDOW);
 
   const ids = freshNews.map((a) => a.id);
   const existingIdSet = new Set<string>();
@@ -847,7 +852,7 @@ async function buildFeedFromDatabase(
   limit: number,
   moversOnly: boolean
 ): Promise<CatalystItem[]> {
-  const cutoff = new Date(Date.now() - MAX_NEWS_AGE_MS);
+  const cutoff = new Date(Date.now() - FEED_MAX_AGE_MS);
 
   if (Date.now() - lastPurgeTime > 60 * 60_000) {
     await purgeStaleCatalysts();
