@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 32;
+export const PLATFORM_GUIDE_VERSION = 34;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -34,7 +34,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "top-bar",
     target: "dashboard-top-bar",
     title: "Top bar",
-    body: "Logo, ticker search, market session, live connection, and your profile. Search filters the feed without leaving the page.",
+    body: "Logo, search, desk health (Live / Catching up), market session, stream connection, and your profile. Search filters the feed without leaving the page.",
+  },
+  {
+    id: "trust-status",
+    target: "trust-status",
+    title: "Desk health",
+    body: "Live = headlines updating. News age = last feed refresh. Scans ≈ how often the wire is polled. Headlines = count on the desk. Desk Xs = median processing time after a catch — not how old the press release is.",
+    tip: "Full status page: /status",
   },
   {
     id: "secondary-nav",
@@ -46,7 +53,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "connection",
     target: "connection-status",
     title: "Connection status",
-    body: "One compact line: Live · last event age. Click for source, stream, and fallback detail. Latency targets are never claimed achieved without production verification and enough samples.",
+    body: "Stream link to your browser: Live · last event age. Click for source and fallback detail. Separate from desk health (headline freshness).",
     tip: "Full status page: /status",
   },
   {
@@ -86,8 +93,8 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "news-feed",
     target: "news-feed",
     title: "Standard Feed",
-    body: "Live stock news (last ~8 hours). Open a row: you get a plain Look / Wait / Skip call, live % move, and a 1-minute TradingView chart — then Event → Reaction → Risks. Duplicate stories collapse to one row.",
-    tip: "Press ? for shortcuts · Talk to founder (bottom-right) for help or requests",
+    body: "Live stock news (last ~8 hours). Click / focus a row: a live 1-minute TradingView chart docks under the feed. Press Enter for the Decision Drawer (Look/Wait/Skip + full chart). Risk → Heavy Volume scans liquid names, not just headlines.",
+    tip: "T opens full TradingView · Enter opens Decision Drawer · Talk to founder (bottom-right)",
   },
   {
     id: "visual-system",
@@ -99,14 +106,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "plan",
     target: "plan-destination",
     title: "Plan",
-    body: "Session Plan lists review candidates (with direction + materiality) and capital-caution names — not long/short buy instructions. Deep link: /dashboard?view=plan or /today.",
+    body: "Session Plan: news review candidates + capital caution, plus a Liquid tape strip of heavy-volume / session movers from the broader tradeable universe (not only headlines). Deep link: /dashboard?view=plan.",
     requiresExtras: true,
   },
   {
     id: "risk",
     target: "risk-destination",
     title: "Risk",
-    body: "Dilution radar, wire & volume, and halt references. Offerings and structural risk stay evidence-linked. Deep link: /dashboard?view=risk or ?panel=dilution.",
+    body: "Dilution radar (SEC offerings) + Wire & Heavy Volume across liquid US names with a live TradingView chart when you click a ticker. Deep link: /dashboard?view=risk.",
     requiresExtras: true,
   },
   {

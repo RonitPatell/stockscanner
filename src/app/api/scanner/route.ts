@@ -29,7 +29,7 @@ async function loadCatalystHints(): Promise<CatalystScanHint[]> {
         publishedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
       orderBy: { publishedAt: "desc" },
-      take: 40,
+      take: 120,
     });
     catalystHints = catalystHints.filter(
       (h) =>

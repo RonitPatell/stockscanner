@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardList, ListX, Target } from "lucide-react";
+import { Activity, ClipboardList, ListX, Target } from "lucide-react";
 import { cn, formatPercent } from "@/lib/utils";
+import { tradingViewUrl } from "@/lib/chart-links";
 
 interface Setup {
   symbol: string;
@@ -30,9 +31,17 @@ interface Skip {
   topRiskLabel?: string | null;
 }
 
+interface TapeName {
+  symbol: string;
+  changePercent: number;
+  rVol: number | null;
+  reason: string;
+}
+
 export function SessionPlanCard({ className }: { className?: string }) {
   const [setups, setSetups] = useState<Setup[]>([]);
   const [skips, setSkips] = useState<Skip[]>([]);
+  const [tape, setTape] = useState<TapeName[]>([]);
   const [mantra, setMantra] = useState("");
 
   useEffect(() => {
@@ -42,12 +51,13 @@ export function SessionPlanCard({ className }: { className?: string }) {
         if (!d) return;
         setSetups(d.setups ?? []);
         setSkips(d.skips ?? []);
+        setTape(d.tapeAttention ?? []);
         setMantra(d.mantra ?? "");
       })
       .catch(() => {});
   }, []);
 
-  if (setups.length === 0 && skips.length === 0) return null;
+  if (setups.length === 0 && skips.length === 0 && tape.length === 0) return null;
 
   return (
     <div
@@ -119,6 +129,42 @@ export function SessionPlanCard({ className }: { className?: string }) {
           ))}
         </div>
       </div>
+      {tape.length > 0 && (
+        <div className="border-t border-violet-500/10 p-2 space-y-1.5">
+          <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-emerald-300/90 px-1">
+            <Activity className="w-3 h-3" /> Liquid tape (not news-only)
+          </div>
+          <div className="grid sm:grid-cols-2 gap-1.5">
+            {tape.map((t) => (
+              <a
+                key={t.symbol}
+                href={tradingViewUrl(t.symbol)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-zinc-800 bg-zinc-950/50 px-2 py-1.5 hover:border-emerald-500/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="font-mono font-bold text-white">{t.symbol}</span>
+                  <span
+                    className={cn(
+                      "font-mono text-[10px]",
+                      t.changePercent >= 0 ? "text-emerald-400" : "text-red-400"
+                    )}
+                  >
+                    {formatPercent(t.changePercent)}
+                  </span>
+                  {t.rVol != null && t.rVol > 0 && (
+                    <span className="text-[9px] text-amber-300/90">
+                      {t.rVol.toFixed(1)}× RVol
+                    </span>
+                  )}
+                </div>
+                <p className="text-[9px] text-zinc-500 mt-0.5">{t.reason}</p>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {mantra && (
         <p className="px-3 py-1.5 text-[9px] text-violet-400/70 border-t border-violet-500/10 italic">
           {mantra}

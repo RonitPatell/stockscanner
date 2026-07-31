@@ -6,6 +6,7 @@ import { BrandHomeLink } from "../BrandHomeLink";
 import { UserMenu } from "../UserMenu";
 import { ConnectionStatusCompact } from "./ConnectionStatusCompact";
 import { MarketSessionBadge } from "./MarketSessionBadge";
+import { TrustStatusBar } from "../TrustStatusBar";
 import { cn } from "@/lib/utils";
 
 export function DashboardTopBar({
@@ -30,7 +31,7 @@ export function DashboardTopBar({
       <div className="max-w-[1680px] mx-auto px-3 sm:px-4 h-12 flex items-center gap-2 sm:gap-3">
         <BrandHomeLink />
 
-        <label className="flex-1 min-w-0 max-w-md relative">
+        <label className="flex-1 min-w-0 max-w-xs lg:max-w-md relative">
           <span className="sr-only">Search tickers</span>
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
           <input
@@ -42,19 +43,21 @@ export function DashboardTopBar({
           />
         </label>
 
+        <TrustStatusBar className="hidden sm:flex flex-1 min-w-0 overflow-x-auto" />
+
         <MarketSessionBadge />
         <ConnectionStatusCompact lastEventAt={lastEventAt} />
 
         <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
           <Link
             href="/desk"
-            className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden md:inline transition-colors"
+            className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden xl:inline transition-colors"
           >
             Prop Desk
           </Link>
           <Link
             href="/status"
-            className="text-[11px] text-zinc-500 hover:text-zinc-300 hidden lg:inline"
+            className="text-[11px] text-zinc-500 hover:text-zinc-300 hidden xl:inline"
           >
             Status
           </Link>

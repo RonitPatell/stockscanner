@@ -1,7 +1,8 @@
 /** Catalyst Feed V3 — presentation-only; does not change classification. */
 export const CATALYST_FEED_V3_VERSION = "catalyst-feed-v3.0";
 
-export const FEED_V3_PREFS_KEY = "tt-catalyst-feed-v3-prefs";
+/** Bump key when default visibility of core columns changes (forces fresh defaults). */
+export const FEED_V3_PREFS_KEY = "tt-catalyst-feed-v3-prefs-v2";
 
 export type DirectionalImplication =
   | "Positive"
@@ -20,13 +21,14 @@ export type FeedV3DisplayPrefs = {
 };
 
 export const DEFAULT_FEED_V3_PREFS: FeedV3DisplayPrefs = {
-  showFloat: false,
-  showMarketCap: false,
+  showFloat: true,
+  showMarketCap: true,
   showSentimentScore: false,
   showGapperLabel: false,
   showAllRisks: false,
   showInternalSourceName: false,
-  showGradeColumn: false,
+  /** Desk letter A–F from materiality / stage / risk */
+  showGradeColumn: true,
 };
 
 /** Semantic colour tokens — CSS-var backed; never colour-only (pair with text/icons). */

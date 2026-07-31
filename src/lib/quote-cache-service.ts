@@ -330,6 +330,9 @@ export async function seedCachedQuote(
         : existing?.rVol ??
           computeRvol(patch.volume ?? existing?.volume, patch.avgVolume ?? existing?.avgVolume) ??
           estimateRvolFromMove(patch.changePercent),
+    floatShares: patch.floatShares ?? existing?.floatShares,
+    marketCap: patch.marketCap ?? existing?.marketCap,
+    dayHigh: patch.dayHigh ?? existing?.dayHigh,
   };
   await persistQuotes({ [sym]: merged });
 }
@@ -342,19 +345,34 @@ export function mergeQuotesIntoFeed<
     rVol?: number | null;
     volume?: number | null;
     avgVolume?: number | null;
+    floatShares?: number | null;
+    marketCap?: number | null;
   },
 >(items: T[], quotes: Record<string, CachedQuote>): T[] {
   if (!Object.keys(quotes).length) return items;
   return items.map((c) => {
     const q = quotes[c.symbol.toUpperCase()] ?? quotes[c.symbol];
     if (!q) return c;
+    const hasPrice = q.price != null && q.price > 0;
     return {
       ...c,
-      price: q.price,
-      changePercent: q.changePercent,
+      price: hasPrice ? q.price : c.price,
+      changePercent: hasPrice ? q.changePercent : c.changePercent,
       rVol: q.rVol != null ? q.rVol : c.rVol,
       volume: q.volume ?? c.volume,
       avgVolume: q.avgVolume ?? c.avgVolume,
+      floatShares:
+        q.floatShares != null && q.floatShares > 0
+          ? q.floatShares
+          : c.floatShares != null && c.floatShares > 0
+            ? c.floatShares
+            : q.floatShares ?? c.floatShares,
+      marketCap:
+        q.marketCap != null && q.marketCap > 0
+          ? q.marketCap
+          : c.marketCap != null && c.marketCap > 0
+            ? c.marketCap
+            : q.marketCap ?? c.marketCap,
     };
   });
 }

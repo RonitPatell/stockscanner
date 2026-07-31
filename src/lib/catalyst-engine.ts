@@ -150,6 +150,93 @@ async function resolveIngestQuote(
   return live;
 }
 
+function positiveNum(n: number | null | undefined): number | undefined {
+  return n != null && Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+type QuoteMap = Record<
+  string,
+  Awaited<ReturnType<typeof getCachedQuotes>>[string]
+>;
+
+/** Apply already-cached profiles onto a quote map (no network). */
+async function mergeCachedProfilesIntoQuotes(
+  symbols: string[],
+  quotesIn: QuoteMap
+): Promise<QuoteMap> {
+  const quotes = { ...quotesIn };
+  const profiles = await getCachedProfiles(symbols);
+  for (const sym of symbols) {
+    const p = profiles[sym];
+    if (!p) continue;
+    const float =
+      positiveNum(quotes[sym]?.floatShares) ?? positiveNum(p.floatShares);
+    const mcap =
+      positiveNum(quotes[sym]?.marketCap) ?? positiveNum(p.marketCap);
+    if (!float && !mcap) continue;
+    if (quotes[sym]) {
+      quotes[sym] = {
+        ...quotes[sym],
+        floatShares: float ?? quotes[sym].floatShares,
+        marketCap: mcap ?? quotes[sym].marketCap,
+      };
+    } else {
+      quotes[sym] = {
+        price: 0,
+        changePercent: 0,
+        change: 0,
+        floatShares: float,
+        marketCap: mcap,
+      };
+    }
+  }
+  return quotes;
+}
+
+/**
+ * Merge float/mcap from profiles. Cached profiles are always applied;
+ * network refresh is optional and capped so feed rebuilds stay fast.
+ */
+async function attachProfilesToQuotes(
+  symbols: string[],
+  quotesIn: QuoteMap,
+  opts: { fetchMissing?: boolean; fetchLimit?: number } = {}
+): Promise<QuoteMap> {
+  const fetchMissing = opts.fetchMissing !== false;
+  const fetchLimit = opts.fetchLimit ?? 24;
+  let quotes = await mergeCachedProfilesIntoQuotes(symbols, quotesIn);
+  if (!fetchMissing) return quotes;
+
+  const needProfiles = symbols.filter(
+    (s) =>
+      !positiveNum(quotes[s]?.floatShares) || !positiveNum(quotes[s]?.marketCap)
+  );
+  if (needProfiles.length === 0) return quotes;
+
+  await refreshProfileCache(needProfiles.slice(0, fetchLimit));
+  return mergeCachedProfilesIntoQuotes(symbols, quotes);
+}
+
+/** After feed write — refresh missing profiles and patch float/mcap in place. */
+function scheduleFeedProfileBackfill(symbols: string[]): void {
+  if (symbols.length === 0) return;
+  void (async () => {
+    const need = symbols.slice(0, 40);
+    await refreshProfileCache(need);
+    const [{ items: all }, { items: movers }] = await Promise.all([
+      getCachedFeed("all"),
+      getCachedFeed("movers"),
+    ]);
+    if (all.length === 0 && movers.length === 0) return;
+    let quotes = await getCachedQuotes(need);
+    quotes = await mergeCachedProfilesIntoQuotes(need, quotes);
+    await writeMergedFeeds(
+      mergeQuotesIntoFeed(all, quotes),
+      mergeQuotesIntoFeed(movers, quotes)
+    );
+  })().catch(() => {});
+}
+
 async function enrichItemsWithQuotes(items: CatalystItem[]): Promise<CatalystItem[]> {
   if (items.length === 0) return items;
   const symbols = [...new Set(items.map((c) => c.symbol))];
@@ -165,37 +252,40 @@ async function enrichItemsWithQuotes(items: CatalystItem[]): Promise<CatalystIte
       await refreshQuoteVolumes(stillNeedRvol.slice(0, 16));
       quotes = { ...(await getCachedQuotes(symbols)) };
     }
-    const needProfiles = symbols.filter((s) => !quotes[s]?.floatShares);
-    if (needProfiles.length > 0) {
-      await refreshProfileCache(needProfiles.slice(0, 12));
-      const profiles = await getCachedProfiles(symbols);
-      for (const sym of symbols) {
-        const p = profiles[sym];
-        if (p && quotes[sym]) {
-          quotes[sym] = { ...quotes[sym], floatShares: p.floatShares, marketCap: p.marketCap };
-        }
-      }
-    }
   }
+
+  quotes = await attachProfilesToQuotes(symbols, quotes, {
+    fetchMissing: true,
+    fetchLimit: 20,
+  });
+
   return items.map((c) => {
     const q = quotes[c.symbol];
-    if (!q?.price) return c;
+    if (!q) return c;
+    const hasPrice = q.price != null && q.price > 0;
+    const float = positiveNum(q.floatShares) ?? positiveNum(c.floatShares) ?? null;
+    const mcap = positiveNum(q.marketCap) ?? positiveNum(c.marketCap) ?? null;
     const enriched = {
       ...c,
-      price: q.price,
-      changePercent: q.changePercent,
+      price: hasPrice ? q.price : c.price,
+      changePercent: hasPrice ? q.changePercent : c.changePercent,
       rVol: q.rVol ?? c.rVol,
       volume: q.volume ?? c.volume,
       avgVolume: q.avgVolume ?? c.avgVolume,
+      floatShares: float,
+      marketCap: mcap,
     };
     void prisma.catalyst
       .update({
         where: { id: c.id },
         data: {
-          price: q.price,
-          changePercent: q.changePercent,
+          ...(hasPrice
+            ? { price: q.price, changePercent: q.changePercent }
+            : {}),
           ...(q.volume != null ? { volume: q.volume } : {}),
           ...(q.avgVolume != null ? { avgVolume: q.avgVolume } : {}),
+          ...(float != null ? { floatShares: float } : {}),
+          ...(mcap != null ? { marketCap: mcap } : {}),
         },
       })
       .catch(() => {});
@@ -956,7 +1046,11 @@ async function prependToPublicFeedCache(newItems: CatalystItem[]): Promise<void>
   if (displayable.length === 0) return;
 
   const symbols = [...new Set(displayable.map((c) => c.symbol))];
-  const quotes = await getCachedQuotes(symbols);
+  let quotes = await getCachedQuotes(symbols);
+  quotes = await attachProfilesToQuotes(symbols, quotes, {
+    fetchMissing: true,
+    fetchLimit: 16,
+  });
   const withQuotes = mergeQuotesIntoFeed(displayable, quotes);
 
   const [{ items: existingAll }, { items: existingMovers }] = await Promise.all([
@@ -994,6 +1088,8 @@ export async function refreshPublicFeedCache(): Promise<void> {
       quotes = await getCachedQuotes(symbols);
     }
   }
+  // Cached profiles only — network fetch runs async so health stays Live
+  quotes = await attachProfilesToQuotes(symbols, quotes, { fetchMissing: false });
 
   const mergedAll = mergeQuotesIntoFeed(allItems, quotes).filter(isDisplayableCatalyst);
   const mergedMovers = mergeQuotesIntoFeed(moverItems, quotes).filter(isDisplayableCatalyst);
@@ -1006,6 +1102,7 @@ export async function refreshPublicFeedCache(): Promise<void> {
   void markTracesSsePublished(
     [...new Set([...mergedAll, ...mergedMovers].map((c) => c.id))]
   ).catch(() => {});
+  scheduleFeedProfileBackfill(symbols);
 }
 
 export async function getCatalysts(

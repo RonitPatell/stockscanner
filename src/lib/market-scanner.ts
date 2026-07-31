@@ -9,12 +9,18 @@ import { fetchQuoteTrusted, fetchVolumeForSymbol } from "./market-data";
 import { seedCachedQuote } from "./quote-cache-service";
 import { isValidTickerFormat } from "./ticker-utils";
 import { isKnownFalsePositive } from "./news-verifier";
-import { getNextTickerBatch } from "./news-sources/active-tickers";
+import {
+  ACTIVE_US_TICKERS,
+  getNextTickerBatch,
+} from "./news-sources/active-tickers";
+import { getActiveCoverageSymbols } from "./coverage/coverage-service";
 import { getRedis } from "./redis";
 
-const MAX_LIVE_QUOTES = 8;
-const MAX_CANDLE_LOOKUPS = 8;
-const VOLUME_LEADERS_SHOWN = 10;
+/** Quote breadth for Risk → Wire & Volume (liquid universe, not news-only). */
+const MAX_LIVE_QUOTES = 48;
+const MAX_CANDLE_LOOKUPS = 36;
+const VOLUME_LEADERS_SHOWN = 30;
+const ROTATING_BATCH = 64;
 const SCAN_CACHE_MS = 60_000;
 const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
 const MAX_ALERTS = 80;
@@ -387,22 +393,34 @@ async function runFullScan(
     if (q) quoteMap.set(hint.symbol, q);
   }
 
+  let coverage: string[] = [];
+  try {
+    coverage = await getActiveCoverageSymbols(120);
+  } catch {
+    coverage = [];
+  }
+
   const symbolOrder = [
     ...new Set([
       ...hints.map((h) => h.symbol),
-      ...extraSymbols,
-      // Rotate liquid names so Heavy Volume isn't news-only
-      ...getNextTickerBatch(12),
+      ...extraSymbols.map((s) => s.toUpperCase()),
+      ...coverage.map((s) => s.toUpperCase()),
+      // Rotate liquid tradeable names — Risk is not news-feed-only
+      ...getNextTickerBatch(ROTATING_BATCH),
+      ...ACTIVE_US_TICKERS.slice(0, 40),
     ]),
-  ];
+  ].filter((s) => isValidTickerFormat(s));
 
-  for (const symbol of symbolOrder) {
-    if (quoteMap.has(symbol)) continue;
-    if (liveFetches >= MAX_LIVE_QUOTES) break;
-    const q = await fetchQuoteTrusted(symbol);
-    liveFetches++;
-    if (q) quoteMap.set(symbol, q);
-  }
+  const needQuotes = symbolOrder
+    .filter((s) => !quoteMap.has(s))
+    .slice(0, Math.max(0, MAX_LIVE_QUOTES - liveFetches));
+
+  await Promise.all(
+    needQuotes.map(async (symbol) => {
+      const q = await fetchQuoteTrusted(symbol);
+      if (q) quoteMap.set(symbol, q);
+    })
+  );
 
   const quotes = [...quoteMap.values()].sort(
     (a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)

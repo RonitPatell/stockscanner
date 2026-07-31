@@ -6,6 +6,7 @@ import {
   presentJudgment,
 } from "../judgment/present.ts";
 import { buildJudgmentV2 } from "../judgment/build-v2.ts";
+import { computeDeskRating } from "../desk-rating.ts";
 import type {
   DirectionalImplication,
   FeedV3DisplayPrefs,
@@ -36,8 +37,10 @@ export interface CatalystFeedRowV3Model {
     gapper: boolean;
     allRiskLabels: string[];
     internalSource: string | null;
-    /** Legacy grade — only when advanced pref on; never primary */
+    /** Desk letter A–F from materiality / stage / risk */
     gradeLabel: string | null;
+    gradeLetter: string | null;
+    gradeWhy: string | null;
   };
   /** Fingerprint of display-relevant fields for SSE merge */
   presentationFingerprint: string;
@@ -71,7 +74,7 @@ function verificationLabel(c: CatalystItem, modelConfidence: string | null): str
 }
 
 function formatFloat(n: number | null | undefined): string | null {
-  if (n == null || !Number.isFinite(n)) return null;
+  if (n == null || !Number.isFinite(n) || n <= 0) return null;
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B float`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M float`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K float`;
@@ -79,7 +82,7 @@ function formatFloat(n: number | null | undefined): string | null {
 }
 
 function formatMcap(n: number | null | undefined): string | null {
-  if (n == null || !Number.isFinite(n)) return null;
+  if (n == null || !Number.isFinite(n) || n <= 0) return null;
   if (n >= 1e9) return `$${((n as number) / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `$${((n as number) / 1e6).toFixed(0)}M`;
   return `$${Math.round(n as number)}`;
@@ -187,9 +190,37 @@ export function projectCatalystFeedRowV3(
         ? activeRisks.map((r) => r.label)
         : [],
       internalSource: prefs.showInternalSourceName ? (c.source ?? null) : null,
-      gradeLabel: prefs.showGradeColumn
-        ? `Legacy ${c.judgmentV2?.grade ?? "—"} (compat)`
-        : null,
+      ...(() => {
+        if (!prefs.showGradeColumn) {
+          return {
+            gradeLabel: null as string | null,
+            gradeLetter: null as string | null,
+            gradeWhy: null as string | null,
+          };
+        }
+        const rating = computeDeskRating({
+          catalystStrength:
+            c.judgmentV2?.catalystStrength ?? judgment.catalystStrength ?? null,
+          directionalImplication:
+            c.judgmentV2?.directionalImplication ??
+            judgment.directionalImplication ??
+            null,
+          reactionStage: model.reactionStage.stage,
+          tradeability: model.tradeability.liquidity,
+          highRisk: activeRisks.some((r) => r.severity === "high"),
+          dilutionRisk: activeRisks.some((r) =>
+            /dilut|offering/i.test(r.label)
+          ),
+          changePercent: c.changePercent,
+          floatShares: c.floatShares,
+          hasJudgment: Boolean(c.judgmentV2 ?? judgment),
+        });
+        return {
+          gradeLabel: `${rating.letter} · ${rating.label}`,
+          gradeLetter: rating.letter,
+          gradeWhy: rating.why,
+        };
+      })(),
     },
     presentationFingerprint: fp,
   };

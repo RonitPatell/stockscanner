@@ -8,6 +8,10 @@ import {
   type FeedV3DisplayPrefs,
   type DirectionalImplication,
 } from "@/lib/catalyst-feed-v3";
+import {
+  deskRatingBadgeClass,
+  type DeskLetter,
+} from "@/lib/desk-rating";
 import { selectCollapsedContextBadges } from "@/lib/visual-system";
 import { cn } from "@/lib/utils";
 
@@ -132,6 +136,22 @@ export function CatalystFeedRowV3({
           <DirectionIcon direction={row.direction} />
           <span>{row.direction}</span>
         </span>
+        {row.extras.gradeLetter && (
+          <span
+            className={cn(
+              "ml-1 inline-flex items-center justify-center min-w-[1.35rem] h-5 px-1 rounded border text-[10px] font-bold shrink-0",
+              deskRatingBadgeClass(row.extras.gradeLetter as DeskLetter)
+            )}
+            title={
+              row.extras.gradeWhy
+                ? `${row.extras.gradeLabel} — ${row.extras.gradeWhy}`
+                : row.extras.gradeLabel ?? undefined
+            }
+            data-testid="desk-grade"
+          >
+            {row.extras.gradeLetter}
+          </span>
+        )}
         <span className={cn("ml-auto tt-num shrink-0 tt-meta")}>
           {row.ageLabel}
         </span>
@@ -160,19 +180,19 @@ export function CatalystFeedRowV3({
         ))}
       </div>
 
-      {/* Advanced prefs extras — still secondary density */}
-      {(row.extras.gradeLabel ||
-        row.extras.floatLabel ||
+      {/* Float / mcap / grade label — scan-critical size data */}
+      {(row.extras.floatLabel ||
         row.extras.marketCapLabel ||
+        row.extras.gradeLabel ||
         row.extras.sentimentScore != null ||
         row.extras.gapper ||
         row.extras.internalSource ||
         row.extras.allRiskLabels.length > 0) && (
         <p className="mt-1 tt-meta">
           {[
-            row.extras.gradeLabel,
             row.extras.floatLabel,
             row.extras.marketCapLabel,
+            row.extras.gradeLabel,
             row.extras.sentimentScore != null
               ? `Sentiment ${row.extras.sentimentScore}`
               : null,

@@ -18,6 +18,7 @@ import type { EarningsEvent, MarketAlert, MarketScannerSnapshot, VolumeLeader } 
 import { cn, formatPercent, formatPrice } from "@/lib/utils";
 import { tradingViewUrl } from "@/lib/chart-links";
 import { pickLiveField, useLiveQuotes, useRegisterLiveSymbols, type LiveQuote } from "./LiveQuoteProvider";
+import { TradingViewMiniChart } from "./TradingViewMiniChart";
 
 const SESSION_LABELS = {
   premarket: "Pre-Market",
@@ -521,6 +522,21 @@ function VolumePanel({
   session: MarketScannerSnapshot["marketSession"];
   liveQuotes: Record<string, LiveQuote>;
 } & PanelExpandProps) {
+  const [chartSymbol, setChartSymbol] = useState<string | null>(
+    leaders[0]?.symbol ?? null
+  );
+
+  useEffect(() => {
+    if (!chartSymbol && leaders[0]?.symbol) setChartSymbol(leaders[0].symbol);
+    if (
+      chartSymbol &&
+      leaders.length > 0 &&
+      !leaders.some((l) => l.symbol === chartSymbol)
+    ) {
+      setChartSymbol(leaders[0]!.symbol);
+    }
+  }, [leaders, chartSymbol]);
+
   return (
     <PanelShell
       title="Heavy Volume"
@@ -531,6 +547,14 @@ function VolumePanel({
       onExpand={onExpand}
       onMinimize={onMinimize}
     >
+      {chartSymbol && (
+        <div className="shrink-0 border-b border-[--border] px-2 pt-2 pb-1">
+          <p className="px-1 pb-1 text-[10px] text-[--text-muted]">
+            Live chart · click a ticker below · liquid universe (not news-only)
+          </p>
+          <TradingViewMiniChart symbol={chartSymbol} height={200} />
+        </div>
+      )}
       <div className="hidden sm:grid grid-cols-[70px_56px_50px_1fr_48px] gap-2 px-4 py-2 border-b border-[--border] text-[11px] uppercase tracking-widest text-[--text-muted] font-semibold shrink-0">
         <span>Ticker</span>
         <span className="text-center">Chg</span>
@@ -556,6 +580,8 @@ function VolumePanel({
               leader={leader}
               liveQuotes={liveQuotes}
               expanded={expanded}
+              active={chartSymbol === leader.symbol}
+              onSelect={() => setChartSymbol(leader.symbol)}
             />
           ))
         )}
@@ -568,10 +594,14 @@ function VolumeRow({
   leader,
   liveQuotes,
   expanded,
+  active,
+  onSelect,
 }: {
   leader: VolumeLeader;
   liveQuotes: Record<string, LiveQuote>;
   expanded?: boolean;
+  active?: boolean;
+  onSelect?: () => void;
 }) {
   const price = pickLiveField(leader.symbol, liveQuotes, "price", leader.price) ?? leader.price;
   const change =
@@ -583,8 +613,18 @@ function VolumeRow({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect?.();
+        }
+      }}
       className={cn(
-        "grid grid-cols-[70px_56px_50px_1fr_48px] gap-2 items-center px-4 py-2.5 border-b border-[--border] hover:bg-white/[0.025] transition-colors"
+        "grid grid-cols-[70px_56px_50px_1fr_48px] gap-2 items-center px-4 py-2.5 border-b border-[--border] hover:bg-white/[0.025] transition-colors cursor-pointer",
+        active && "bg-emerald-500/10 border-l-2 border-l-emerald-400"
       )}
     >
       <div>
@@ -592,6 +632,7 @@ function VolumeRow({
           href={tradingViewUrl(leader.symbol)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="font-mono font-bold text-[14px] text-white hover:text-[--accent-bright] transition-colors"
         >
           {leader.symbol}

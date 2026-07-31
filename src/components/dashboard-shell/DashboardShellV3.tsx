@@ -33,6 +33,7 @@ import { FocusModeV2 } from "../focus/FocusModeV2";
 import { DashboardTopBar } from "./DashboardTopBar";
 import { DashboardSecondaryNav } from "./DashboardSecondaryNav";
 import { CatalystContextDrawer } from "./CatalystContextDrawer";
+import { SelectedTapeChart } from "../SelectedTapeChart";
 import {
   destinationFromSearchParams,
   type DashboardDestination,
@@ -376,6 +377,15 @@ export function DashboardShellV3({
                   onCatalystActivate={openDrawerFor}
                   focusCatalystId={drawerOpen ? selected?.id ?? null : null}
                 />
+                {selected && (
+                  <div className="shrink-0 border-t border-[var(--border)] p-2">
+                    <SelectedTapeChart
+                      symbol={selected.symbol}
+                      headline={selected.headline}
+                      onOpenDetails={() => openDrawerFor(selected)}
+                    />
+                  </div>
+                )}
               </section>
             )}
 
@@ -402,6 +412,15 @@ export function DashboardShellV3({
                     onCatalystActivate={openDrawerFor}
                     focusCatalystId={drawerOpen ? selected?.id ?? null : null}
                   />
+                  {selected && (
+                    <div className="shrink-0 border-t border-[var(--border)] p-2">
+                      <SelectedTapeChart
+                        symbol={selected.symbol}
+                        headline={selected.headline}
+                        onOpenDetails={() => openDrawerFor(selected)}
+                      />
+                    </div>
+                  )}
                 </section>
                 <WatchlistAutopsy symbols={initialWatchlist} />
               </section>

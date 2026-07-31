@@ -1,7 +1,17 @@
 import { getCachedFeed } from "@/lib/feed-cache";
 import { buildActionPlaybook, isDilutionCatalyst } from "@/lib/action-playbook";
 import { presentJudgment, presentSessionBias } from "@/lib/judgment/present";
+import { getCachedScannerSnapshot } from "@/lib/market-scanner";
 import type { CatalystItem } from "@/types";
+
+/** Liquid / heavy-volume names from the market scanner (not news-only). */
+export interface SessionTapeName {
+  symbol: string;
+  changePercent: number;
+  rVol: number | null;
+  price: number | null;
+  reason: string;
+}
 
 export interface SessionSetup {
   symbol: string;
@@ -37,6 +47,8 @@ export interface SessionPlan {
   generatedAt: string;
   setups: SessionSetup[];
   skips: SessionSkip[];
+  /** Session movers / heavy volume across the liquid universe */
+  tapeAttention: SessionTapeName[];
   mantra: string;
 }
 
@@ -110,13 +122,13 @@ export async function buildSessionPlan(): Promise<SessionPlan> {
       };
     });
 
-  const setupSymbols = new Set(setups.map((s) => s.symbol.toUpperCase()));
+  const setupOnly = new Set(setups.map((s) => s.symbol.toUpperCase()));
 
   const skips = uniqueBySymbol(
     scored
       .filter(
         ({ playbook, c }) =>
-          !setupSymbols.has(c.symbol.toUpperCase()) &&
+          !setupOnly.has(c.symbol.toUpperCase()) &&
           (playbook.bias === "avoid" ||
             playbook.antiFomoScore >= 75 ||
             isDilutionCatalyst(c))
@@ -139,11 +151,35 @@ export async function buildSessionPlan(): Promise<SessionPlan> {
       };
     });
 
+  const planSymbols = new Set([
+    ...setups.map((s) => s.symbol.toUpperCase()),
+    ...skips.map((s) => s.symbol.toUpperCase()),
+  ]);
+
+  const scanner = await getCachedScannerSnapshot();
+  const tapeAttention: SessionTapeName[] = (scanner?.volumeLeaders ?? [])
+    .filter((l) => !planSymbols.has(l.symbol.toUpperCase()))
+    .filter((l) => Math.abs(l.changePercent) >= 1.5 || (l.rVol ?? 0) >= 2)
+    .slice(0, 12)
+    .map((l) => ({
+      symbol: l.symbol,
+      changePercent: l.changePercent,
+      rVol: l.rVol ?? null,
+      price: l.price ?? null,
+      reason:
+        (l.rVol ?? 0) >= 3
+          ? "Heavy relative volume"
+          : Math.abs(l.changePercent) >= 4
+            ? "Session mover"
+            : "Active tape",
+    }));
+
   return {
     generatedAt: new Date().toISOString(),
     setups,
     skips,
+    tapeAttention,
     mantra:
-      "Review material events. Separate direction from attention. Prefer caution over FOMO.",
+      "Review material events. Watch liquid tape even without a headline. Prefer caution over FOMO.",
   };
 }

@@ -113,13 +113,31 @@ export async function GET(req: NextRequest) {
 
       for (const sym of symbols) {
         const p = profiles[sym];
+        if (!p) continue;
         const q = quotes[sym];
-        if (!p || !q) continue;
-        quotes[sym] = {
-          ...q,
-          floatShares: p.floatShares,
-          marketCap: p.marketCap,
-        };
+        const float =
+          (q?.floatShares != null && q.floatShares > 0
+            ? q.floatShares
+            : null) ??
+          (p.floatShares > 0 ? p.floatShares : undefined);
+        const mcap =
+          (q?.marketCap != null && q.marketCap > 0 ? q.marketCap : null) ??
+          (p.marketCap > 0 ? p.marketCap : undefined);
+        if (q) {
+          quotes[sym] = {
+            ...q,
+            floatShares: float ?? q.floatShares,
+            marketCap: mcap ?? q.marketCap,
+          };
+        } else if (float != null || mcap != null) {
+          quotes[sym] = {
+            price: 0,
+            changePercent: 0,
+            change: 0,
+            floatShares: float,
+            marketCap: mcap,
+          };
+        }
       }
     }
 

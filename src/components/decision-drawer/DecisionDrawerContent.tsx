@@ -367,6 +367,14 @@ export function DecisionDrawerContent({
   const floatShares = drawerField(model.tradeability.floatShares, {
     compact: true,
   });
+  const marketCapLabel =
+    catalyst.marketCap != null && Number.isFinite(catalyst.marketCap)
+      ? catalyst.marketCap >= 1e9
+        ? `$${(catalyst.marketCap / 1e9).toFixed(1)}B`
+        : catalyst.marketCap >= 1e6
+          ? `$${(catalyst.marketCap / 1e6).toFixed(0)}M`
+          : `$${Math.round(catalyst.marketCap)}`
+      : null;
   const dayChange = drawerField(model.identity.changePercent, {
     digits: 2,
     suffix: "%",
@@ -612,6 +620,7 @@ export function DecisionDrawerContent({
           <Row label="Spread" value={spread$ ?? spreadBps} />
           <Row label="Spread (bps)" value={spread$ ? spreadBps : null} />
           <Row label="Float" value={floatShares} />
+          <Row label="Market cap" value={marketCapLabel} />
           <Row label="Confirmation" value={confirm} />
           {model.tradeability.tradeabilityExplanation && (
             <p className="mt-1 text-[10px] leading-snug text-[var(--text-secondary)]">

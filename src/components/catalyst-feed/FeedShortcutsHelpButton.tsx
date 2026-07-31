@@ -152,7 +152,7 @@ export function FeedShortcutsHelpButton({
             </p>
             {(
               [
-                ["showGradeColumn", "Legacy desk grade (compat only)"],
+                ["showGradeColumn", "Desk grade (A–F)"],
                 ["showFloat", "Float"],
                 ["showMarketCap", "Market cap"],
                 ["showSentimentScore", "Sentiment score"],

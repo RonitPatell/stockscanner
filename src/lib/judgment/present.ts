@@ -18,7 +18,12 @@ import type { ReactionStage } from "../decision-card/types.ts";
 
 export const JUDGMENT_PRESENTATION_VERSION = "judgment-present-v1";
 
-export type MaterialityLabel = "High" | "Medium" | "Low" | "Not material";
+export type MaterialityLabel =
+  | "High"
+  | "Medium"
+  | "Low"
+  | "Not material"
+  | "Unknown";
 export type DirectionLabel = "Positive" | "Negative" | "Mixed" | "Unclear";
 export type ReactionStageLabel =
   | "Early"
@@ -71,7 +76,7 @@ export function presentMateriality(
     case "NOT_MATERIAL":
       return "Not material";
     default:
-      return "Not material";
+      return "Unknown";
   }
 }
 

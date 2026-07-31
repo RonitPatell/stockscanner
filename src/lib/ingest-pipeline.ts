@@ -127,7 +127,7 @@ async function runIngestPipelineInner(): Promise<IngestPipelineResult> {
     const { items: allItems } = await getCachedFeed("all");
     const quotesUpdated = await refreshQuoteCache(allItems.map((c) => c.symbol));
     await refreshPublicFeedCache();
-    void scanMarketActivity(allItems.map((c) => c.symbol).slice(0, 30)).catch(() => {});
+    void scanMarketActivity(allItems.map((c) => c.symbol).slice(0, 80)).catch(() => {});
     const all = await getCachedFeed("all");
     const movers = await getCachedFeed("movers");
     return {
@@ -157,7 +157,7 @@ async function runIngestPipelineInner(): Promise<IngestPipelineResult> {
   const symbols = allItems.map((c) => c.symbol);
   const quotesUpdated = await refreshQuoteCache(symbols);
   await refreshPublicFeedCache();
-  void scanMarketActivity(symbols.slice(0, 30)).catch(() => {});
+  void scanMarketActivity(symbols.slice(0, 80)).catch(() => {});
 
   const all = await getCachedFeed("all");
   const movers = await getCachedFeed("movers");
