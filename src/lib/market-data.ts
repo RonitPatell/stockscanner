@@ -424,30 +424,29 @@ async function fetchFinnhubCompanyNews(
 }
 
 async function fetchFinnhubMarketNews(key: string): Promise<NewsArticle[]> {
-  try {
-    const res = await finnhubFetch(`${FINNHUB_BASE}/news?category=general&token=${key}`);
-    if (!res.ok) return [];
-    const data = (await res.json()) as FinnhubNewsItem[];
-    const articles: NewsArticle[] = [];
-    for (const item of data.slice(0, 60)) {
-      const symbol = resolveFinnhubSymbol(item, "");
-      if (!symbol) continue;
-      articles.push(
-        withFinnhubStamp({
-          id: `fh-mkt-${item.id}`,
-          symbol,
-          headline: item.headline,
-          source: item.source,
-          url: item.url,
-          summary: item.summary,
-          datetime: item.datetime,
-        })
-      );
-    }
-    return articles;
-  } catch {
-    return [];
+  const res = await finnhubFetch(`${FINNHUB_BASE}/news?category=general&token=${key}`);
+  if (!res.ok) {
+    // Throw so ingest circuit breaker trips (silent [] hid 429s as "success")
+    throw new Error(`finnhub_market_news_${res.status}`);
   }
+  const data = (await res.json()) as FinnhubNewsItem[];
+  const articles: NewsArticle[] = [];
+  for (const item of data.slice(0, 60)) {
+    const symbol = resolveFinnhubSymbol(item, "");
+    if (!symbol) continue;
+    articles.push(
+      withFinnhubStamp({
+        id: `fh-mkt-${item.id}`,
+        symbol,
+        headline: item.headline,
+        source: item.source,
+        url: item.url,
+        summary: item.summary,
+        datetime: item.datetime,
+      })
+    );
+  }
+  return articles;
 }
 
 /** Priority-ingest Tier 1 — Finnhub general wire only. */

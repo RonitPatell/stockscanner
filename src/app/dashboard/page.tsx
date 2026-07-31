@@ -54,7 +54,9 @@ export default async function DashboardPage({
           try {
             initialCatalysts = await Promise.race([
               getCatalysts(150),
-              new Promise<CatalystItem[]>((r) => setTimeout(() => r([]), 800)),
+              new Promise<CatalystItem[]>((r) =>
+                setTimeout(() => r([]), 2_500)
+              ),
             ]);
           } catch {
             initialCatalysts = [];

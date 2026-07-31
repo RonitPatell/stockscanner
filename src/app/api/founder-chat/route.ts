@@ -2,14 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { sendEmail, emailShell } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 const TOPICS = new Set(["help", "suggestion", "request", "other"]);
+const FOUNDER_INBOX =
+  process.env.FOUNDER_CHAT_EMAIL?.trim() || "ronitpat@trustticker.com";
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 /**
  * Public founder inbox — rate-limited. Never echoes secrets.
- * Optional Discord notify via FOUNDER_CHAT_WEBHOOK (incoming webhook URL).
+ * Emails FOUNDER_CHAT_EMAIL (default ronitpat@trustticker.com).
+ * Optional Discord notify via FOUNDER_CHAT_WEBHOOK.
  */
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
@@ -77,6 +89,21 @@ export async function POST(req: NextRequest) {
     },
     select: { id: true, createdAt: true },
   });
+
+  const fromLine = name ? `${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;` : escapeHtml(email);
+  const bodyHtml = `
+    <p><strong>Topic:</strong> ${escapeHtml(topic)}</p>
+    <p><strong>From:</strong> ${fromLine}</p>
+    <p><strong>Page:</strong> ${escapeHtml(pagePath || "—")}</p>
+    <p><strong>Id:</strong> ${escapeHtml(row.id)}</p>
+    <hr style="border:none;border-top:1px solid #27272a;margin:16px 0" />
+    <p style="white-space:pre-wrap">${escapeHtml(message)}</p>
+  `;
+  void sendEmail(
+    FOUNDER_INBOX,
+    `[TrustTicker] Founder chat · ${topic} · ${email}`,
+    emailShell("Founder chat", bodyHtml)
+  ).catch(() => {});
 
   const webhook = process.env.FOUNDER_CHAT_WEBHOOK?.trim();
   if (webhook?.startsWith("https://")) {

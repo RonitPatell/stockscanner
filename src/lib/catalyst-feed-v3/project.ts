@@ -214,6 +214,7 @@ export function projectCatalystFeedRowV3(
           changePercent: c.changePercent,
           floatShares: c.floatShares,
           hasJudgment: Boolean(c.judgmentV2 ?? judgment),
+          catalystType: c.catalystType,
         });
         return {
           gradeLabel: `${rating.letter} · ${rating.label}`,

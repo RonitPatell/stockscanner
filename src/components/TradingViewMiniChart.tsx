@@ -14,6 +14,11 @@ declare global {
 
 let tvScriptPromise: Promise<void> | null = null;
 
+/** Call early (dashboard mount) so the first chart paint is faster. */
+export function prefetchTradingViewScript(): void {
+  void loadTradingViewScript().catch(() => {});
+}
+
 function loadTradingViewScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.TradingView) return Promise.resolve();

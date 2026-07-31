@@ -1,18 +1,41 @@
-/** Exchange:SYMBOL for TradingView widgets / deep links */
+/**
+ * TradingView symbol helpers.
+ * Prefer bare US tickers — prefixing NASDAQ: breaks NYSE/AMEX/ARCA names.
+ * Only use EXCHANGE:SYMBOL when we know the listing venue.
+ */
+
+const TV_EXCHANGES = new Set([
+  "NASDAQ",
+  "NYSE",
+  "AMEX",
+  "ARCA",
+  "BATS",
+  "NYSEARCA",
+  "OTC",
+]);
+
+function normalizeExchange(exchange?: string | null): string | null {
+  if (!exchange) return null;
+  const ex = exchange.toUpperCase().replace(/\s+/g, "");
+  if (ex === "NMS" || ex === "NGM" || ex === "NCM" || ex === "XNAS") return "NASDAQ";
+  if (ex === "NYQ" || ex === "XNYS") return "NYSE";
+  if (ex === "ASE" || ex === "XASE") return "AMEX";
+  if (ex === "ARC" || ex === "NYSEARCA" || ex === "ARCX") return "ARCA";
+  if (TV_EXCHANGES.has(ex)) return ex;
+  return null;
+}
+
+/** Exchange:SYMBOL when exchange known; otherwise bare ticker (TV resolves). */
 export function tradingViewSymbol(
   symbol: string,
   exchange?: string | null
 ): string {
-  const ex = (exchange || "NASDAQ").toUpperCase().replace(/\s+/g, "");
-  const mapped =
-    ex === "NYSE" ||
-    ex === "AMEX" ||
-    ex === "NASDAQ" ||
-    ex === "ARCA" ||
-    ex === "BATS"
-      ? ex
-      : "NASDAQ";
-  return `${mapped}:${symbol.toUpperCase()}`;
+  const sym = symbol.toUpperCase().replace(/[^A-Z0-9.-]/g, "");
+  const ex = normalizeExchange(exchange);
+  if (ex && ex !== "OTC") return `${ex}:${sym}`;
+  // Bare symbol — TradingView's US resolver finds NYSE/NASDAQ/AMEX correctly.
+  // Hardcoding NASDAQ: was why many charts failed to load.
+  return sym;
 }
 
 /** Deep links into charts / brokers for US equities */

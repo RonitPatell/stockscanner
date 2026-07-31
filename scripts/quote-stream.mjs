@@ -35,6 +35,10 @@ function loadEnvFile() {
 loadEnvFile();
 
 const FINNHUB_KEY = process.env.FINNHUB_API_KEY || "";
+/** Off by default — WS 429s starve Finnhub news REST. Set FINNHUB_WS_ENABLED=1 to turn on. */
+const FINNHUB_WS_ENABLED =
+  process.env.FINNHUB_WS_ENABLED === "1" ||
+  process.env.FINNHUB_WS_ENABLED === "true";
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || "";
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || "";
 const POLL_MS = Number(process.env.QUOTE_STREAM_MS || 1_200);
@@ -527,7 +531,7 @@ function subscribeFinnhub(symbols) {
 }
 
 function connectFinnhub() {
-  if (!FINNHUB_KEY) return;
+  if (!FINNHUB_KEY || !FINNHUB_WS_ENABLED) return;
 
   finnhubWs = new WebSocket(`wss://ws.finnhub.io?token=${encodeURIComponent(FINNHUB_KEY)}`);
 
@@ -571,7 +575,9 @@ function connectFinnhub() {
 }
 
 console.log(
-  `Quote stream → ${USE_REDIS ? "Redis" : "HTTP"} (Yahoo${FINNHUB_KEY ? " + Finnhub WS" : ""}, poll ${POLL_MS}ms)`
+  `Quote stream → ${USE_REDIS ? "Redis" : "HTTP"} (Yahoo${
+    FINNHUB_KEY && FINNHUB_WS_ENABLED ? " + Finnhub WS" : FINNHUB_KEY ? " · Finnhub WS off" : ""
+  }, poll ${POLL_MS}ms)`
 );
 
 if (redis) {

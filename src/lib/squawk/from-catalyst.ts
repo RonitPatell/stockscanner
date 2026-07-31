@@ -48,7 +48,7 @@ function highestRisk(c: CatalystItem): string | null {
 
 function tradeabilityLabel(c: CatalystItem): string | null {
   const t = presentJudgment({ judgment: c.judgmentV2 ?? null }).tradeability;
-  return t === "Unknown" ? null : t.toLowerCase();
+  return t === "Liquidity TBD" ? null : t.toLowerCase();
 }
 
 function contentFingerprint(c: CatalystItem): string {

@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 34;
+export const PLATFORM_GUIDE_VERSION = 35;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -40,8 +40,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "trust-status",
     target: "trust-status",
     title: "Desk health",
-    body: "Live = headlines updating. News age = last feed refresh. Scans ≈ how often the wire is polled. Headlines = count on the desk. Desk Xs = median processing time after a catch — not how old the press release is.",
+    body: "Live / Catching up / Stale news based on the newest headline’s publish time. Scans ≈ wire poll cadence. Desk Xs = median processing after a catch.",
     tip: "Full status page: /status",
+  },
+  {
+    id: "live-tape-chart",
+    target: "live-tape-chart",
+    title: "Chart",
+    body: "Dedicated 1‑minute TradingView chart for the selected headline. Click any news row to load that ticker — works for NYSE and NASDAQ (not NASDAQ-only).",
   },
   {
     id: "secondary-nav",

@@ -76,7 +76,13 @@ export function FounderChat() {
                 Talk to Ron
               </p>
               <p className="text-[10px] text-[var(--text-muted)]">
-                Help · suggestions · feature requests
+                Help · suggestions · feature requests ·{" "}
+                <a
+                  href="mailto:ronitpat@trustticker.com"
+                  className="text-emerald-400/90 hover:underline"
+                >
+                  ronitpat@trustticker.com
+                </a>
               </p>
             </div>
             <button

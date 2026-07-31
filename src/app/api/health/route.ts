@@ -26,10 +26,30 @@ export async function GET() {
   const avgIngestDelaySec =
     latency?.p50Sec ?? latency?.avgSec ?? health.avgIngestDelaySec ?? null;
 
+  let newestHeadlineAt: string | null = null;
+  let newestHeadlineAgeSec: number | null = null;
+  if (items.length > 0) {
+    let newestMs = 0;
+    for (const c of items) {
+      const t = Date.parse(c.publishedAt);
+      if (Number.isFinite(t) && t > newestMs) newestMs = t;
+    }
+    if (newestMs > 0) {
+      newestHeadlineAt = new Date(newestMs).toISOString();
+      newestHeadlineAgeSec = Math.max(
+        0,
+        Math.floor((Date.now() - newestMs) / 1000)
+      );
+    }
+  }
+
   return NextResponse.json(
     {
       status: freshness.status,
+      /** Cache rewrite age — prefer newestHeadlineAgeSec for “how old is news” */
       feedAgeSec: freshness.feedAgeSec,
+      newestHeadlineAt,
+      newestHeadlineAgeSec,
       scaleMode: health.scaleMode,
       wireCycleMs: health.wireCycleMs,
       feedItemCount: health.feedItemCount,

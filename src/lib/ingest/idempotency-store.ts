@@ -9,17 +9,42 @@ function redisKey(key: string): string {
   return `ingest:idemp:${key}`;
 }
 
-/** Returns true if this item was already seen (duplicate). */
-export async function claimIdempotency(
-  article: NewsArticle
-): Promise<{ duplicate: boolean; key: string }> {
-  const key = buildIdempotencyKey({
+export function idempotencyKeyFor(article: NewsArticle): string {
+  return buildIdempotencyKey({
     providerItemId: article.trace?.providerItemId ?? article.id,
     url: article.url,
     title: article.headline,
     ticker: article.symbol,
     publishedAt: article.publishedAt,
   });
+}
+
+/** Check if already claimed — does not write. */
+export async function peekIdempotency(
+  article: NewsArticle
+): Promise<{ seen: boolean; key: string }> {
+  const key = idempotencyKeyFor(article);
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const v = await redis.get(redisKey(key));
+      if (v != null) return { seen: true, key };
+      return { seen: false, key };
+    } catch {
+      /* memory */
+    }
+  }
+  const now = Date.now();
+  const exp = memorySeen.get(key);
+  if (exp && exp > now) return { seen: true, key };
+  return { seen: false, key };
+}
+
+/** Mark item as processed (call only after successful DB ingest or intentional skip). */
+export async function claimIdempotency(
+  article: NewsArticle
+): Promise<{ duplicate: boolean; key: string }> {
+  const key = idempotencyKeyFor(article);
 
   const redis = getRedis();
   if (redis) {
@@ -38,7 +63,6 @@ export async function claimIdempotency(
   }
 
   const now = Date.now();
-  // prune occasionally
   if (memorySeen.size > 20_000) {
     for (const [k, exp] of memorySeen) {
       if (exp <= now) memorySeen.delete(k);
@@ -50,15 +74,39 @@ export async function claimIdempotency(
   return { duplicate: false, key };
 }
 
+/** Allow retry after verify/quarantine failure (was burning keys for 6h). */
+export async function releaseIdempotencyKey(key: string): Promise<void> {
+  memorySeen.delete(key);
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.del(redisKey(key));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Filter to unseen articles without claiming.
+ * Claim happens after successful ingest so failed verifies can retry.
+ */
 export async function filterFreshArticles(
   articles: NewsArticle[]
 ): Promise<NewsArticle[]> {
   const out: NewsArticle[] = [];
   for (const a of articles) {
-    const { duplicate } = await claimIdempotency(a);
-    if (!duplicate) out.push(a);
+    const { seen } = await peekIdempotency(a);
+    if (!seen) out.push(a);
   }
   return out;
+}
+
+/** Mark a batch as seen after they were ingested or already in DB. */
+export async function markArticlesSeen(articles: NewsArticle[]): Promise<void> {
+  for (const a of articles) {
+    await claimIdempotency(a);
+  }
 }
 
 export function __resetIdempotencyForTests(): void {

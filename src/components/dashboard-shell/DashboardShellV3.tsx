@@ -79,7 +79,9 @@ export function DashboardShellV3({
   const [tab, setTab] = useState<ScannerTab>("all");
   const [mode, setMode] = useState<"focus" | "full">("focus");
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<CatalystItem | null>(null);
+  const [selected, setSelected] = useState<CatalystItem | null>(
+    () => initialCatalysts[0] ?? null
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastEventAt, setLastEventAt] = useState<Date | null>(
     initialCatalysts.length ? new Date() : null
@@ -87,6 +89,13 @@ export function DashboardShellV3({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
   const drawerMode = useDrawerMode();
+
+  useEffect(() => {
+    // Prefetch TradingView widget script so the first chart click is instant
+    void import("../TradingViewMiniChart").then((m) =>
+      m.prefetchTradingViewScript?.()
+    );
+  }, []);
 
   useEffect(() => {
     try {
@@ -114,6 +123,8 @@ export function DashboardShellV3({
           setDrawerOpen(true);
           writeCatalystDeepLink(found.id);
         }
+      } else if (!selected && initialCatalysts[0]) {
+        setSelected(initialCatalysts[0]);
       }
       const muteSym = params.get("mute");
       if (muteSym && /^[A-Za-z]{1,5}$/.test(muteSym)) {
@@ -184,10 +195,15 @@ export function DashboardShellV3({
     if (d) setLastEventAt(d);
   }, []);
 
+  /** Click a news row → select for chart + open decision drawer. */
   const openDrawerFor = useCallback((c: CatalystItem) => {
     setSelected(c);
     setDrawerOpen(true);
     writeCatalystDeepLink(c.id);
+  }, []);
+
+  const selectForChart = useCallback((c: CatalystItem) => {
+    setSelected(c);
   }, []);
 
   const closeDrawer = useCallback(() => {
@@ -341,52 +357,73 @@ export function DashboardShellV3({
             )}
 
             {!focusV2Active && destination === "feed" && (
-              <section data-guide="news-feed" className="desk-panel desk-panel--raised flex flex-col min-h-[70vh]">
-                <div className="desk-panel-header shrink-0 flex items-center gap-2 px-3 py-2">
-                  <span className="desk-label">Feed</span>
-                  <div className="flex gap-1 ml-auto items-center">
-                    {(
-                      [
-                        ["all", "All"],
-                        ["premarket", "Premarket"],
-                        ["watchlist", "Watchlist"],
-                      ] as const
-                    ).map(([id, label]) => (
-                      <button
-                        key={id}
-                        type="button"
-                        data-active={tab === id}
-                        className="desk-feed-tab"
-                        onClick={() => setTab(id)}
-                      >
-                        {label}
-                      </button>
-                    ))}
+              <div className="space-y-3">
+                <section
+                  data-guide="live-tape-chart"
+                  className="desk-panel desk-panel--raised"
+                >
+                  <div className="desk-panel-header shrink-0 flex items-center gap-2 px-3 py-2">
+                    <span className="desk-label">Chart</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Click any headline to load its 1‑minute tape
+                    </span>
                   </div>
-                </div>
-                <LiveScanner
-                  embedded
-                  tab={feedTab}
-                  onTabChange={setTab}
-                  initialCatalysts={initialCatalysts}
-                  initialWatchlist={initialWatchlist}
-                  initialFilters={filtersWithSearch}
-                  focusCompact={focused}
-                  onFocusedCatalystChange={onFocusedCatalystChange}
-                  onLastEventAtChange={onLastEventAtChange}
-                  onCatalystActivate={openDrawerFor}
-                  focusCatalystId={drawerOpen ? selected?.id ?? null : null}
-                />
-                {selected && (
-                  <div className="shrink-0 border-t border-[var(--border)] p-2">
-                    <SelectedTapeChart
-                      symbol={selected.symbol}
-                      headline={selected.headline}
-                      onOpenDetails={() => openDrawerFor(selected)}
-                    />
+                  <div className="p-2">
+                    {selected ? (
+                      <SelectedTapeChart
+                        symbol={selected.symbol}
+                        headline={selected.headline}
+                        onOpenDetails={() => openDrawerFor(selected)}
+                      />
+                    ) : (
+                      <p className="px-2 py-6 text-center text-[12px] text-[var(--text-muted)]">
+                        Select a news row to open its chart
+                      </p>
+                    )}
                   </div>
-                )}
-              </section>
+                </section>
+
+                <section data-guide="news-feed" className="desk-panel desk-panel--raised flex flex-col min-h-[60vh]">
+                  <div className="desk-panel-header shrink-0 flex items-center gap-2 px-3 py-2">
+                    <span className="desk-label">Feed</span>
+                    <div className="flex gap-1 ml-auto items-center">
+                      {(
+                        [
+                          ["all", "All"],
+                          ["premarket", "Premarket"],
+                          ["watchlist", "Watchlist"],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          data-active={tab === id}
+                          className="desk-feed-tab"
+                          onClick={() => setTab(id)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <LiveScanner
+                    embedded
+                    tab={feedTab}
+                    onTabChange={setTab}
+                    initialCatalysts={initialCatalysts}
+                    initialWatchlist={initialWatchlist}
+                    initialFilters={filtersWithSearch}
+                    focusCompact={focused}
+                    onFocusedCatalystChange={(c) => {
+                      onFocusedCatalystChange(c);
+                      if (c) selectForChart(c);
+                    }}
+                    onLastEventAtChange={onLastEventAtChange}
+                    onCatalystActivate={openDrawerFor}
+                    focusCatalystId={selected?.id ?? null}
+                  />
+                </section>
+              </div>
             )}
 
             {!focusV2Active && destination === "watchlist" && (
@@ -395,6 +432,27 @@ export function DashboardShellV3({
                 className="space-y-3"
               >
                 <WatchlistBrief />
+                <section
+                  data-guide="live-tape-chart"
+                  className="desk-panel desk-panel--raised"
+                >
+                  <div className="desk-panel-header px-3 py-2">
+                    <span className="desk-label">Chart</span>
+                  </div>
+                  <div className="p-2">
+                    {selected ? (
+                      <SelectedTapeChart
+                        symbol={selected.symbol}
+                        headline={selected.headline}
+                        onOpenDetails={() => openDrawerFor(selected)}
+                      />
+                    ) : (
+                      <p className="px-2 py-6 text-center text-[12px] text-[var(--text-muted)]">
+                        Select a watchlist row to open its chart
+                      </p>
+                    )}
+                  </div>
+                </section>
                 <section data-guide="news-feed" className="desk-panel desk-panel--raised flex flex-col min-h-[60vh]">
                   <div className="desk-panel-header px-3 py-2">
                     <span className="desk-label">Watchlist feed</span>
@@ -407,20 +465,14 @@ export function DashboardShellV3({
                     initialWatchlist={initialWatchlist}
                     initialFilters={filtersWithSearch}
                     focusCompact={focused}
-                    onFocusedCatalystChange={onFocusedCatalystChange}
+                    onFocusedCatalystChange={(c) => {
+                      onFocusedCatalystChange(c);
+                      if (c) selectForChart(c);
+                    }}
                     onLastEventAtChange={onLastEventAtChange}
                     onCatalystActivate={openDrawerFor}
-                    focusCatalystId={drawerOpen ? selected?.id ?? null : null}
+                    focusCatalystId={selected?.id ?? null}
                   />
-                  {selected && (
-                    <div className="shrink-0 border-t border-[var(--border)] p-2">
-                      <SelectedTapeChart
-                        symbol={selected.symbol}
-                        headline={selected.headline}
-                        onOpenDetails={() => openDrawerFor(selected)}
-                      />
-                    </div>
-                  )}
                 </section>
                 <WatchlistAutopsy symbols={initialWatchlist} />
               </section>

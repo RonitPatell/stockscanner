@@ -8,7 +8,7 @@ export type DirectionalImplication =
   | "Positive"
   | "Negative"
   | "Mixed"
-  | "Unclear";
+  | "No clear bias";
 
 export type FeedV3DisplayPrefs = {
   showFloat: boolean;

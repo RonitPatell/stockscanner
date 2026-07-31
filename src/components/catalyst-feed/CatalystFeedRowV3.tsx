@@ -39,6 +39,11 @@ function directionTone(direction: DirectionalImplication) {
   return FEED_V3_COLORS.meta;
 }
 
+function directionDisplay(direction: DirectionalImplication): string {
+  if (direction === "No clear bias") return "No bias";
+  return direction;
+}
+
 function formatMove(pct: number | null): string {
   if (pct == null || !Number.isFinite(pct)) return "—";
   const sign = pct > 0 ? "+" : "";
@@ -134,22 +139,21 @@ export function CatalystFeedRowV3({
           )}
         >
           <DirectionIcon direction={row.direction} />
-          <span>{row.direction}</span>
+          <span>{directionDisplay(row.direction)}</span>
         </span>
         {row.extras.gradeLetter && (
           <span
             className={cn(
-              "ml-1 inline-flex items-center justify-center min-w-[1.35rem] h-5 px-1 rounded border text-[10px] font-bold shrink-0",
+              "ml-1 inline-flex items-center gap-1 h-5 px-1.5 rounded border text-[10px] font-bold shrink-0",
               deskRatingBadgeClass(row.extras.gradeLetter as DeskLetter)
             )}
-            title={
-              row.extras.gradeWhy
-                ? `${row.extras.gradeLabel} — ${row.extras.gradeWhy}`
-                : row.extras.gradeLabel ?? undefined
-            }
+            title={row.extras.gradeWhy ?? row.extras.gradeLabel ?? undefined}
             data-testid="desk-grade"
           >
-            {row.extras.gradeLetter}
+            <span>{row.extras.gradeLetter}</span>
+            <span className="font-semibold opacity-90 hidden sm:inline">
+              {row.extras.gradeLabel?.replace(/^[A-F?]\s*·\s*/, "") ?? ""}
+            </span>
           </span>
         )}
         <span className={cn("ml-auto tt-num shrink-0 tt-meta")}>

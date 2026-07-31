@@ -37,6 +37,7 @@ import {
   markTracesSsePublished,
 } from "./latency-trace";
 import { getCachedProfiles, refreshProfileCache } from "./profile-cache-service";
+import { markArticlesSeen } from "./ingest/idempotency-store";
 import type { CatalystItem } from "@/types";
 import type { NewsArticle } from "@/types";
 import { getPriorityTickers } from "./priority-tickers";
@@ -58,8 +59,8 @@ const FEED_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 /** Keep DB rows longer for review / autopsy; feed eligibility uses FEED_MAX_AGE_MS. */
 const PURGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const RECENT_NEWS_MS = 90 * 60 * 1000;
-/** Free RSS/PR publishers often lag a few minutes; keep wire path accepting them. */
-const WIRE_RECENT_MS = 45 * 60 * 1000;
+/** Free RSS/PR publishers lag; accept up to 3h so wire path doesn't drop fresh stories. */
+const WIRE_RECENT_MS = 3 * 60 * 60 * 1000;
 const FEED_CACHE_MS = isScaleMode() ? 1_500 : 2_500;
 
 /** Structural / relevance gates (no price requirement). */
@@ -866,6 +867,10 @@ export async function ingestAndAnalyzeNews(
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
     .slice(0, maxNew);
 
+  const handledForIdemp: NewsArticle[] = freshNews.filter((a) =>
+    existingIdSet.has(a.id)
+  );
+
   for (let i = 0; i < unseen.length; i += concurrency) {
     const batch = unseen.slice(i, i + concurrency);
     const batchResults = await Promise.all(
@@ -873,13 +878,19 @@ export async function ingestAndAnalyzeNews(
         ingestOne(article).catch(() => null)
       )
     );
-    for (const item of batchResults) {
-      if (!item) continue;
+    for (let j = 0; j < batchResults.length; j++) {
+      const item = batchResults[j];
+      if (!item) continue; // verify/quarantine — leave unclaimed so next poll can retry
       results.push(item);
       newItems.push(item);
+      handledForIdemp.push(batch[j]);
     }
   }
 
+  // Claim only after DB success / already-known — failed verifies stay retryable
+  if (handledForIdemp.length > 0) {
+    void markArticlesSeen(handledForIdemp).catch(() => {});
+  }
 
   if (newItems.length > 0) {
     if (wireOnly) {

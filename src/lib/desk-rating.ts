@@ -3,7 +3,7 @@
  * Informational only — not a buy/sell signal.
  */
 
-export type DeskLetter = "A" | "B" | "C" | "D" | "F" | "?";
+export type DeskLetter = "A" | "B" | "C" | "D" | "F";
 
 export interface DeskRatingInput {
   catalystStrength?: string | null;
@@ -15,6 +15,7 @@ export interface DeskRatingInput {
   changePercent?: number | null;
   floatShares?: number | null;
   hasJudgment?: boolean;
+  catalystType?: string | null;
 }
 
 export interface DeskRating {
@@ -35,7 +36,7 @@ function strengthPts(s: string | null | undefined): number {
     case "NOT_MATERIAL":
       return 0;
     default:
-      return 8;
+      return 12; // assume moderate-weak until classified
   }
 }
 
@@ -47,7 +48,7 @@ function directionPts(d: string | null | undefined): number {
     case "MIXED":
       return 10;
     default:
-      return 4;
+      return 6;
   }
 }
 
@@ -62,37 +63,46 @@ function stagePts(stage: string | null | undefined): number {
     case "STALE":
       return 0;
     default:
-      return 8;
+      return 10;
   }
 }
 
 function tradePts(t: string | null | undefined): number {
   const u = (t || "").toUpperCase();
-  if (u.includes("TRADEABLE") || u.includes("OK") || u.includes("GOOD")) return 15;
+  if (u.includes("UNKNOWN") || u.includes("TBD") || !u.trim()) return 8;
+  if (u.includes("TRADEABLE") || u.includes("OK") || u.includes("GOOD") || u.includes("ACCEPTABLE"))
+    return 15;
   if (u.includes("CAUTION") || u.includes("THIN")) return 6;
-  if (u.includes("AVOID") || u.includes("POOR")) return 0;
+  if (u.includes("AVOID") || u.includes("POOR") || u.includes("EXTREMELY")) return 0;
   return 8;
 }
 
-/** Build a genuine letter grade with a one-line why. */
+const LABELS: Record<DeskLetter, string> = {
+  A: "Priority look",
+  B: "Worth a look",
+  C: "Monitor",
+  D: "Low priority",
+  F: "Skip / caution",
+};
+
+function letterFromScore(score: number): DeskLetter {
+  if (score >= 75) return "A";
+  if (score >= 60) return "B";
+  if (score >= 45) return "C";
+  if (score >= 30) return "D";
+  return "F";
+}
+
+/** Build a genuine letter grade with a one-line why — never "Unknown". */
 export function computeDeskRating(input: DeskRatingInput): DeskRating {
   if (input.dilutionRisk || input.highRisk) {
     return {
       letter: "F",
       score: 15,
-      label: "High risk",
+      label: LABELS.F,
       why: input.dilutionRisk
         ? "Dilution / offering risk flagged"
         : "Primary high-severity risk active",
-    };
-  }
-
-  if (!input.hasJudgment && input.catalystStrength == null) {
-    return {
-      letter: "?",
-      score: 0,
-      label: "Pending",
-      why: "Desk read still forming — check source",
     };
   }
 
@@ -104,46 +114,39 @@ export function computeDeskRating(input: DeskRatingInput): DeskRating {
 
   const absMove = Math.abs(input.changePercent ?? 0);
   if (absMove >= 2 && absMove < 10) score += 5;
-  if (absMove >= 12) score -= 8; // already extended
+  if (absMove >= 12) score -= 8;
 
   const floatM = (input.floatShares ?? 0) / 1e6;
-  if (floatM > 0 && floatM < 20) score += 5; // small float can matter for day trades
+  if (floatM > 0 && floatM < 20) score += 5;
   if (floatM > 500) score -= 3;
 
+  const type = (input.catalystType || "").toLowerCase();
+  if (["fda", "offering", "earnings", "contract", "merger"].includes(type)) {
+    score += 4;
+  }
+
   score = Math.max(0, Math.min(100, score));
+  const letter = letterFromScore(score);
 
-  let letter: DeskLetter;
-  if (score >= 75) letter = "A";
-  else if (score >= 60) letter = "B";
-  else if (score >= 45) letter = "C";
-  else if (score >= 30) letter = "D";
-  else letter = "F";
-
-  const labels: Record<DeskLetter, string> = {
-    A: "Priority look",
-    B: "Worth a look",
-    C: "Monitor",
-    D: "Low priority",
-    F: "Skip / caution",
-    "?": "Pending",
-  };
-
-  const bits: string[] = [];
-  if (input.catalystStrength)
-    bits.push(`Materiality ${input.catalystStrength.toLowerCase().replace(/_/g, " ")}`);
-  if (input.reactionStage) bits.push(`Stage ${input.reactionStage}`);
-  if (input.directionalImplication)
-    bits.push(`Dir ${input.directionalImplication.toLowerCase()}`);
+  const strength = (input.catalystStrength || "").toUpperCase();
+  const stage = (input.reactionStage || "").toLowerCase() || "forming";
+  let why: string;
+  if (strength === "STRONG") why = `Strong catalyst · ${stage} tape`;
+  else if (strength === "MODERATE") why = `Moderate catalyst · ${stage} tape`;
+  else if (strength === "WEAK") why = `Weak catalyst · ${stage} tape`;
+  else if (strength === "NOT_MATERIAL") why = "Likely not material for a day trade";
+  else if (absMove >= 2) why = `Live move ${absMove.toFixed(1)}% · ${stage} tape`;
+  else why = `Desk score ${score}/100 · ${stage} tape`;
 
   return {
     letter,
     score,
-    label: labels[letter],
-    why: bits.slice(0, 2).join(" · ") || "Based on materiality, stage, and risk",
+    label: LABELS[letter],
+    why,
   };
 }
 
-export function deskRatingBadgeClass(letter: DeskLetter): string {
+export function deskRatingBadgeClass(letter: DeskLetter | string): string {
   switch (letter) {
     case "A":
       return "border-emerald-500/40 bg-emerald-500/15 text-emerald-200";

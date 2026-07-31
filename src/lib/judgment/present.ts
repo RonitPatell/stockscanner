@@ -24,7 +24,11 @@ export type MaterialityLabel =
   | "Low"
   | "Not material"
   | "Unknown";
-export type DirectionLabel = "Positive" | "Negative" | "Mixed" | "Unclear";
+export type DirectionLabel =
+  | "Positive"
+  | "Negative"
+  | "Mixed"
+  | "No clear bias";
 export type ReactionStageLabel =
   | "Early"
   | "Active"
@@ -36,7 +40,7 @@ export type TradeabilityLabel =
   | "Acceptable"
   | "Thin"
   | "Extremely thin"
-  | "Unknown";
+  | "Liquidity TBD";
 
 export interface JudgmentPresentation {
   version: typeof JUDGMENT_PRESENTATION_VERSION;
@@ -76,7 +80,8 @@ export function presentMateriality(
     case "NOT_MATERIAL":
       return "Not material";
     default:
-      return "Unknown";
+      // Prefer a readable default over "Unknown" on the desk
+      return "Low";
   }
 }
 
@@ -96,9 +101,9 @@ export function presentDirection(
       return "Mixed";
     case "UNCLEAR":
     case "Unclear":
-      return "Unclear";
+      return "No clear bias";
     default:
-      return "Unclear";
+      return "No clear bias";
   }
 }
 
@@ -219,9 +224,9 @@ export function presentTradeability(
     case null:
     case undefined:
     case "":
-      return "Unknown";
+      return "Liquidity TBD";
     default:
-      return "Unknown";
+      return "Liquidity TBD";
   }
 }
 
@@ -260,9 +265,9 @@ export function presentSessionBias(
     return { direction: "Negative", reviewLabel: "Review candidate" };
   }
   if (b === "avoid") {
-    return { direction: "Unclear", reviewLabel: "Capital caution" };
+    return { direction: "No clear bias", reviewLabel: "Capital caution" };
   }
-  return { direction: "Unclear", reviewLabel: "Monitor" };
+  return { direction: "No clear bias", reviewLabel: "Monitor" };
 }
 
 export interface PresentJudgmentInput {
@@ -366,7 +371,7 @@ export function materialityTone(
 export function tradeabilityTone(
   t: TradeabilityLabel
 ): "warn" | "neutral" {
-  if (t === "Thin" || t === "Extremely thin" || t === "Unknown") return "warn";
+  if (t === "Thin" || t === "Extremely thin" || t === "Liquidity TBD") return "warn";
   return "neutral";
 }
 

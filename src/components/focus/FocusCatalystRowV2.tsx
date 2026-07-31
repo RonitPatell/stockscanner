@@ -95,7 +95,7 @@ export function FocusCatalystRowV2({
             p.direction === "Positive" && "tt-tone-positive",
             p.direction === "Negative" && "tt-tone-negative",
             p.direction === "Mixed" && "tt-tone-risk",
-            p.direction === "Unclear" && "tt-tone-meta"
+            p.direction === "No clear bias" && "tt-tone-meta"
           )}
         >
           <DirIcon className="tt-icon-sm" aria-hidden />

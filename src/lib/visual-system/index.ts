@@ -106,10 +106,15 @@ export function selectCollapsedContextBadges(input: {
     });
   }
 
-  if (out.length < FEED_COLLAPSED_BADGE_MAX && input.materialityLabel?.trim()) {
+  const mat = input.materialityLabel?.trim();
+  if (
+    out.length < FEED_COLLAPSED_BADGE_MAX &&
+    mat &&
+    !/^unknown$/i.test(mat)
+  ) {
     out.push({
       id: "materiality",
-      label: `${input.materialityLabel.trim()} materiality`,
+      label: `${mat} materiality`,
       tone: "meta",
     });
   }

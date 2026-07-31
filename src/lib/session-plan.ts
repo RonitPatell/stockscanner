@@ -72,7 +72,8 @@ function presentSetup(c: CatalystItem, bias: string, action: string) {
     dilutionHint: isDilutionCatalyst(c),
   });
   return {
-    directionLabel: biasP.direction !== "Unclear" ? biasP.direction : p.direction,
+    directionLabel:
+      biasP.direction !== "No clear bias" ? biasP.direction : p.direction,
     reviewLabel: biasP.reviewLabel,
     materialityLabel: p.materiality,
     tradeabilityLabel: p.tradeability,

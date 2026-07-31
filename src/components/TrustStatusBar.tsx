@@ -10,26 +10,24 @@ interface HealthData {
   feedItemCount: number;
   avgIngestDelaySec: number | null;
   feedAgeSec: number | null;
+  newestHeadlineAgeSec?: number | null;
+  newestHeadlineAt?: string | null;
   wireCycleMs: number;
   pipelineInFlight: boolean;
   scaleMode: boolean;
   latencyMetric?: string | null;
 }
 
-function formatAgo(sec: number | null, iso: string | null): string {
-  let s = sec;
-  if (s == null && iso) {
-    s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  }
-  if (s == null || !Number.isFinite(s)) return "—";
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return `${Math.floor(s / 3600)}h ago`;
+function formatAgo(sec: number | null): string {
+  if (sec == null || !Number.isFinite(sec)) return "—";
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
 }
 
 /**
  * Plain-language desk health for the top bar.
- * Live = headlines flowing · Catching up = older than 3m · Offline = empty.
+ * “News age” = newest headline publish time (not cache rewrite).
  */
 export function TrustStatusBar({ className }: { className?: string }) {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -65,16 +63,16 @@ export function TrustStatusBar({ className }: { className?: string }) {
     );
   }
 
-  void tick; // refresh relative ages
+  void tick;
 
   const count = health.feedItemCount ?? 0;
-  const ageSec =
-    health.feedAgeSec ??
-    (health.feedUpdatedAt
+  const headlineAge =
+    health.newestHeadlineAgeSec ??
+    (health.newestHeadlineAt
       ? Math.max(
           0,
           Math.floor(
-            (Date.now() - new Date(health.feedUpdatedAt).getTime()) / 1000
+            (Date.now() - new Date(health.newestHeadlineAt).getTime()) / 1000
           )
         )
       : null);
@@ -86,11 +84,14 @@ export function TrustStatusBar({ className }: { className?: string }) {
   if (ingesting && count > 0) {
     statusLabel = "Updating";
     live = true;
-  } else if (count > 0 && ageSec != null && ageSec <= 180) {
+  } else if (count > 0 && headlineAge != null && headlineAge <= 180) {
     statusLabel = "Live";
     live = true;
-  } else if (count > 0) {
+  } else if (count > 0 && headlineAge != null && headlineAge <= 900) {
     statusLabel = "Catching up";
+    warn = true;
+  } else if (count > 0) {
+    statusLabel = "Stale news";
     warn = true;
   } else if (ingesting) {
     statusLabel = "Starting";
@@ -103,7 +104,7 @@ export function TrustStatusBar({ className }: { className?: string }) {
     <div
       className={cn("desk-health flex items-center gap-1.5 min-w-0", className)}
       data-guide="trust-status"
-      title="Desk health: live headlines, last update, scan cadence"
+      title="Newest headline age · wire scan cadence · desk processing"
     >
       <span
         className={cn(
@@ -130,7 +131,7 @@ export function TrustStatusBar({ className }: { className?: string }) {
 
       <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full border border-zinc-800 text-[11px] text-zinc-400">
         <Timer className="w-3 h-3" />
-        News {formatAgo(ageSec, health.feedUpdatedAt)}
+        Newest {formatAgo(headlineAge)}
       </span>
 
       <span className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-full border border-zinc-800 text-[11px] text-zinc-400">
