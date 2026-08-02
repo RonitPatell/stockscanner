@@ -2,7 +2,7 @@ self.addEventListener("push", (event) => {
   let data = {
     title: "TrustTicker",
     body: "New catalyst alert",
-    url: "/dashboard",
+    url: "/dashboard?view=monitor",
     symbol: null,
     catalystId: null,
     actionsEnabled: true,
@@ -28,7 +28,7 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/icon-32.png",
       data: {
-        url: data.url || "/dashboard",
+        url: data.url || "/dashboard?view=monitor",
         symbol: data.symbol,
         catalystId: data.catalystId,
       },
@@ -43,16 +43,16 @@ self.addEventListener("notificationclick", (event) => {
   const action = event.action || "open";
   const symbol = event.notification.data?.symbol || "";
   const catalystId = event.notification.data?.catalystId || "";
-  let url = event.notification.data?.url || "/dashboard";
+  let url = event.notification.data?.url || "/dashboard?view=monitor";
 
   if (action === "mute" && symbol) {
-    url = `/dashboard?focus=1&mute=${encodeURIComponent(symbol)}`;
+    url = `/dashboard?view=monitor&mute=${encodeURIComponent(symbol)}`;
   } else if (action === "watchlist" && symbol) {
-    url = `/dashboard?focus=1&watch=${encodeURIComponent(symbol)}`;
+    url = `/dashboard?view=watchlist&symbol=${encodeURIComponent(symbol)}`;
   } else if (action === "evidence" && (catalystId || symbol)) {
     url = catalystId
-      ? `/dashboard?focus=1&evidence=${encodeURIComponent(catalystId)}`
-      : `/dashboard?focus=1&symbol=${encodeURIComponent(symbol)}`;
+      ? `/dashboard?view=feed&focus=1&evidence=${encodeURIComponent(catalystId)}`
+      : `/dashboard?view=monitor&symbol=${encodeURIComponent(symbol)}`;
   } else if (symbol) {
     url = url.includes("?")
       ? `${url}&symbol=${encodeURIComponent(symbol)}`

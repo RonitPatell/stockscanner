@@ -1,0 +1,118 @@
+/**
+ * TrustTicker Monitor — design tokens
+ * Institutional trading-terminal aesthetic. Visual only.
+ * Not a copy of Arcane Monitor or any third-party desk.
+ */
+
+.tt-monitor,
+.tt-monitor-gallery {
+  /* —— Surfaces —— */
+  --mon-bg: #0a0d11;
+  --mon-surface: #10151c;
+  --mon-surface-2: #151c26;
+  --mon-surface-hover: #1a222e;
+  --mon-surface-selected: #1c2836;
+  --mon-field: #0c1219;
+
+  /* Legacy aliases (existing CSS) */
+  --mon-panel: var(--mon-surface);
+  --mon-panel-2: var(--mon-surface-2);
+
+  /* —— Borders —— */
+  --mon-border: #222a36;
+  --mon-border-strong: #344054;
+  --mon-line: var(--mon-border);
+
+  /* —— Text —— */
+  --mon-text: #e8eef6;
+  --mon-text-secondary: #a8b4c4;
+  --mon-text-muted: #7a8799;
+  --mon-muted: var(--mon-text-muted);
+
+  /* —— Semantic (meaning only) —— */
+  --mon-positive: #3fad7a;
+  --mon-negative: #d16b6b;
+  --mon-warning: #c9a14a;
+  --mon-verified: #4a9bb8;
+  --mon-critical: #d45454;
+  --mon-accent: #3fad7a;
+  --mon-warn: var(--mon-warning);
+  --mon-danger: var(--mon-critical);
+  --mon-info: var(--mon-verified);
+
+  /* —— Brand —— */
+  --mon-brand: #3fad7a;
+  --mon-brand-soft: color-mix(in srgb, var(--mon-brand) 18%, transparent);
+
+  /* —— Focus —— */
+  --mon-focus-ring: color-mix(in srgb, var(--mon-brand) 65%, white 10%);
+
+  /* —— Spacing (8px system) —— */
+  --mon-space-1: 4px;
+  --mon-space-2: 8px;
+  --mon-space-3: 16px;
+  --mon-space-4: 24px;
+  --mon-space-5: 32px;
+  --mon-space-6: 40px;
+  --mon-space-7: 48px;
+  --mon-space-8: 64px;
+
+  /* —— Radius —— */
+  --mon-radius-sm: 2px;
+  --mon-radius: 4px;
+  --mon-radius-lg: 6px;
+
+  /* —— Shadow (minimal) —— */
+  --mon-shadow-none: none;
+  --mon-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --mon-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.4);
+
+  /* —— Motion (desk instrument — not game juice) —— */
+  /* Instant feedback 80–120ms */
+  --mon-duration-instant: 100ms;
+  /* Hover / control 120–180ms */
+  --mon-duration-fast: 120ms;
+  --mon-duration-control: 150ms;
+  --mon-duration: 150ms;
+  /* Drawer / panel 200–280ms */
+  --mon-duration-panel: 240ms;
+  --mon-duration-slow: 240ms;
+  /* Rank / layout movement 300–500ms */
+  --mon-duration-layout: 400ms;
+  /* Critical appearance — no decorative delay */
+  --mon-duration-critical: 0ms;
+
+  /* Ease-out enter · ease-in leave · spatial smooth (no overshoot) */
+  --mon-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --mon-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mon-ease-spatial: cubic-bezier(0.33, 1, 0.32, 1);
+  --mon-ease: var(--mon-ease-out);
+
+  --mon-tooltip-delay: 280ms;
+  --mon-value-flash: 480ms;
+  --mon-value-coalesce: 120ms;
+  --mon-recovered-hold: 1600ms;
+  --mon-tape-enter: 360ms;
+
+  /* —— Typography —— */
+  --mon-font-sans: var(--font-inter), "IBM Plex Sans", "Segoe UI", ui-sans-serif,
+    system-ui, sans-serif;
+  --mon-font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Mono",
+    monospace;
+
+  --mon-type-product: 11px;
+  --mon-type-page: 15px;
+  --mon-type-ticker-lg: 32px;
+  --mon-type-ticker: 17px;
+  --mon-type-section: 11px;
+  --mon-type-headline: 15px;
+  --mon-type-body: 14px;
+  --mon-type-meta: 12px;
+  --mon-type-badge: 12px;
+  --mon-type-num: 13px;
+
+  --mon-lh-tight: 1.2;
+  --mon-lh-body: 1.45;
+  --mon-tracking-section: 0.08em;
+  --mon-tracking-ticker: 0.03em;
+}

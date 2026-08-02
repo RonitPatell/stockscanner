@@ -47,6 +47,30 @@
     {
       "path": "/api/cron/halts",
       "schedule": "* * * * 1-5"
+    },
+    {
+      "path": "/api/cron/monitor-snapshot",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/monitor-delivery",
+      "schedule": "*/2 * * * 1-5"
+    },
+    {
+      "path": "/api/cron/scanner",
+      "schedule": "*/3 * * * 1-5"
+    },
+    {
+      "path": "/api/cron/market-warm?phase=premarket",
+      "schedule": "30 7 * * 1-5"
+    },
+    {
+      "path": "/api/cron/market-warm?phase=open",
+      "schedule": "25 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/market-warm?phase=closed",
+      "schedule": "15 1 * * *"
     }
   ]
 }

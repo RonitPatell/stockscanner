@@ -50,9 +50,12 @@ If logs show `npm error command sh -c node scripts/realtime-worker.mjs`, scroll 
 | Process | Script | Cadence |
 |---------|--------|---------|
 | Priority ingest | `scripts/priority-ingest-worker.mjs` | Tier 0 PR/SEC ~8s; Tier 1 Finnhub/Yahoo/editorial ~10s |
-| Quote / volume | `scripts/quote-stream.mjs` | Yahoo ~1.2s batches; heavy RVol/% names every cycle |
+| Quote / volume | `scripts/quote-stream.mjs` | Yahoo ~1.2s batches; heavy RVol/% names every cycle (lease-gated) |
+| Monitor market | `scripts/monitor-market-worker.mjs` | ~45s warm + snapshot + scanner (lease-gated) |
 
-Vercel crons (`/api/cron/wire`, `/api/cron/ingest`) remain a **safety net** only (~1–2 min). They are not the realtime path.
+Vercel crons (`/api/cron/wire`, `/api/cron/ingest`, `/api/cron/monitor-snapshot`, `/api/cron/market-warm`) remain a **safety net** only. They are not the realtime path and must not rely on browser traffic.
+
+See **[MARKET_WORKERS.md](./MARKET_WORKERS.md)** for leases, CLOSED snapshots, readiness, and the “no user-route warming” rules.
 
 ## Feed rules
 

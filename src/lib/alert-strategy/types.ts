@@ -6,8 +6,11 @@ export type StrategyPresetId =
   | "low_float_momentum"
   | "biotech_catalyst"
   | "large_cap_news"
+  | "downside_momentum"
+  | "halt_resumption"
   | "dilution_offering_risk"
   | "watchlist_risk_monitor"
+  | "watchlist_only"
   | "custom";
 
 export type ConditionLogic = "AND" | "OR";
@@ -17,19 +20,28 @@ export type ConditionField =
   | "price"
   | "float_m"
   | "float_confidence"
+  | "market_cap_m"
   | "catalyst_category"
   | "source_tier"
+  | "source_verification"
   | "confirmation_count"
   | "catalyst_strength"
   | "reaction_stage"
   | "relative_volume"
   | "dollar_volume"
+  | "dollar_volume_velocity"
+  | "trades_per_second"
   | "pct_move"
   | "spread_bps"
   | "tradeability"
   | "dilution_flag"
+  | "risk_flag"
   | "market_session"
   | "halt_status"
+  | "resumption_flag"
+  | "momentum_state"
+  | "momentum_intensity"
+  | "attention_priority"
   | "max_catalyst_age_min"
   | "ticker_exclusion"
   | "sector"
@@ -137,25 +149,41 @@ export interface SimulationResult {
 }
 
 /** Facts available to the evaluator — never includes phone/watchlist PII for analytics. */
+export type SourceVerificationLevel =
+  | "verified"
+  | "partial"
+  | "unverified"
+  | "unavailable";
+
 export interface StrategyEvalFacts {
   symbol: string;
   onWatchlist: boolean;
   price: number | null;
   floatM: number | null;
   floatConfidence: "high" | "medium" | "low" | "unavailable" | null;
+  marketCapM: number | null;
   catalystCategory: string | null;
   sourceTier: string | null;
+  sourceVerification: SourceVerificationLevel | null;
   confirmationCount: number | null;
   catalystStrength: string | null;
   reactionStage: string | null;
   relativeVolume: number | null;
   dollarVolume: number | null;
+  dollarVolumeVelocity: number | null;
+  tradesPerSecond: number | null;
   pctMove: number | null;
   spreadBps: number | null;
   tradeability: string | null;
   dilutionFlags: string[];
+  /** Active risk ids for inclusion/exclusion (e.g. atm, offering, halt). */
+  riskFlags: string[];
   marketSession: string | null;
   haltStatus: "halted" | "trading" | "unknown" | null;
+  resumptionFlag: boolean;
+  momentumState: string | null;
+  momentumIntensity: number | null;
+  attentionPriority: number | null;
   catalystAgeMin: number | null;
   sector: string | null;
   exchange: string | null;

@@ -19,6 +19,8 @@ export type SquawkSettings = {
   enabled: boolean;
   watchlistOnly: boolean;
   riskOnly: boolean;
+  /** Monitor: only speak symbols that match an alert strategy */
+  strategyMatchOnly: boolean;
   /** Minimum priority to speak */
   minPriority: SquawkPriorityLevel;
   quietHours: QuietHours;
@@ -30,6 +32,7 @@ export const DEFAULT_SQUAWK_SETTINGS: SquawkSettings = {
   enabled: false,
   watchlistOnly: false,
   riskOnly: false,
+  strategyMatchOnly: false,
   minPriority: "normal",
   quietHours: { enabled: false, startMin: 22 * 60, endMin: 7 * 60 },
   voice: { voiceURI: null, rate: 1.05, pitch: 1, volume: 0.9 },

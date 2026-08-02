@@ -3,31 +3,17 @@ import { requirePro } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isQuotableMarketSymbol } from "@/lib/index-quotes";
-import { resolveFinnhubKey } from "@/lib/finnhub-key";
 import {
   getCachedQuotes,
-  refreshQuoteCache,
-  refreshQuoteVolumes,
   isLiveQuoteStreamFresh,
   type CachedQuote,
 } from "@/lib/quote-cache-service";
-import { getCachedProfiles, refreshProfileCache } from "@/lib/profile-cache-service";
+import { getCachedProfiles } from "@/lib/profile-cache-service";
 import { estimateRvolFromMove } from "@/lib/volume-utils";
 import { isScaleMode } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
-
-const PRICE_BUDGET_MS = 5_000;
-const RVOL_BUDGET_MS = 8_000;
-const PROFILE_BUDGET_MS = 6_000;
-
-async function withBudget<T>(fn: () => Promise<T>, fallback: T, ms: number): Promise<T> {
-  return Promise.race([
-    fn(),
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
 
 function applyInstantRvolEstimates(
   quotes: Record<string, CachedQuote>,
@@ -43,7 +29,10 @@ function applyInstantRvolEstimates(
   return out;
 }
 
-/** Live prices — cache-first; refreshes price, RVOL, float/mcap on demand. */
+/**
+ * Live prices — worker-warmed cache / stream only.
+ * Never opens Finnhub/Yahoo from user traffic.
+ */
 export async function GET(req: NextRequest) {
   const gate = await requirePro();
   if (gate.error) return gate.error;
@@ -68,49 +57,26 @@ export async function GET(req: NextRequest) {
     const symbols = raw
       .split(",")
       .map((s) => s.trim().toUpperCase())
-      .filter((s) => s.length > 0 && (isValidTickerFormat(s) || isQuotableMarketSymbol(s)))
+      .filter(
+        (s) =>
+          s.length > 0 &&
+          (isValidTickerFormat(s) || isQuotableMarketSymbol(s))
+      )
       .slice(0, max);
 
     if (symbols.length === 0) {
       return NextResponse.json({ quotes: {} });
     }
 
-    const liveOnly =
-      req.nextUrl.searchParams.get("live") === "1" || (await isLiveQuoteStreamFresh());
-
+    const live = await isLiveQuoteStreamFresh();
     let quotes: Record<string, CachedQuote> = await getCachedQuotes(symbols);
-
-    const missingPrice = symbols.filter((s) => !quotes[s]?.price);
-    if (missingPrice.length > 0 && !liveOnly) {
-      await withBudget(
-        () => refreshQuoteCache(missingPrice, { fetchVolume: false }),
-        0,
-        PRICE_BUDGET_MS
-      );
-      quotes = { ...quotes, ...(await getCachedQuotes(missingPrice)) };
-    }
 
     if (needRvol) {
       quotes = applyInstantRvolEstimates(quotes, symbols);
-
-      const missingRvol = symbols.filter((s) => quotes[s]?.price && quotes[s]?.rVol == null);
-      if (missingRvol.length > 0 && !liveOnly) {
-        await withBudget(() => refreshQuoteVolumes(missingRvol), 0, RVOL_BUDGET_MS);
-        quotes = {
-          ...quotes,
-          ...applyInstantRvolEstimates(await getCachedQuotes(symbols), symbols),
-        };
-      }
     }
 
     if (needProfile) {
-      let profiles = await getCachedProfiles(symbols);
-      const missingProfiles = symbols.filter((s) => !profiles[s]);
-      if (missingProfiles.length > 0) {
-        await withBudget(() => refreshProfileCache(missingProfiles), 0, PROFILE_BUDGET_MS);
-        profiles = { ...(await getCachedProfiles(symbols)) };
-      }
-
+      const profiles = await getCachedProfiles(symbols);
       for (const sym of symbols) {
         const p = profiles[sym];
         if (!p) continue;
@@ -118,8 +84,7 @@ export async function GET(req: NextRequest) {
         const float =
           (q?.floatShares != null && q.floatShares > 0
             ? q.floatShares
-            : null) ??
-          (p.floatShares > 0 ? p.floatShares : undefined);
+            : null) ?? (p.floatShares > 0 ? p.floatShares : undefined);
         const mcap =
           (q?.marketCap != null && q.marketCap > 0 ? q.marketCap : null) ??
           (p.marketCap > 0 ? p.marketCap : undefined);
@@ -141,41 +106,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (Object.keys(quotes).length === 0 && !isScaleMode()) {
-      const key = resolveFinnhubKey();
-      if (key) {
-        for (const symbol of symbols.slice(0, 8)) {
-          try {
-            const res = await fetch(
-              `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(key)}`,
-              { cache: "no-store", signal: AbortSignal.timeout(3_000) }
-            );
-            if (!res.ok) continue;
-            const quote = await res.json();
-            if (!quote?.c || quote.c <= 0) continue;
-            quotes[symbol] = {
-              price: quote.c,
-              changePercent: quote.dp ?? 0,
-              change: quote.d ?? 0,
-              rVol: estimateRvolFromMove(quote.dp ?? 0) ?? undefined,
-              dayHigh:
-                typeof quote.h === "number" && quote.h > 0 ? quote.h : undefined,
-            };
-          } catch {
-            /* skip */
-          }
-        }
-      }
-    }
-
     return NextResponse.json({
       quotes,
       updatedAt: new Date().toISOString(),
-      cached: isScaleMode(),
-      live: liveOnly,
+      cached: true,
+      live,
+      workerOwned: true,
+      scaleMode: isScaleMode(),
     });
   } catch (error) {
     console.error("Quotes API error:", error);
-    return NextResponse.json({ quotes: {}, error: "Failed to fetch quotes" }, { status: 200 });
+    return NextResponse.json(
+      { quotes: {}, error: "Failed to read quotes", workerOwned: true },
+      { status: 200 }
+    );
   }
 }

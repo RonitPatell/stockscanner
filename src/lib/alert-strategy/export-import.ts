@@ -1,3 +1,4 @@
+import { STRATEGY_LIMITS } from "./limits.ts";
 import { ALERT_STRATEGY_SCHEMA_VERSION } from "./version.ts";
 import { validateStrategy } from "./validate.ts";
 import { ensureConditionIds } from "./versioning.ts";
@@ -20,8 +21,11 @@ const PRESETS: StrategyPresetId[] = [
   "low_float_momentum",
   "biotech_catalyst",
   "large_cap_news",
+  "downside_momentum",
+  "halt_resumption",
   "dilution_offering_risk",
   "watchlist_risk_monitor",
+  "watchlist_only",
   "custom",
 ];
 
@@ -133,6 +137,21 @@ export function importStrategies(
   const errors: string[] = [];
   let list: unknown[] = [];
 
+  try {
+    const size = JSON.stringify(raw ?? null).length;
+    if (size > STRATEGY_LIMITS.maxPayloadBytes) {
+      return {
+        ok: false,
+        strategies: [],
+        errors: [
+          `Import payload exceeds ${STRATEGY_LIMITS.maxPayloadBytes} bytes`,
+        ],
+      };
+    }
+  } catch {
+    return { ok: false, strategies: [], errors: ["Import payload unreadable"] };
+  }
+
   if (isObj(raw) && raw.format === "trustticker-alert-strategy") {
     if (!Array.isArray(raw.strategies)) {
       return { ok: false, strategies: [], errors: ["Missing strategies array"] };
@@ -146,6 +165,16 @@ export function importStrategies(
     return { ok: false, strategies: [], errors: ["Unrecognized JSON format"] };
   }
 
+  if (list.length > STRATEGY_LIMITS.maxImportStrategies) {
+    return {
+      ok: false,
+      strategies: [],
+      errors: [
+        `At most ${STRATEGY_LIMITS.maxImportStrategies} strategies per import`,
+      ],
+    };
+  }
+
   const strategies: AlertStrategy[] = [];
   for (let i = 0; i < list.length; i++) {
     const parsed = parseStrategy(list[i]);
@@ -154,6 +183,7 @@ export function importStrategies(
       continue;
     }
     if (opts?.replaceIds) {
+      // Import always creates a new identity — never silently overwrite a saved preset.
       parsed.id = `imported_${Date.now()}_${i}`;
       parsed.version = 1;
     }

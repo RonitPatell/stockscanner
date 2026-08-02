@@ -50,6 +50,10 @@ model User {
   lastTrialDripAt    DateTime?
   /// Explicit opt-in to sync trader feedback / autopsy records to the account.
   traderFeedbackSyncOptIn Boolean @default(false)
+  /// Beta opt-out: hide TrustTicker Monitor and keep Feed / legacy desk.
+  monitorBetaOptOut Boolean @default(false)
+  /// Lightweight Monitor UI prefs (preset id, pin, density, squawk) — never full strategy JSON.
+  monitorUiPrefs   Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   alertLogs        AlertLog[]
@@ -692,6 +696,51 @@ model ServiceCreditAuditLog {
   @@index([evaluationId])
   @@index([actorUserId])
   @@index([createdAt])
+}
+
+/// Durable audit trail for Monitor Operations admin mutations.
+model MonitorOpsAuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  action       String
+  confirmToken String?
+  detailJson   Json
+  ipHash       String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+/// Compact durable Monitor public snapshot (Redis is active; PG is controlled schedule).
+model MonitorPublicSnapshot {
+  id                 String   @id @default(cuid())
+  snapshotId         String   @unique
+  schemaVersion      String
+  calculationVersion String
+  lastEventId        String
+  generatedAt        DateTime
+  marketSession      String
+  isRecovery         Boolean  @default(false)
+  payloadJson        Json
+  createdAt          DateTime @default(now())
+
+  @@index([generatedAt])
+  @@index([lastEventId])
+  @@index([createdAt])
+}
+
+/// Snapshot generation / publish errors — never mixed into the active snapshot body.
+model MonitorSnapshotBuildError {
+  id         String   @id @default(cuid())
+  stage      String
+  message    String
+  detailJson Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([stage])
 }
 
 /// Direct messages to the founder (help / suggestions / feature requests).

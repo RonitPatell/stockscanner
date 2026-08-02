@@ -251,6 +251,10 @@ function buildVolumeLeader(
     dayHigh,
     nearHod: dayHigh > 0 && quote.price >= dayHigh * 0.995,
     marketCap: quote.marketCap,
+    floatShares:
+      quote.floatShares != null && quote.floatShares > 0
+        ? quote.floatShares
+        : undefined,
   };
 }
 

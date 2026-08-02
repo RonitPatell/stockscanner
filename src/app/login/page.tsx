@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { entitledDashboardHref } from "@/lib/monitor/route";
 import LoginForm from "./LoginForm";
 
 export default async function LoginPage({
@@ -22,7 +23,11 @@ export default async function LoginPage({
       where: { id: session.user.id },
       select: { subscriptionStatus: true, subscriptionEndsAt: true },
     });
-    redirect(hasActiveSubscription(user ?? undefined) ? "/dashboard" : "/demo");
+    redirect(
+      hasActiveSubscription(user ?? undefined)
+        ? entitledDashboardHref()
+        : "/demo"
+    );
   }
 
   return (

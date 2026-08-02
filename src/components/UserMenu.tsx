@@ -7,6 +7,8 @@ import { ChevronDown, LogOut, Settings, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { isSubscribedFromSettings } from "@/lib/subscription-client";
+import { entitledDashboardHref } from "@/lib/monitor/route";
+import { isMonitorV1Enabled } from "@/lib/monitor";
 
 export function UserMenu() {
   const { data: session } = useSession();
@@ -41,8 +43,9 @@ export function UserMenu() {
   if (!session?.user) return null;
 
   const label = session.user.name || session.user.email?.split("@")[0] || "Account";
-  const homeHref = isSubscribed ? "/dashboard" : "/demo";
+  const homeHref = isSubscribed ? entitledDashboardHref() : "/demo";
   const homeLabel = isSubscribed ? "Live Scanner" : "Demo";
+  const homePrefetch = isSubscribed && isMonitorV1Enabled();
 
   return (
     <div className="relative" ref={ref}>
@@ -71,6 +74,7 @@ export function UserMenu() {
           </div>
           <Link
             href={homeHref}
+            prefetch={homePrefetch}
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900 transition-colors"
           >

@@ -1,52 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Sparkles, Layers } from "lucide-react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
-import { LiveScanner, type ScannerTab } from "../LiveScanner";
-import { WatchlistBrief } from "../WatchlistBrief";
-import { PremarketCenter } from "../PremarketCenter";
-import { SessionRecap } from "../SessionRecap";
-import { SpeedWinsPanel } from "../SpeedWinsPanel";
-import { SpeedEdgeLedger } from "../SpeedEdgeLedger";
-import { DilutionRadar } from "../DilutionRadar";
-import { GreenLedger } from "../GreenLedger";
-import { TraderFeedbackPanel } from "../trader-feedback/TraderFeedbackPanel";
-import { WatchlistAutopsy } from "../WatchlistAutopsy";
-import { SessionPlanCard } from "../SessionPlanCard";
-import { PaperTradeLedger } from "../PaperTradeLedger";
-import { SympathyMapPanel } from "../SympathyMapPanel";
-import { CatalystReplayPanel } from "../CatalystReplayPanel";
-import { DailyEdgeRecap } from "../DailyEdgeRecap";
-import { SpeedBacktestPanel } from "../SpeedBacktestPanel";
-import { CallBoard } from "../CallBoard";
-import { CatchesBoard } from "../CatchesBoard";
-import { AlertSetupNudge } from "../AlertSetupNudge";
-import { MarketMonitor } from "../MarketMonitor";
-import { HelpTip } from "../HelpTip";
+import type { ScannerTab } from "../LiveScanner";
 import { PlatformGuide } from "../PlatformGuide";
 import { OnboardingWizard } from "../OnboardingWizard";
 import { OnboardingChecklist } from "../OnboardingChecklist";
 import { LiveQuoteProvider } from "../LiveQuoteProvider";
-import { FeedShortcutsHelpButton } from "../catalyst-feed/FeedShortcutsHelpButton";
-import { FocusModeV2 } from "../focus/FocusModeV2";
 import { DashboardTopBar } from "./DashboardTopBar";
-import { DashboardSecondaryNav } from "./DashboardSecondaryNav";
+import { DashboardPanelBar } from "./DashboardPanelBar";
 import { CatalystContextDrawer } from "./CatalystContextDrawer";
-import { SelectedTapeChart } from "../SelectedTapeChart";
-import {
-  destinationFromSearchParams,
-  type DashboardDestination,
-} from "@/lib/dashboard-shell";
+import { TradingFloor } from "./TradingFloor";
+import type { DashboardDestination } from "@/lib/dashboard-shell";
 import { isFocusModeV2Enabled } from "@/lib/focus-mode";
+import { isMonitorV1Enabled } from "@/lib/monitor";
+import { MonitorBetaChrome } from "../monitor/MonitorBetaChrome";
+import { MonitorLoadingSkeleton } from "../monitor/states/MonitorLoadingSkeleton";
 import {
   catalystIdFromSearchParams,
   writeCatalystDeepLink,
 } from "@/lib/decision-drawer";
+import type { MonitorInitialSnapshot } from "@/lib/monitor/ssr";
 import Link from "next/link";
+import {
+  DEFAULT_DESK_MODE,
+  DESK_MODE_META,
+  loadDeskMode,
+  modeFromLegacyView,
+  saveDeskMode,
+  type DeskModeId,
+} from "@/lib/dashboard-shell/panel-prefs";
 
 const MODE_KEY = "tt-dashboard-mode";
 const FOCUS_V2 = isFocusModeV2Enabled();
+
+const TrustTickerMonitor = lazy(async () => {
+  const m = await import("../monitor/TrustTickerMonitor");
+  return { default: m.TrustTickerMonitor };
+});
+
+const DashboardNonMonitorBody = lazy(async () => {
+  const m = await import("./DashboardNonMonitorBody");
+  return { default: m.DashboardNonMonitorBody };
+});
 
 function useDrawerMode(): "side" | "overlay" | "sheet" {
   const [mode, setMode] = useState<"side" | "overlay" | "sheet">("side");
@@ -64,21 +68,74 @@ function useDrawerMode(): "side" | "overlay" | "sheet" {
   return mode;
 }
 
+function ModeSection({
+  id,
+  children,
+}: {
+  id: DeskModeId;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      data-testid={`desk-panel-${id}`}
+      data-guide={
+        id === "watchlist"
+          ? "watchlist-destination"
+          : id === "floor"
+            ? "trading-floor"
+            : undefined
+      }
+      className="desk-panel border-b border-[var(--border)] min-w-0 min-h-0 flex-1 flex flex-col"
+    >
+      {id !== "floor" ? (
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--background)]/95 backdrop-blur border-b border-[var(--border)]/60 shrink-0">
+          <div className="min-w-0 flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+              {DESK_MODE_META[id].label}
+            </h2>
+            <p className="text-[11px] text-zinc-500 truncate hidden md:block">
+              {DESK_MODE_META[id].description}
+            </p>
+          </div>
+        </header>
+      ) : null}
+      <div className="min-h-0 flex-1 flex flex-col">{children}</div>
+    </section>
+  );
+}
+
+function SectionFallback({ label }: { label: string }) {
+  return (
+    <div
+      className="p-4 text-sm text-zinc-500"
+      data-testid="desk-destination-skeleton"
+      aria-busy="true"
+    >
+      Loading {label}…
+    </div>
+  );
+}
+
 export function DashboardShellV3({
   initialCatalysts = [],
   initialWatchlist = [],
   initialFilters = null,
   initialScanner = null,
+  initialDestination,
+  initialMonitorSnapshot = null,
 }: {
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
   initialFilters?: ScannerFilters | null;
   initialScanner?: MarketScannerSnapshot | null;
+  initialDestination?: DashboardDestination;
+  initialMonitorSnapshot?: MonitorInitialSnapshot | null;
 }) {
-  const [destination, setDestination] = useState<DashboardDestination>("feed");
+  const [deskMode, setDeskMode] = useState<DeskModeId>(DEFAULT_DESK_MODE);
   const [tab, setTab] = useState<ScannerTab>("all");
-  const [mode, setMode] = useState<"focus" | "full">("focus");
+  const [mode, setMode] = useState<"focus" | "full">("full");
   const [search, setSearch] = useState("");
+  const [floorLookup, setFloorLookup] = useState<string | null>(null);
   const [selected, setSelected] = useState<CatalystItem | null>(
     () => initialCatalysts[0] ?? null
   );
@@ -88,57 +145,65 @@ export function DashboardShellV3({
   );
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [monitorEnabled, setMonitorEnabled] = useState(isMonitorV1Enabled());
   const drawerMode = useDrawerMode();
+  const selectedIdRef = useRef<string | null>(
+    initialCatalysts[0]?.id ?? null
+  );
 
   useEffect(() => {
-    // Prefetch TradingView widget script so the first chart click is instant
-    void import("../TradingViewMiniChart").then((m) =>
-      m.prefetchTradingViewScript?.()
-    );
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(MODE_KEY);
-      if (saved === "full" || saved === "advanced") setMode("full");
-      else if (saved === "focus" || saved === "simple") setMode("focus");
-    } catch {
-      /* ignore */
-    }
-
+    // Product default is Floor unless an explicit deep link says otherwise.
+    let next: DeskModeId = DEFAULT_DESK_MODE;
     try {
       const params = new URLSearchParams(window.location.search);
-      setDestination(destinationFromSearchParams(params));
+      const viewParam = params.get("view");
+      const fromView = modeFromLegacyView(
+        viewParam ?? initialDestination ?? null
+      );
+      if (fromView) {
+        next = fromView;
+      } else {
+        const saved = loadDeskMode();
+        // Never reopen retired News tab from old prefs
+        next = saved === "news" ? "floor" : saved;
+      }
       if (params.get("focus") === "1") {
         setMode("focus");
         localStorage.setItem(MODE_KEY, "focus");
+        next = "floor";
       }
-      if (params.get("tab") === "watchlist") setTab("watchlist");
+      if (params.get("tab") === "watchlist") {
+        setTab("watchlist");
+        next = "watchlist";
+      }
       if (params.get("tab") === "premarket") setTab("premarket");
+
+      const savedMode = localStorage.getItem(MODE_KEY);
+      if (savedMode === "full" || savedMode === "advanced") setMode("full");
+      else if (savedMode === "focus" || savedMode === "simple") setMode("focus");
+
       const deepId = catalystIdFromSearchParams(params);
       if (deepId) {
         const found = initialCatalysts.find((c) => c.id === deepId);
         if (found) {
+          selectedIdRef.current = found.id;
           setSelected(found);
           setDrawerOpen(true);
           writeCatalystDeepLink(found.id);
+          next = "floor";
         }
       } else if (!selected && initialCatalysts[0]) {
+        selectedIdRef.current = initialCatalysts[0].id;
         setSelected(initialCatalysts[0]);
-      }
-      const muteSym = params.get("mute");
-      if (muteSym && /^[A-Za-z]{1,5}$/.test(muteSym)) {
-        const key = "tt-muted-symbols-v1";
-        const prev = JSON.parse(localStorage.getItem(key) || "[]") as string[];
-        localStorage.setItem(
-          key,
-          JSON.stringify([...new Set([...prev, muteSym.toUpperCase()])])
-        );
       }
     } catch {
       /* ignore */
     }
-  }, [initialCatalysts]);
+    if (next === "news") next = "floor";
+    setDeskMode(next);
+    saveDeskMode(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount hydrate only
+  }, [initialCatalysts, initialDestination]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -153,20 +218,13 @@ export function DashboardShellV3({
     return () => clearTimeout(t);
   }, []);
 
-  const navigate = useCallback((id: DashboardDestination) => {
-    setDestination(id);
-    setDrawerOpen(false);
-    writeCatalystDeepLink(null);
-    if (id === "watchlist") setTab("watchlist");
-    if (id === "feed" && tab === "watchlist") setTab("all");
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("view", id);
-      window.history.replaceState({}, "", url.toString());
-    } catch {
-      /* ignore */
-    }
-  }, [tab]);
+  const selectMode = useCallback((id: DeskModeId) => {
+    const next = id === "news" ? "floor" : id;
+    setDeskMode(next);
+    saveDeskMode(next);
+    if (next === "watchlist") setTab("watchlist");
+    if (next === "floor") setTab("all");
+  }, []);
 
   const setDashboardMode = useCallback((next: "focus" | "full") => {
     setMode(next);
@@ -175,34 +233,55 @@ export function DashboardShellV3({
     } catch {
       /* ignore */
     }
-  }, []);
+    if (next === "focus") selectMode("floor");
+  }, [selectMode]);
+
+  const navigate = useCallback(
+    (id: DashboardDestination) => {
+      const map: Record<DashboardDestination, DeskModeId> = {
+        monitor: "scanner",
+        feed: "floor",
+        watchlist: "watchlist",
+        plan: "floor",
+        risk: "floor",
+        review: "floor",
+      };
+      selectMode(map[id]);
+    },
+    [selectMode]
+  );
+
+  useEffect(() => {
+    const onOpenWatchlist = () => navigate("watchlist");
+    window.addEventListener("tt-open-watchlist-panel", onOpenWatchlist);
+    return () =>
+      window.removeEventListener("tt-open-watchlist-panel", onOpenWatchlist);
+  }, [navigate]);
 
   const onFocusedCatalystChange = useCallback((c: CatalystItem | null) => {
+    const id = c?.id ?? null;
+    // Hard bail — even Object.is-equal setState was retriggering LiveScanner.
+    if (selectedIdRef.current === id) return;
+    selectedIdRef.current = id;
     setSelected(c);
-    // Keep drawer open on j/k; refresh deep-link when a selection exists
-    if (c) {
-      setDrawerOpen((open) => {
-        if (open) {
-          // Defer URL write — never side-effect inside setState updater
-          queueMicrotask(() => writeCatalystDeepLink(c.id));
-        }
-        return open;
-      });
-    }
   }, []);
 
   const onLastEventAtChange = useCallback((d: Date | null) => {
     if (d) setLastEventAt(d);
   }, []);
 
-  /** Click a news row → select for chart + open decision drawer. */
   const openDrawerFor = useCallback((c: CatalystItem) => {
-    setSelected(c);
+    if (selectedIdRef.current !== c.id) {
+      selectedIdRef.current = c.id;
+      setSelected(c);
+    }
     setDrawerOpen(true);
     writeCatalystDeepLink(c.id);
   }, []);
 
   const selectForChart = useCallback((c: CatalystItem) => {
+    if (selectedIdRef.current === c.id) return;
+    selectedIdRef.current = c.id;
     setSelected(c);
   }, []);
 
@@ -214,46 +293,105 @@ export function DashboardShellV3({
   const guideNavigate = useCallback(
     (step?: { id: string; target?: string }) => {
       const t = step?.target ?? "";
-      if (t === "plan-destination" || t === "session-plan" || t === "daily-edge") {
-        navigate("plan");
-      } else if (t === "risk-destination" || t === "dilution-radar" || t === "market-monitor") {
-        navigate("risk");
+      if (t.startsWith("monitor-") || t === "monitor-beta-chrome") {
+        navigate("monitor");
+      } else if (
+        t === "trading-floor" ||
+        t === "floor-movers" ||
+        t === "floor-wire" ||
+        t === "floor-gappers"
+      ) {
+        selectMode("floor");
+      } else if (t === "watchlist-destination") {
+        navigate("watchlist");
+      } else if (t === "news-feed" || t === "live-tape-chart") {
+        selectMode("floor");
       } else {
-        navigate("review");
+        navigate("feed");
       }
     },
-    [navigate]
+    [navigate, selectMode]
   );
 
   const focused = mode === "focus";
   const focusV2Active = FOCUS_V2 && focused;
   const feedTab: ScannerTab =
-    destination === "watchlist" ? "watchlist" : tab;
+    deskMode === "watchlist" || tab === "watchlist" ? "watchlist" : tab;
 
   useEffect(() => {
     if (!focusV2Active) return;
-    if (destination === "plan" || destination === "risk" || destination === "review") {
-      setDestination("feed");
-    }
-  }, [focusV2Active, destination]);
+    if (deskMode !== "floor" && deskMode !== "watchlist") selectMode("floor");
+  }, [focusV2Active, deskMode, selectMode]);
 
+  useEffect(() => {
+    if (!monitorEnabled && deskMode === "scanner") {
+      selectMode("floor");
+    }
+  }, [monitorEnabled, deskMode, selectMode]);
+
+  // On Floor, search loads a ticker — do not filter the news tape.
   const filtersWithSearch = useMemo(() => {
     const base = initialFilters ?? {};
+    if (deskMode === "floor") return base;
     if (!search.trim()) return base;
     return { ...base, search: search.trim() };
-  }, [initialFilters, search]);
+  }, [initialFilters, search, deskMode]);
+
+  const submitSearch = useCallback(
+    (raw: string) => {
+      const token = raw.trim().toUpperCase().replace(/^\$/, "");
+      const sym = token.split(/\s+/)[0] ?? "";
+      if (!sym) return;
+      if (deskMode === "floor" || /^[A-Z]{1,5}$/.test(sym)) {
+        selectMode("floor");
+        setFloorLookup(sym);
+        setSearch(sym);
+        return;
+      }
+      // Stay on Floor — session news already lives there
+      selectMode("floor");
+      setSearch(raw.trim());
+    },
+    [deskMode, selectMode]
+  );
 
   const showSideDrawer =
     drawerOpen &&
     drawerMode === "side" &&
-    (destination === "feed" || destination === "watchlist" || focusV2Active);
+    (deskMode === "floor" ||
+      deskMode === "news" ||
+      deskMode === "watchlist" ||
+      focusV2Active);
+
+  const nonMonitorProps = {
+    focused,
+    focusV2Active,
+    tab,
+    setTab,
+    setDashboardMode,
+    navigate,
+    search,
+    setSearch,
+    selected,
+    drawerOpen,
+    initialCatalysts,
+    initialWatchlist,
+    filtersWithSearch,
+    initialScanner,
+    openDrawerFor,
+    onFocusedCatalystChange,
+    onLastEventAtChange,
+    selectForChart,
+    feedTab,
+  };
 
   return (
     <LiveQuoteProvider>
       <div
         className="dashboard-shell-v3 flex flex-col h-full min-h-0"
         data-shell="v3"
-        data-destination={destination}
+        data-layout="exclusive-modes"
+        data-desk-mode={deskMode}
       >
         {showOnboarding && (
           <OnboardingWizard
@@ -278,275 +416,110 @@ export function DashboardShellV3({
           lastEventAt={lastEventAt}
           searchValue={search}
           onSearchChange={setSearch}
-        />
-        <DashboardSecondaryNav
-          active={destination}
-          onChange={navigate}
-          hiddenIds={
-            focusV2Active ? ["plan", "risk", "review"] : undefined
+          onSearchSubmit={submitSearch}
+          searchPlaceholder={
+            deskMode === "floor"
+              ? "Search any ticker — float, mcap, chart"
+              : "Search ticker or headline"
           }
         />
+        <DashboardPanelBar mode={deskMode} onSelect={selectMode} />
 
-        {/* Single page-level scroll — no left feature column */}
-        <div className="flex-1 min-h-0 flex max-w-[1680px] w-full mx-auto">
-          <main
-            className="flex-1 min-w-0 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 space-y-3"
-            data-testid="dashboard-main-scroll"
-          >
-            {(destination === "feed" || destination === "watchlist") && !focusV2Active && (
-              <>
-                <div className="flex flex-wrap items-center gap-2">
+        <div className="flex-1 min-h-0 flex w-full">
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col">
+            {deskMode === "floor" ? (
+              <ModeSection id="floor">
+                <TradingFloor
+                  initialScanner={initialScanner}
+                  initialCatalysts={initialCatalysts}
+                  lookupSymbol={floorLookup}
+                  onLookupHandled={() => setFloorLookup(null)}
+                  onSymbolSelect={(symbol, catalyst) => {
+                    if (catalyst) {
+                      onFocusedCatalystChange(catalyst);
+                    } else {
+                      const id = `floor-${symbol}`;
+                      if (selectedIdRef.current !== id) {
+                        selectedIdRef.current = id;
+                        setSelected({
+                          id,
+                          symbol,
+                          headline: symbol,
+                          source: "floor",
+                          publishedAt: new Date().toISOString(),
+                        });
+                      }
+                    }
+                    setLastEventAt(new Date());
+                  }}
+                />
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "news" ? (
+              <ModeSection id="news">
+                <div className="max-w-[1680px] w-full mx-auto min-h-[380px]">
+                  <Suspense fallback={<SectionFallback label="News" />}>
+                    <DashboardNonMonitorBody
+                      {...nonMonitorProps}
+                      destination="feed"
+                    />
+                  </Suspense>
+                </div>
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "watchlist" ? (
+              <ModeSection id="watchlist">
+                <div className="max-w-[1680px] w-full mx-auto min-h-[320px]">
+                  <Suspense fallback={<SectionFallback label="Watchlist" />}>
+                    <DashboardNonMonitorBody
+                      {...nonMonitorProps}
+                      destination="watchlist"
+                    />
+                  </Suspense>
+                </div>
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "scanner" ? (
+              <ModeSection id="scanner">
+                <div className="flex flex-col min-w-0">
                   <div
-                    className="desk-seg desk-command-mode"
-                    role="group"
-                    aria-label="Feed density"
+                    className="min-h-[min(72vh,820px)] h-[min(72vh,820px)] max-h-[min(72vh,820px)] flex flex-col min-w-0 overflow-hidden relative z-0"
+                    data-testid="monitor-root"
                   >
-                    <button
-                      type="button"
-                      data-active={focused}
-                      data-testid="mode-focus"
-                      onClick={() => setDashboardMode("focus")}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Focus
-                    </button>
-                    <button
-                      type="button"
-                      data-active={!focused}
-                      data-testid="mode-full"
-                      onClick={() => setDashboardMode("full")}
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      Standard
-                    </button>
-                  </div>
-                  <HelpTip title="Focus Mode">
-                    Focus keeps at most five priority catalysts — materiality,
-                    reaction, tradeability, and risk — not predicted profit.
-                  </HelpTip>
-                  <FeedShortcutsHelpButton className="ml-auto" />
-                </div>
-                <AlertSetupNudge />
-              </>
-            )}
-
-            {focusV2Active && (
-              <FocusModeV2
-                initialCatalysts={initialCatalysts}
-                initialWatchlist={initialWatchlist}
-                initialFilters={filtersWithSearch}
-                searchValue={search}
-                onSearchChange={setSearch}
-                onExitFocus={() => setDashboardMode("full")}
-                onCatalystActivate={openDrawerFor}
-                onFocusedCatalystChange={onFocusedCatalystChange}
-                onLastEventAtChange={onLastEventAtChange}
-                focusCatalystId={drawerOpen ? selected?.id ?? null : null}
-                onShowAllNews={() => {
-                  setDashboardMode("full");
-                  navigate("feed");
-                }}
-                onEditFocusRules={() => {
-                  window.location.href = "/settings#alert-strategies";
-                }}
-                onReviewWatchlist={() => {
-                  setDashboardMode("full");
-                  navigate("watchlist");
-                }}
-              />
-            )}
-
-            {!focusV2Active && destination === "feed" && (
-              <div className="space-y-3">
-                <section
-                  data-guide="live-tape-chart"
-                  className="desk-panel desk-panel--raised"
-                >
-                  <div className="desk-panel-header shrink-0 flex items-center gap-2 px-3 py-2">
-                    <span className="desk-label">Chart</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Click any headline to load its 1‑minute tape
-                    </span>
-                  </div>
-                  <div className="p-2">
-                    {selected ? (
-                      <SelectedTapeChart
-                        symbol={selected.symbol}
-                        headline={selected.headline}
-                        onOpenDetails={() => openDrawerFor(selected)}
-                      />
-                    ) : (
-                      <p className="px-2 py-6 text-center text-[12px] text-[var(--text-muted)]">
-                        Select a news row to open its chart
-                      </p>
-                    )}
-                  </div>
-                </section>
-
-                <section data-guide="news-feed" className="desk-panel desk-panel--raised flex flex-col min-h-[60vh]">
-                  <div className="desk-panel-header shrink-0 flex items-center gap-2 px-3 py-2">
-                    <span className="desk-label">Feed</span>
-                    <div className="flex gap-1 ml-auto items-center">
-                      {(
-                        [
-                          ["all", "All"],
-                          ["premarket", "Premarket"],
-                          ["watchlist", "Watchlist"],
-                        ] as const
-                      ).map(([id, label]) => (
-                        <button
-                          key={id}
-                          type="button"
-                          data-active={tab === id}
-                          className="desk-feed-tab"
-                          onClick={() => setTab(id)}
-                        >
-                          {label}
-                        </button>
-                      ))}
+                    <div className="shrink-0">
+                      <MonitorBetaChrome onAccessChange={setMonitorEnabled} />
                     </div>
-                  </div>
-                  <LiveScanner
-                    embedded
-                    tab={feedTab}
-                    onTabChange={setTab}
-                    initialCatalysts={initialCatalysts}
-                    initialWatchlist={initialWatchlist}
-                    initialFilters={filtersWithSearch}
-                    focusCompact={focused}
-                    onFocusedCatalystChange={(c) => {
-                      onFocusedCatalystChange(c);
-                      if (c) selectForChart(c);
-                    }}
-                    onLastEventAtChange={onLastEventAtChange}
-                    onCatalystActivate={openDrawerFor}
-                    focusCatalystId={selected?.id ?? null}
-                  />
-                </section>
-              </div>
-            )}
-
-            {!focusV2Active && destination === "watchlist" && (
-              <section
-                data-guide="watchlist-destination"
-                className="space-y-3"
-              >
-                <WatchlistBrief />
-                <section
-                  data-guide="live-tape-chart"
-                  className="desk-panel desk-panel--raised"
-                >
-                  <div className="desk-panel-header px-3 py-2">
-                    <span className="desk-label">Chart</span>
-                  </div>
-                  <div className="p-2">
-                    {selected ? (
-                      <SelectedTapeChart
-                        symbol={selected.symbol}
-                        headline={selected.headline}
-                        onOpenDetails={() => openDrawerFor(selected)}
-                      />
+                    {monitorEnabled ? (
+                      <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col">
+                        <Suspense fallback={<MonitorLoadingSkeleton />}>
+                          <TrustTickerMonitor
+                            initialSnapshot={initialMonitorSnapshot}
+                          />
+                        </Suspense>
+                      </div>
                     ) : (
-                      <p className="px-2 py-6 text-center text-[12px] text-[var(--text-muted)]">
-                        Select a watchlist row to open its chart
-                      </p>
+                      <div className="flex-1 min-h-0 p-6 text-sm text-zinc-400 space-y-3 overflow-auto">
+                        <p>
+                          Advanced Scanner is not active for your account.
+                          Switch back to Floor above, or open the old
+                          dashboard.
+                        </p>
+                        <Link
+                          href="/dashboard?shell=legacy"
+                          className="text-sky-400/90 underline-offset-2 hover:underline"
+                        >
+                          Old dashboard
+                        </Link>
+                      </div>
                     )}
                   </div>
-                </section>
-                <section data-guide="news-feed" className="desk-panel desk-panel--raised flex flex-col min-h-[60vh]">
-                  <div className="desk-panel-header px-3 py-2">
-                    <span className="desk-label">Watchlist feed</span>
-                  </div>
-                  <LiveScanner
-                    embedded
-                    tab="watchlist"
-                    onTabChange={setTab}
-                    initialCatalysts={initialCatalysts}
-                    initialWatchlist={initialWatchlist}
-                    initialFilters={filtersWithSearch}
-                    focusCompact={focused}
-                    onFocusedCatalystChange={(c) => {
-                      onFocusedCatalystChange(c);
-                      if (c) selectForChart(c);
-                    }}
-                    onLastEventAtChange={onLastEventAtChange}
-                    onCatalystActivate={openDrawerFor}
-                    focusCatalystId={selected?.id ?? null}
-                  />
-                </section>
-                <WatchlistAutopsy symbols={initialWatchlist} />
-              </section>
-            )}
-
-            {!focusV2Active && destination === "plan" && (
-              <section data-guide="plan-destination" className="space-y-4 max-w-3xl">
-                <div data-guide="session-plan">
-                  <SessionPlanCard />
                 </div>
-                <p className="text-[12px] text-[--text-secondary]">
-                  Full daily plan page:{" "}
-                  <Link href="/today" className="text-emerald-400 underline">
-                    /today
-                  </Link>
-                </p>
-                <div data-guide="daily-edge">
-                  <DailyEdgeRecap />
-                </div>
-                <SessionRecap />
-                {!focused && <PremarketCenter />}
-              </section>
-            )}
-
-            {!focusV2Active && destination === "risk" && (
-              <section data-guide="risk-destination" className="space-y-4 max-w-3xl">
-                <div data-guide="dilution-radar">
-                  <DilutionRadar />
-                </div>
-                <p className="text-[12px] text-[--text-secondary]">
-                  Halt code reference:{" "}
-                  <Link href="/halt-codes" className="text-emerald-400 underline">
-                    /halt-codes
-                  </Link>
-                  . Official halt status appears on Decision Cards when configured.
-                </p>
-                <div data-guide="market-monitor" className="min-h-[320px]">
-                  <div className="desk-label px-1 pb-1">Wire &amp; volume</div>
-                  <MarketMonitor className="h-full min-h-[300px]" initialSnapshot={initialScanner} />
-                </div>
-                <SympathyMapPanel seedSymbol={initialWatchlist[0]} />
-              </section>
-            )}
-
-            {!focusV2Active && destination === "review" && (
-              <section
-                data-guide="review-destination"
-                className="space-y-4 max-w-3xl"
-              >
-                <div data-guide="skip-ledger">
-                  <GreenLedger />
-                </div>
-                <TraderFeedbackPanel />
-                <PaperTradeLedger />
-                <div data-guide="wins-brief">
-                  <SpeedWinsPanel showViewAll title="Speed wins" />
-                </div>
-                <div data-guide="catches-board">
-                  <CatchesBoard />
-                </div>
-                <div data-guide="call-board">
-                  <CallBoard />
-                </div>
-                <CatalystReplayPanel />
-                <SpeedBacktestPanel />
-                <SpeedEdgeLedger />
-              </section>
-            )}
-
-            <p className="desk-disclaimer text-[10px] text-[--text-muted] text-center pb-4">
-              Not financial advice · informational only · TrustTicker does not
-              execute orders
-            </p>
-          </main>
+              </ModeSection>
+            ) : null}
+          </div>
 
           {showSideDrawer && (
             <CatalystContextDrawer
@@ -567,7 +540,6 @@ export function DashboardShellV3({
           />
         )}
 
-        {/* Keep closed marker mounted for guide target uniqueness tests on feed */}
         {!drawerOpen && (
           <CatalystContextDrawer
             catalyst={null}

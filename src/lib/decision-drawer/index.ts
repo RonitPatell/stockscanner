@@ -174,11 +174,25 @@ export function writeCatalystDeepLink(catalystId: string | null): void {
   if (typeof window === "undefined") return;
   try {
     const url = new URL(window.location.href);
-    if (catalystId) url.searchParams.set(DRAWER_CATALYST_PARAM, catalystId);
+    const next = catalystId ? catalystId.trim().slice(0, 128) : "";
+    const cur =
+      url.searchParams.get(DRAWER_CATALYST_PARAM) ??
+      url.searchParams.get("catalystId") ??
+      url.searchParams.get("catalyst") ??
+      "";
+    if (next === cur) return;
+    if (next) url.searchParams.set(DRAWER_CATALYST_PARAM, next);
     else url.searchParams.delete(DRAWER_CATALYST_PARAM);
     url.searchParams.delete("catalystId");
     url.searchParams.delete("catalyst");
-    window.history.replaceState({}, "", url.toString());
+    // Prefer pushState-less URL sync only when the value actually changes.
+    // Dashboard reads searchParams as RSC — thrashing replaceState causes
+    // fetchMissingDynamicData / "Failed to fetch" under load.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      url.toString()
+    );
   } catch {
     /* ignore */
   }

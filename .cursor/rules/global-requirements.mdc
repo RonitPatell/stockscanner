@@ -1,0 +1,49 @@
+---
+description: Global TrustTicker product, accuracy, security, and compliance requirements for every change
+alwaysApply: true
+---
+
+# Global TrustTicker requirements
+
+TrustTicker is an **informational market-intelligence product**. It does not execute orders.
+
+## Do not
+
+- Add brokerage execution
+- Present personalized buy or sell instructions
+- Claim or imply guaranteed profits
+- Display expected profit, target prices, or probability of success
+- Claim latency or reliability targets have been achieved without adequate reproducible production samples
+- Cherry-pick performance or latency records
+- Copy Arcane Monitor branding, artwork, source code, proprietary assets, or exact visual styling
+
+## Security
+
+- Never trust a client-provided `userId`
+- Derive private ownership from the authenticated server session
+- Scope every private query and mutation by session user
+- Require server-side `requireAdmin` (or equivalent) on every admin page, API, and server action
+- Keep cron authentication fail-closed
+- Rate-limit sensitive and computationally expensive endpoints
+- Use least-privilege Prisma selects
+- Never expose secrets, provider credentials, internal hostnames, webhook URLs, or private user data
+- Analytics must use event-specific allowlists
+
+Also follow `.cursor/rules/security.mdc`.
+
+## Accuracy
+
+- Preserve source timestamps, sequence numbers, and data-quality states
+- Never silently substitute missing values
+- Distinguish unavailable, stale, estimated, and verified data
+- Quarantine ambiguous ticker resolution
+- Preserve calculation and rule versions
+- Every calculated state must be explainable
+
+## Product
+
+- Separate momentum intensity, attention priority, tradeability, directional implication, and risk
+- Never use an attention score as a recommendation
+- Major trader-interface changes must update the Platform Guide version, copy, and `data-guide` targets (see `.cursor/rules/platform-guide.mdc`)
+- Maintain keyboard and screen-reader accessibility
+- Use feature flags and backward-compatible migrations

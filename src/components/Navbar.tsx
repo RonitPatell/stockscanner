@@ -8,6 +8,8 @@ import { UserMenu } from "./UserMenu";
 import { BrandHomeLink } from "./BrandHomeLink";
 
 import { isSubscribedFromSettings } from "@/lib/subscription-client";
+import { entitledDashboardHref } from "@/lib/monitor/route";
+import { isMonitorV1Enabled } from "@/lib/monitor";
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -33,8 +35,10 @@ export function Navbar() {
     };
   }, [isLoggedIn, session?.user?.id]);
 
-  const scannerHref = isSubscribed ? "/dashboard" : "/demo";
+  const scannerHref = isSubscribed ? entitledDashboardHref() : "/demo";
   const scannerLabel = isSubscribed ? "Open Scanner" : "Evidence demo";
+  /** Link prefetch only when entitled — Next skips work for demo. */
+  const monitorLinkPrefetch = isSubscribed && isMonitorV1Enabled();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] bg-[rgba(9,8,7,0.72)] backdrop-blur-xl">
@@ -63,7 +67,13 @@ export function Navbar() {
               )}
               {isSubscribed && (
                 <>
-                  <Link href="/dashboard" className="hover:text-[var(--text-primary)] transition-colors">Scanner</Link>
+                  <Link
+                    href={scannerHref}
+                    prefetch={monitorLinkPrefetch}
+                    className="hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    Scanner
+                  </Link>
                   <Link href="/desk" className="hover:text-[var(--text-primary)] transition-colors">Prop Desk</Link>
                 </>
               )}
@@ -77,7 +87,11 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <>
-              <Link href={scannerHref} className="hidden sm:block">
+              <Link
+                href={scannerHref}
+                prefetch={isSubscribed ? monitorLinkPrefetch : true}
+                className="hidden sm:block"
+              >
                 <Button size="sm">{scannerLabel}</Button>
               </Link>
               <UserMenu />

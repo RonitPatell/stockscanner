@@ -15,11 +15,11 @@ import {
   PLATFORM_GUIDE_VERSION,
 } from "../src/lib/platform-guide.ts";
 
-test("five destinations defined", () => {
-  assert.equal(DASHBOARD_DESTINATIONS.length, 5);
+test("six destinations defined (Monitor + five legacy)", () => {
+  assert.equal(DASHBOARD_DESTINATIONS.length, 6);
   assert.deepEqual(
     DASHBOARD_DESTINATIONS.map((d) => d.id),
-    ["feed", "watchlist", "plan", "risk", "review"]
+    ["monitor", "feed", "watchlist", "plan", "risk", "review"]
   );
 });
 
@@ -54,8 +54,8 @@ test("deep links map legacy panels to destinations", () => {
   );
 });
 
-test("platform guide version bumped for shell v3", () => {
-  assert.ok(PLATFORM_GUIDE_VERSION >= 27);
+test("platform guide version bumped for shell v3 / monitor", () => {
+  assert.ok(PLATFORM_GUIDE_VERSION >= 41);
 });
 
 test("each dashboard guide target is unique in steps", () => {

@@ -149,6 +149,12 @@ export interface VolumeLeader {
   dayHigh: number;
   nearHod: boolean;
   marketCap?: number;
+  /** Share float when the quote/profile feed has it. */
+  floatShares?: number;
+  /** Trade prints when the upstream feed provides a count; otherwise omit. */
+  ticks?: number;
+  /** Client sticky / universe source — not shown in UI. */
+  source?: "scanner" | "universe" | "news" | "lookup";
 }
 
 export interface MarketScannerSnapshot {

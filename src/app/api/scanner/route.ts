@@ -1,55 +1,16 @@
 import { NextResponse } from "next/server";
 import { requirePro } from "@/lib/api-guard";
-import {
-  getCachedScannerSnapshot,
-  scanMarketActivity,
-  type CatalystScanHint,
-} from "@/lib/market-scanner";
-import { prisma } from "@/lib/prisma";
-import { isValidTickerFormat } from "@/lib/ticker-utils";
-import { isKnownFalsePositive } from "@/lib/news-verifier";
+import { getCachedScannerSnapshot } from "@/lib/market-scanner";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 15;
 
-async function loadCatalystHints(): Promise<CatalystScanHint[]> {
-  try {
-    let catalystHints = await prisma.catalyst.findMany({
-      select: {
-        symbol: true,
-        price: true,
-        changePercent: true,
-        headline: true,
-        publishedAt: true,
-        volume: true,
-        avgVolume: true,
-      },
-      where: {
-        publishedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      },
-      orderBy: { publishedAt: "desc" },
-      take: 120,
-    });
-    catalystHints = catalystHints.filter(
-      (h) =>
-        isValidTickerFormat(h.symbol) &&
-        !isKnownFalsePositive(h.symbol, h.headline) &&
-        h.price != null &&
-        h.changePercent != null
-    );
-
-    const seen = new Set<string>();
-    return catalystHints.filter((h) => {
-      if (seen.has(h.symbol)) return false;
-      seen.add(h.symbol);
-      return true;
-    });
-  } catch {
-    return [];
-  }
-}
-
+/**
+ * Pro scanner read API — cache only.
+ * Does NOT connect market-data providers, rebuild the symbol universe,
+ * or warm the Monitor snapshot. Warming is cron/worker-owned.
+ */
 export async function GET(req: Request) {
   const gate = await requirePro();
   if (gate.error) return gate.error;
@@ -65,33 +26,30 @@ export async function GET(req: Request) {
 
   try {
     const cached = await getCachedScannerSnapshot();
-    const hasCached =
-      cached && (cached.alerts.length > 0 || cached.volumeLeaders.length > 0);
-
-    if (hasCached) {
-      // Refresh in background — client already has something to paint
-      void (async () => {
-        try {
-          const hints = await loadCatalystHints();
-          await scanMarketActivity(
-            hints.map((h) => h.symbol),
-            hints
-          );
-        } catch {
-          /* ignore */
-        }
-      })();
-      return NextResponse.json(cached);
+    if (cached) {
+      return NextResponse.json({
+        ...cached,
+        workerOwned: true,
+      });
     }
 
-    const catalystHints = await loadCatalystHints();
-    const snapshot = await scanMarketActivity(
-      catalystHints.map((h) => h.symbol),
-      catalystHints
+    return NextResponse.json(
+      {
+        alerts: [],
+        volumeLeaders: [],
+        scannedAt: new Date().toISOString(),
+        marketSession: "closed",
+        stale: true,
+        workerOwned: true,
+        note: "Scanner snapshot not yet published by market workers",
+      },
+      {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      }
     );
-    return NextResponse.json(snapshot);
   } catch (error) {
     console.error("Scanner API error:", error);
-    return NextResponse.json({ error: "Scanner failed" }, { status: 500 });
+    return NextResponse.json({ error: "Scanner unavailable" }, { status: 500 });
   }
 }

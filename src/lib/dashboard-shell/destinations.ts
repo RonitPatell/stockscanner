@@ -1,4 +1,7 @@
+import { isMonitorV1Enabled } from "../monitor/flags.ts";
+
 export type DashboardDestination =
+  | "monitor"
   | "feed"
   | "watchlist"
   | "plan"
@@ -11,6 +14,12 @@ export const DASHBOARD_DESTINATIONS: Array<{
   href: string;
   description: string;
 }> = [
+  {
+    id: "monitor",
+    label: "Monitor",
+    href: "/dashboard?view=monitor",
+    description: "TrustTicker Monitor — priority ladder and momentum field",
+  },
   {
     id: "feed",
     label: "Feed",
@@ -43,20 +52,26 @@ export const DASHBOARD_DESTINATIONS: Array<{
   },
 ];
 
-const VALID = new Set<DashboardDestination>([
-  "feed",
-  "watchlist",
-  "plan",
-  "risk",
-  "review",
-]);
+const VALID = new Set<DashboardDestination>(
+  DASHBOARD_DESTINATIONS.map((d) => d.id)
+);
+
+/** Destinations visible in nav (Monitor gated by monitorV1). */
+export function visibleDestinations(): typeof DASHBOARD_DESTINATIONS {
+  if (isMonitorV1Enabled()) return DASHBOARD_DESTINATIONS;
+  return DASHBOARD_DESTINATIONS.filter((d) => d.id !== "monitor");
+}
 
 /** Map legacy panel deep-links to V3 destinations. */
 export function destinationFromSearchParams(
   params: URLSearchParams
 ): DashboardDestination {
+  const monitorOn = isMonitorV1Enabled();
   const view = params.get("view")?.toLowerCase();
-  if (view && VALID.has(view as DashboardDestination)) {
+  if (view === "monitor") {
+    return monitorOn ? "monitor" : "feed";
+  }
+  if (view && VALID.has(view as DashboardDestination) && view !== "monitor") {
     return view as DashboardDestination;
   }
 
@@ -91,11 +106,14 @@ export function destinationFromSearchParams(
   }
   if (panel === "watchlist" || panel === "brief") return "watchlist";
   if (panel === "feed" || panel === "news" || panel === "scanner") return "feed";
+  if (panel === "monitor" || panel === "tt-monitor") {
+    return monitorOn ? "monitor" : "feed";
+  }
 
-  // ?focus=1 stays on Feed with Focus Mode
   if (params.get("tab") === "watchlist") return "watchlist";
 
-  return "feed";
+  // Default landing: Monitor when flag on, else Feed.
+  return monitorOn ? "monitor" : "feed";
 }
 
 export function destinationDeepLink(

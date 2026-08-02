@@ -86,6 +86,7 @@ export async function GET() {
       emailBriefEnabled: true,
       onboardingCompleted: true,
       pushSubscription: true,
+      monitorBetaOptOut: true,
     },
   });
 
@@ -108,6 +109,7 @@ export async function GET() {
     emailBriefEnabled: user.emailBriefEnabled,
     onboardingCompleted: user.onboardingCompleted,
     pushSubscription: user.pushSubscription ? { configured: true } : null,
+    monitorBetaOptOut: user.monitorBetaOptOut === true,
   });
 }
 
@@ -219,6 +221,9 @@ export async function PATCH(req: NextRequest) {
       ...(alertRules !== undefined && {
         alertRules: alertRules as unknown as Prisma.InputJsonValue,
       }),
+      ...(body.monitorBetaOptOut !== undefined && {
+        monitorBetaOptOut: body.monitorBetaOptOut === true,
+      }),
     },
     select: {
       discordWebhook: true,
@@ -230,6 +235,7 @@ export async function PATCH(req: NextRequest) {
       watchlist: true,
       scannerFilters: true,
       alertRules: true,
+      monitorBetaOptOut: true,
     },
   });
 
@@ -258,6 +264,7 @@ export async function PATCH(req: NextRequest) {
     watchlist: user.watchlist,
     scannerFilters: user.scannerFilters,
     alertRules: user.alertRules,
+    monitorBetaOptOut: user.monitorBetaOptOut === true,
   });
 }
 

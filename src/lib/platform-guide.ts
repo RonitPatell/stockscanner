@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 35;
+export const PLATFORM_GUIDE_VERSION = 55;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -26,15 +26,126 @@ export interface GuideStep {
 export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
-    title: "Welcome to your desk",
-    body: "The desk uses five destinations: Feed, Watchlist, Plan, Risk, and Review. Session Plan, Dilution, and the Green Ledger are no longer pinned beside the live feed — open the matching tab when you need them.",
+    title: "Welcome to TrustTicker",
+    body: "The dashboard opens on the Trading Floor: live movers, wire, news, and chart. That is the main desk.",
     tip: "Tap any ? icon if something is unclear · Esc exits the guide",
+  },
+  {
+    id: "secondary-nav",
+    target: "dashboard-secondary-nav",
+    title: "View switcher",
+    body: "Floor is the main desk. Watchlist is your saved symbols. Separate News/Scanner tabs were removed — Floor already has the live tape.",
+  },
+  {
+    id: "trading-floor",
+    target: "trading-floor",
+    title: "Trading Floor",
+    body: "Default desk. Left list switches Volume / Biggest % (same full-height rail — no cramped bottom strip). Wire below. Chart + news stay large on the right. Search any ticker for float, market cap, and chart; session news keeps running. Names stay sticky ~30 minutes.",
+  },
+  {
+    id: "floor-wire",
+    target: "floor-wire",
+    title: "Wire alerts",
+    body: "Constant notifications when names surge on volume, hit highs, or show momentum. Click an alert to load that symbol on the chart.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-beta",
+    target: "monitor-beta-chrome",
+    title: "Scanner beta controls",
+    body: "Only on the Scanner view. During staged rollout you can open the old dashboard, opt out of Scanner beta, and send feedback. Technical errors are captured without private financial notes.",
+    tip: "Floor and News stay available if you opt out",
+  },
+  {
+    id: "monitor-status",
+    target: "monitor-status-bar",
+    title: "Scanner status bar",
+    body: "Command chrome: market session, connection (Live / Degraded / Disconnected / Recovered), last event age, snapshot age, search, active strategy preset, Squawk, and profile. Quiet markets stay empty — no fake tickers. Outages name user-facing categories and link to /status.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-session",
+    target: "monitor-session",
+    title: "Market session",
+    body: "Shows the current US equity session segment so you know whether you are in premarket, regular, or after-hours context.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-connection",
+    target: "monitor-connection",
+    title: "Stream state",
+    body: "Live shows a steady status mark. Degraded is amber with a plain-language reason. Disconnected is red with recovery context. After reconnect you briefly see Recovered, then back to Live. Snapshot age sits next to Event age on first paint so you know how old the server seed is while live sync catches up.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-filter",
+    target: "monitor-filter-preset",
+    title: "List filters",
+    body: "Primary toggle: All / Watchlist / Strategy. Extra filters (Upward, Downward, Risk, Halted) sit under More. Changes which names you inspect — not a trade filter.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-preset",
+    target: "monitor-preset",
+    title: "Strategy presets",
+    body: "Active preset lives in the status bar. Open it for Alert Strategy Builder templates: Low-Float Momentum, Biotech Catalysts, Large-Cap News, Downside Momentum, Halt and Resumption, Dilution and Offering Risk, Watchlist Only, or Custom. Plain-language summary, validation, export/import, replay preview, and match explains. Saved presets are never changed silently.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-search",
+    target: "monitor-search",
+    title: "Scanner search",
+    body: "Jump to a symbol in the priority list without leaving the Scanner panel.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-squawk",
+    target: "monitor-squawk",
+    title: "Squawk",
+    body: "Status-bar control opens mute, replay, and transcript. Speaks only high-value transitions (verified catalyst, attention leader, momentum breaking, official halt/resumption, high-severity dilution/offering, critical data degradation). Never raw articles, returns, or trade instructions.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-profile",
+    target: "monitor-profile",
+    title: "Profile",
+    body: "Account menu for settings and sign-out. Same profile control as the rest of the desk.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-ladder",
+    target: "monitor-priority-ladder",
+    title: "Priority names",
+    body: "Left column: ranked list (rank, ticker, state, one-line reason). Click a row to load detail on the right. Pin / mute / watchlist from the row. Minor score changes do not constantly reshuffle — critical events may.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-field",
+    target: "monitor-momentum-field",
+    title: "Activity map (optional)",
+    body: "Off by default. Use Show map for an optional spatial view of active names. Prefer the priority list for day-to-day reading. List view inside the map mirrors the same data. Not a trade cue.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-intel",
+    target: "monitor-intelligence",
+    title: "Selected-ticker detail",
+    body: "Right column for the name you clicked: essentials stay usable from the snapshot while filings, analogues, feedback, and autopsy load in isolated panels. A slow secondary never blanks the list. Failures show Retry on that panel only.",
+    requiresExtras: true,
+  },
+  {
+    id: "monitor-tape",
+    target: "monitor-event-tape",
+    title: "Event tape",
+    body: "Bottom strip of inspection events — quiet unless severity is high/critical. Filters: All, Selected, Watchlist, Risk, Market. Click to focus the ticker and jump to the matching detail section. Labels are not trade instructions.",
+    requiresExtras: true,
   },
   {
     id: "top-bar",
     target: "dashboard-top-bar",
-    title: "Top bar",
-    body: "Logo, search, desk health (Live / Catching up), market session, stream connection, and your profile. Search filters the feed without leaving the page.",
+    title: "Desk top bar",
+    body: "Logo, search, desk health, market session, stream connection, and profile — shared across the whole page.",
+    requiresExtras: true,
   },
   {
     id: "trust-status",
@@ -42,18 +153,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     title: "Desk health",
     body: "Live / Catching up / Stale news based on the newest headline’s publish time. Scans ≈ wire poll cadence. Desk Xs = median processing after a catch.",
     tip: "Full status page: /status",
+    requiresExtras: true,
   },
   {
     id: "live-tape-chart",
     target: "live-tape-chart",
     title: "Chart",
     body: "Dedicated 1‑minute TradingView chart for the selected headline. Click any news row to load that ticker — works for NYSE and NASDAQ (not NASDAQ-only).",
-  },
-  {
-    id: "secondary-nav",
-    target: "dashboard-secondary-nav",
-    title: "Destinations",
-    body: "Feed = live catalysts. Watchlist = your book + briefs. Plan = session / daily plan. Risk = dilution, wire & volume, halts. Review = ledger, feedback, autopsies, paper tools.",
+    requiresExtras: true,
   },
   {
     id: "connection",
@@ -61,6 +168,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     title: "Connection status",
     body: "Stream link to your browser: Live · last event age. Click for source and fallback detail. Separate from desk health (headline freshness).",
     tip: "Full status page: /status",
+    requiresExtras: true,
   },
   {
     id: "setup-checklist",
@@ -72,7 +180,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "focus-enter",
     target: "focus-mode-rail",
     title: "Focus Mode",
-    body: "Focus is a minimal live surface: at most five priority catalysts. Plan, Risk, and Review stay hidden until you Exit Focus. Ranking uses strategy match, watchlist, materiality, freshness, and critical risk — never predicted profit.",
+    body: "Focus is a minimal live surface: at most five priority catalysts. The desk switches to the News view until you Exit Focus. Ranking uses strategy match, watchlist, materiality, freshness, and critical risk — never predicted profit.",
     tip: "Enter Focus from Standard, or open /dashboard?focus=1",
   },
   {
@@ -85,49 +193,28 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "focus-exit",
     target: "exit-focus-guide",
     title: "Exit Focus & Squawk",
-    body: "Exit Focus restores Standard destinations. Squawk and the compact Live indicator stay on Focus. Enter opens the Decision Drawer for detail.",
+    body: "Exit Focus returns you to a full News desk. Squawk and the compact Live indicator stay on Focus. Enter opens the Decision Drawer for detail.",
     tip: "j/k navigate · Enter opens drawer",
   },
   {
     id: "context-drawer",
     target: "catalyst-context-drawer",
     title: "Decision Drawer",
-    body: "Right-side Decision Drawer (overlay on tablet, sheet on mobile) shows Event → Reaction → Tradeability → Primary risks → Evidence, then Optional analysis (analogues, feedback) collapsed. Known tape and catalyst fields stay sticky once seen; empty optional rows are omitted instead of labeled Unavailable. Escape closes; j/k keeps it open on the next catalyst. Deep-link with ?cid=.",
+    body: "Right-side Decision Drawer (overlay on tablet, sheet on mobile) shows Event → Reaction → Tradeability → Primary risks → Evidence, then Optional analysis (analogues, feedback) collapsed. Escape closes; j/k keeps it open on the next catalyst. Deep-link with ?cid=.",
     tip: "Source and TradingView stay in the header",
   },
   {
     id: "news-feed",
     target: "news-feed",
-    title: "Standard Feed",
-    body: "Live stock news (last ~8 hours). Click / focus a row: a live 1-minute TradingView chart docks under the feed. Press Enter for the Decision Drawer (Look/Wait/Skip + full chart). Risk → Heavy Volume scans liquid names, not just headlines.",
-    tip: "T opens full TradingView · Enter opens Decision Drawer · Talk to founder (bottom-right)",
+    title: "News",
+    body: "Headlines sit on the Floor (right column) and expand in the News view. Click a row to load the chart. Press Enter on News for the Decision Drawer.",
+    tip: "T opens full TradingView · Enter opens Decision Drawer",
   },
   {
     id: "visual-system",
     target: "visual-system-gallery-link",
     title: "Visual system gallery",
     body: "Open /gallery for feed rows, Decision Drawer sections, status, risk, empty, loading, and disconnected fixtures. Semantic colours: green/red direction, amber risk, cyan system, grey metadata, purple brand.",
-  },
-  {
-    id: "plan",
-    target: "plan-destination",
-    title: "Plan",
-    body: "Session Plan: news review candidates + capital caution, plus a Liquid tape strip of heavy-volume / session movers from the broader tradeable universe (not only headlines). Deep link: /dashboard?view=plan.",
-    requiresExtras: true,
-  },
-  {
-    id: "risk",
-    target: "risk-destination",
-    title: "Risk",
-    body: "Dilution radar (SEC offerings) + Wire & Heavy Volume across liquid US names with a live TradingView chart when you click a ticker. Deep link: /dashboard?view=risk.",
-    requiresExtras: true,
-  },
-  {
-    id: "review",
-    target: "review-destination",
-    title: "Review",
-    body: "Green Ledger, trader feedback & autopsies, paper decisions, and speed tools. Local-first feedback until you opt in to sync. Deep link: /dashboard?view=review.",
-    requiresExtras: true,
   },
   {
     id: "judgment-v2",
@@ -145,45 +232,33 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "done",
     title: "You’re set",
-    body: "Work the Feed. Open Plan / Risk / Review when needed. Prefer capital caution over FOMO. In Settings, the Alert Strategy Builder versions every save.",
-    tip: "Legacy desk: /dashboard?shell=legacy · Prop Desk: /desk",
+    body: "Stay on Floor for movers, wire, news, and chart. Use News or Watchlist when you want a dedicated layout. Prefer capital caution over FOMO.",
+    tip: "Legacy desk: /dashboard?shell=legacy",
   },
 ];
 
 export const DESK_GUIDE_STEPS: GuideStep[] = [
   {
     id: "desk-welcome",
-    title: "Prop Desk mode",
-    body: "A tighter layout for session intensity: judgment tools on the left, live feed on the right. Same data as the main scanner — less scrolling.",
+    title: "Prop Desk",
+    body: "Same Trading Floor idea in a tighter frame: movers and wire stay visible with the live feed.",
   },
   {
-    id: "desk-edge",
-    target: "daily-edge",
-    title: "Catalyst reaction",
-    body: "Normalized price-reaction stats for today’s classifications. Dollar scenarios stay optional and labelled.",
+    id: "desk-floor",
+    target: "trading-floor",
+    title: "Floor first",
+    body: "Heavy volume, biggest movers, wire alerts, news, and chart — click a symbol to focus.",
   },
   {
-    id: "desk-plan",
-    target: "session-plan",
-    title: "Session plan",
-    body: "Suggested setups to focus on and skips (often dilution) before you force trades.",
-  },
-  {
-    id: "desk-dilution",
-    target: "dilution-radar",
-    title: "Dilution radar",
-    body: "Filing evidence for offerings and shelves — capacity vs announced sale labeled. Skip FOMO; open the SEC link when unsure.",
-  },
-  {
-    id: "desk-calls",
-    target: "call-board",
-    title: "Call board",
-    body: "Post and track calls. Filter to your watchlist when you only care about your book.",
+    id: "desk-wire",
+    target: "floor-wire",
+    title: "Wire",
+    body: "Realtime surge / high-of-day / momentum notices so you do not miss loud names.",
   },
   {
     id: "desk-feed",
     target: "news-feed",
-    title: "Live feed",
-    body: "Same realtime stock-news scanner (last ~8 hours, deduped stories) with hotkeys. Expand rows for playbooks and paper stamps.",
+    title: "News",
+    body: "Session headlines with active names sorted first. Open News view for the full tape.",
   },
 ];

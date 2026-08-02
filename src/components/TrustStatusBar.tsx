@@ -37,7 +37,24 @@ export function TrustStatusBar({ className }: { className?: string }) {
     const load = () => {
       void fetch("/api/health")
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d && setHealth(d))
+        .then((d) => {
+          if (!d) return;
+          setHealth((prev) => {
+            if (
+              prev &&
+              prev.status === d.status &&
+              prev.feedUpdatedAt === d.feedUpdatedAt &&
+              prev.feedItemCount === d.feedItemCount &&
+              prev.newestHeadlineAt === d.newestHeadlineAt &&
+              prev.newestHeadlineAgeSec === d.newestHeadlineAgeSec &&
+              prev.avgIngestDelaySec === d.avgIngestDelaySec &&
+              prev.pipelineInFlight === d.pipelineInFlight
+            ) {
+              return prev;
+            }
+            return d as HealthData;
+          });
+        })
         .catch(() => {});
     };
     load();
@@ -46,7 +63,7 @@ export function TrustStatusBar({ className }: { className?: string }) {
   }, []);
 
   useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    const t = setInterval(() => setTick((n) => (n + 1) % 1_000_000), 1000);
     return () => clearInterval(t);
   }, []);
 

@@ -32,10 +32,14 @@ function factValue(facts: StrategyEvalFacts, field: StrategyCondition["field"]):
       return facts.floatM;
     case "float_confidence":
       return facts.floatConfidence;
+    case "market_cap_m":
+      return facts.marketCapM;
     case "catalyst_category":
       return facts.catalystCategory;
     case "source_tier":
       return facts.sourceTier;
+    case "source_verification":
+      return facts.sourceVerification;
     case "confirmation_count":
       return facts.confirmationCount;
     case "catalyst_strength":
@@ -46,6 +50,10 @@ function factValue(facts: StrategyEvalFacts, field: StrategyCondition["field"]):
       return facts.relativeVolume;
     case "dollar_volume":
       return facts.dollarVolume;
+    case "dollar_volume_velocity":
+      return facts.dollarVolumeVelocity;
+    case "trades_per_second":
+      return facts.tradesPerSecond;
     case "pct_move":
       return facts.pctMove;
     case "spread_bps":
@@ -54,10 +62,21 @@ function factValue(facts: StrategyEvalFacts, field: StrategyCondition["field"]):
       return facts.tradeability;
     case "dilution_flag":
       return (facts.dilutionFlags?.length ?? 0) > 0;
+    case "risk_flag":
+      // Presence of any listed risk — evaluated specially in `in` / `not_in`
+      return facts.riskFlags ?? [];
     case "market_session":
       return facts.marketSession;
     case "halt_status":
       return facts.haltStatus;
+    case "resumption_flag":
+      return facts.resumptionFlag === true;
+    case "momentum_state":
+      return facts.momentumState;
+    case "momentum_intensity":
+      return facts.momentumIntensity;
+    case "attention_priority":
+      return facts.attentionPriority;
     case "max_catalyst_age_min":
       return facts.catalystAgeMin;
     case "ticker_exclusion":
@@ -113,6 +132,16 @@ export function evaluateCondition(
         detail = passed ? "not excluded" : "ticker excluded";
         break;
       }
+      if (condition.field === "risk_flag") {
+        const flags = (Array.isArray(actualRaw) ? actualRaw : [])
+          .map(String)
+          .map((s) => s.toLowerCase());
+        passed = list.some((r) => flags.includes(r));
+        detail = passed
+          ? `risk inclusion hit (${flags.filter((f) => list.includes(f)).join(", ") || "yes"})`
+          : "no included risk flags present";
+        break;
+      }
       passed =
         actualRaw != null && list.includes(String(actualRaw).toLowerCase());
       detail = `actual ${fmt(actualRaw)}`;
@@ -120,6 +149,16 @@ export function evaluateCondition(
     }
     case "not_in": {
       const list = asList(condition.value).map((s) => s.toLowerCase());
+      if (condition.field === "risk_flag") {
+        const flags = (Array.isArray(actualRaw) ? actualRaw : [])
+          .map(String)
+          .map((s) => s.toLowerCase());
+        passed = !list.some((r) => flags.includes(r));
+        detail = passed
+          ? "excluded risks absent"
+          : `excluded risk present (${flags.filter((f) => list.includes(f)).join(", ")})`;
+        break;
+      }
       passed =
         actualRaw == null || !list.includes(String(actualRaw).toLowerCase());
       detail = `actual ${fmt(actualRaw)}`;

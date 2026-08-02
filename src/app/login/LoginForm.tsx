@@ -8,6 +8,12 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { LogoMark } from "@/components/Logo";
+import { entitledDashboardHref } from "@/lib/monitor/route";
+import {
+  prefetchMonitorRoute,
+  warmMonitorCriticalAssets,
+} from "@/lib/monitor/prefetch";
+import { isSubscribedFromSettings } from "@/lib/subscription-client";
 
 /** Only allow same-origin relative paths (blocks open redirects). */
 function safeReturnPath(raw: string | null): string | null {
@@ -17,12 +23,16 @@ function safeReturnPath(raw: string | null): string | null {
   return raw;
 }
 
+function defaultPostAuthPath(): string {
+  return entitledDashboardHref();
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegister = searchParams.get("register") === "true";
   const nextParam = searchParams.get("next") ?? searchParams.get("callbackUrl");
-  const returnTo = safeReturnPath(nextParam) ?? "/dashboard";
+  const returnTo = safeReturnPath(nextParam) ?? defaultPostAuthPath();
 
   const [mode, setMode] = useState<"login" | "register">(isRegister ? "register" : "login");
   const [email, setEmail] = useState("");
@@ -73,7 +83,29 @@ export default function LoginForm() {
         return;
       }
 
-      router.push(returnTo);
+      // Entitlement-gated Monitor prefetch — never for non-Pro; no snapshot poll.
+      let target = returnTo;
+      try {
+        const settings = await fetch("/api/settings").then((r) =>
+          r.ok ? r.json() : null
+        );
+        const subscribed = isSubscribedFromSettings(settings);
+        if (subscribed) {
+          const access = { subscribed: true as const };
+          await prefetchMonitorRoute(router, access);
+          void warmMonitorCriticalAssets(access);
+          if (
+            returnTo === "/dashboard" ||
+            returnTo.startsWith("/dashboard?")
+          ) {
+            target = entitledDashboardHref();
+          }
+        }
+      } catch {
+        /* navigate anyway */
+      }
+
+      router.push(target);
       router.refresh();
     } catch {
       setError("Something went wrong");

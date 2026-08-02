@@ -1,3 +1,4 @@
+import { STRATEGY_LIMITS } from "./limits.ts";
 import type {
   AlertStrategy,
   StrategyCondition,
@@ -86,6 +87,80 @@ export function validateStrategy(strategy: AlertStrategy): {
       code: "EMPTY_RULES",
       message: "Add at least one condition so the rule can match something.",
       path: "root",
+    });
+  }
+
+  if (conditions.length > STRATEGY_LIMITS.maxConditions) {
+    issues.push({
+      severity: "error",
+      code: "TOO_MANY_CONDITIONS",
+      message: `At most ${STRATEGY_LIMITS.maxConditions} conditions allowed (found ${conditions.length}).`,
+      path: "root",
+    });
+  }
+
+  function depthOf(g: StrategyConditionGroup, d: number): number {
+    let max = d;
+    for (const child of g.groups ?? []) {
+      max = Math.max(max, depthOf(child, d + 1));
+    }
+    return max;
+  }
+  const depth = depthOf(strategy.root, 0);
+  if (depth > STRATEGY_LIMITS.maxNestingDepth) {
+    issues.push({
+      severity: "error",
+      code: "NESTING_TOO_DEEP",
+      message: `Nested groups deeper than ${STRATEGY_LIMITS.maxNestingDepth} levels are not allowed.`,
+      path: "root",
+    });
+  }
+
+  let groupCount = 0;
+  function countGroups(g: StrategyConditionGroup) {
+    for (const child of g.groups ?? []) {
+      groupCount += 1;
+      countGroups(child);
+    }
+  }
+  countGroups(strategy.root);
+  if (groupCount > STRATEGY_LIMITS.maxGroups) {
+    issues.push({
+      severity: "error",
+      code: "TOO_MANY_GROUPS",
+      message: `At most ${STRATEGY_LIMITS.maxGroups} nested groups allowed.`,
+      path: "root",
+    });
+  }
+
+  try {
+    const payload = JSON.stringify(strategy);
+    if (payload.length > STRATEGY_LIMITS.maxPayloadBytes) {
+      issues.push({
+        severity: "error",
+        code: "PAYLOAD_TOO_LARGE",
+        message: `Strategy JSON exceeds ${STRATEGY_LIMITS.maxPayloadBytes} bytes.`,
+        path: "root",
+      });
+    }
+  } catch {
+    issues.push({
+      severity: "error",
+      code: "PAYLOAD_UNSERIALIZABLE",
+      message: "Strategy could not be serialized for size validation.",
+      path: "root",
+    });
+  }
+
+  if (
+    strategy.userNote &&
+    strategy.userNote.length > STRATEGY_LIMITS.maxUserNoteChars
+  ) {
+    issues.push({
+      severity: "error",
+      code: "NOTE_TOO_LONG",
+      message: `Notes must be ≤ ${STRATEGY_LIMITS.maxUserNoteChars} characters.`,
+      path: "userNote",
     });
   }
 
@@ -244,6 +319,100 @@ export function validateStrategy(strategy: AlertStrategy): {
       });
     }
   });
+
+  // Momentum / direction contradictions in AND groups
+  function checkMomentumContradiction(
+    g: StrategyConditionGroup,
+    path: string
+  ) {
+    if (g.logic === "AND") {
+      const pctGte = g.conditions.filter(
+        (c) => c.field === "pct_move" && c.op === "gte"
+      );
+      const pctLte = g.conditions.filter(
+        (c) => c.field === "pct_move" && c.op === "lte"
+      );
+      for (const up of pctGte) {
+        for (const down of pctLte) {
+          const a = Number(up.value);
+          const b = Number(down.value);
+          if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b < 0) {
+            issues.push({
+              severity: "warning",
+              code: "DIRECTION_TENSION",
+              message:
+                "Rule requires both a positive % move floor and a negative % move ceiling in the same AND group — check intent.",
+              path,
+            });
+          }
+        }
+      }
+      const states = g.conditions.filter((c) => c.field === "momentum_state");
+      const hasUp = states.some(
+        (c) =>
+          Array.isArray(c.value) &&
+          (c.value as string[]).some((v) =>
+            /BREAKING|BUILDING|RECLAIMING|EMERGING/i.test(String(v))
+          )
+      );
+      const hasDown = states.some(
+        (c) =>
+          Array.isArray(c.value) &&
+          (c.value as string[]).some((v) => /FADING|COOLING/i.test(String(v)))
+      );
+      const pctDown = pctLte.some((c) => Number(c.value) < 0);
+      const pctUp = pctGte.some((c) => Number(c.value) > 0);
+      if (hasUp && pctDown) {
+        issues.push({
+          severity: "warning",
+          code: "MOMENTUM_DIRECTION_MISMATCH",
+          message:
+            "Upward momentum states combined with a negative % move filter may rarely match.",
+          path,
+        });
+      }
+      if (hasDown && pctUp) {
+        issues.push({
+          severity: "warning",
+          code: "MOMENTUM_DIRECTION_MISMATCH",
+          message:
+            "Cooling/fading states combined with a positive % move floor may rarely match.",
+          path,
+        });
+      }
+      const riskIn = g.conditions.filter(
+        (c) => c.field === "risk_flag" && c.op === "in"
+      );
+      const riskOut = g.conditions.filter(
+        (c) => c.field === "risk_flag" && c.op === "not_in"
+      );
+      for (const inc of riskIn) {
+        for (const exc of riskOut) {
+          const a = new Set(
+            (Array.isArray(inc.value) ? inc.value : []).map((x) =>
+              String(x).toLowerCase()
+            )
+          );
+          const b = (
+            Array.isArray(exc.value) ? exc.value : []
+          ).map((x) => String(x).toLowerCase());
+          if (b.some((x) => a.has(x))) {
+            issues.push({
+              severity: "error",
+              code: "RISK_INCLUDE_EXCLUDE",
+              message:
+                "Same risk flag cannot be both included and excluded in one AND group.",
+              path,
+            });
+          }
+        }
+      }
+    }
+    for (let i = 0; i < (g.groups?.length ?? 0); i++) {
+      checkMomentumContradiction(g.groups![i]!, `${path}.groups[${i}]`);
+    }
+  }
+  checkMomentumContradiction(strategy.root, "root");
 
   const ok = !issues.some((i) => i.severity === "error");
   return { ok, issues };

@@ -111,6 +111,16 @@ export function SquawkControls({
           />
           Risk only
         </label>
+        <label className="flex items-center gap-1.5 text-[--text-secondary] col-span-2">
+          <input
+            type="checkbox"
+            checked={settings.strategyMatchOnly}
+            onChange={(e) =>
+              onChange({ ...settings, strategyMatchOnly: e.target.checked })
+            }
+          />
+          Strategy match only (Monitor)
+        </label>
       </div>
 
       <label className="block text-[10px] text-[--text-muted]">

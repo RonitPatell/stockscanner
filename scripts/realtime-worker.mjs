@@ -1,15 +1,22 @@
 /**
- * Always-on desk workers: priority news ingest + live quote/volume stream.
+ * Always-on desk workers (dedicated service — not Vercel serverless).
  *
- * Railway start command (Settings → Deploy → Custom Start Command):
+ * Vercel cannot run persistent market-data sockets or session-long warmers.
+ * This Railway (or Fly/VPS) supervisor owns:
+ *   - priority news ingest
+ *   - live quote / volume stream
+ *   - Monitor market warm + snapshot ticks (lease-gated)
+ *
+ * Railway start command:
  *   node scripts/realtime-worker.mjs
- * (or: npm run realtime:worker)
  *
- * Required env on Railway:
+ * Required env:
  *   CRON_SECRET
- *   NEXT_PUBLIC_APP_URL   ← must be your public Vercel URL, NOT localhost
+ *   NEXT_PUBLIC_APP_URL   ← public Vercel URL, NOT localhost
  *   UPSTASH_REDIS_*       (recommended)
- *   FINNHUB_API_KEY       (recommended — company + market news)
+ *   FINNHUB_API_KEY       (recommended)
+ *
+ * Do not use browser traffic as a keepalive.
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -184,11 +191,40 @@ function shutdown(reason) {
   setTimeout(() => process.exit(reason === "restart-limit" ? 1 : 0), 2_500).unref();
 }
 
+async function beatSupervisor() {
+  try {
+    await fetch(`${BASE}/api/cron/worker-lease`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "heartbeat",
+        heartbeat: {
+          name: "realtime_supervisor",
+          instanceId: `supervisor-${process.pid}`,
+          meta: { providerConnected: true },
+        },
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (e) {
+    console.warn(
+      `[realtime] supervisor heartbeat failed: ${e?.message || e}`
+    );
+  }
+}
+
 console.log(
   `[realtime] starting desk workers → app ${BASE}${onRailway ? " (Railway)" : ""}`
 );
 start("scripts/priority-ingest-worker.mjs", "ingest:priority");
 start("scripts/quote-stream.mjs", "quote:stream");
+start("scripts/monitor-market-worker.mjs", "monitor:market");
+
+void beatSupervisor();
+setInterval(() => void beatSupervisor(), 30_000);
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

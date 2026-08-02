@@ -53,3 +53,22 @@ export function strategyAnalyticsSafeSummary(strategy: {
     channelCount: strategy.channels.length,
   });
 }
+
+/**
+ * Strip private strategy contents before any analytics / telemetry sink.
+ * Never includes condition trees, mutes, notes, or channel secrets.
+ */
+export function monitorPresetAnalyticsSafe(strategy: {
+  id: string;
+  version: number;
+  presetId: string;
+  enabled: boolean;
+}): Record<string, string | number | boolean> {
+  return scrubStrategyAnalyticsProps({
+    strategyId: strategy.id.slice(0, 24),
+    version: strategy.version,
+    presetId: strategy.presetId,
+    enabled: strategy.enabled,
+    surface: "monitor_preset",
+  });
+}

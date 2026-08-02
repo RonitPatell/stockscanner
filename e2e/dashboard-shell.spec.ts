@@ -66,6 +66,23 @@ test.describe("authenticated dashboard shell v3", () => {
       );
       await expect(page).toHaveURL(new RegExp(`view=${id}`));
     }
+
+    // Monitor V1 (flagged) — when nav is present, destination still switches cleanly.
+    const monitorNav = page.getByTestId("nav-monitor");
+    if (await monitorNav.count()) {
+      await monitorNav.click();
+      await expect(page.locator('[data-destination="monitor"]')).toHaveAttribute(
+        "data-destination",
+        "monitor"
+      );
+      await expect(page).toHaveURL(/view=monitor/);
+      await expect(page.getByTestId("trustticker-monitor")).toBeVisible();
+      expect(await page.locator('[data-guide="monitor-status-bar"]').count()).toBe(1);
+      expect(await page.locator('[data-guide="monitor-priority-ladder"]').count()).toBe(1);
+      expect(await page.locator('[data-guide="monitor-momentum-field"]').count()).toBe(1);
+      expect(await page.locator('[data-guide="monitor-intelligence"]').count()).toBe(1);
+      expect(await page.locator('[data-guide="monitor-event-tape"]').count()).toBe(1);
+    }
   });
 
   test("deep links open Plan / Risk / Review", async ({ page }) => {

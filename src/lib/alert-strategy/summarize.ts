@@ -10,19 +10,28 @@ const FIELD_LABELS: Record<ConditionField, string> = {
   price: "price",
   float_m: "float (millions)",
   float_confidence: "float confidence",
+  market_cap_m: "market cap (millions)",
   catalyst_category: "catalyst category",
   source_tier: "source tier",
+  source_verification: "source verification",
   confirmation_count: "confirmation count",
   catalyst_strength: "catalyst strength",
   reaction_stage: "reaction stage",
   relative_volume: "relative volume",
   dollar_volume: "dollar volume",
+  dollar_volume_velocity: "dollar-volume velocity",
+  trades_per_second: "trades per second",
   pct_move: "percentage move",
   spread_bps: "spread (bps)",
   tradeability: "tradeability",
   dilution_flag: "dilution flags",
+  risk_flag: "risk flags",
   market_session: "market session",
   halt_status: "halt status",
+  resumption_flag: "resumption flag",
+  momentum_state: "momentum state",
+  momentum_intensity: "momentum intensity",
+  attention_priority: "attention priority",
   max_catalyst_age_min: "catalyst age (minutes)",
   ticker_exclusion: "ticker exclusions",
   sector: "sector",
@@ -40,13 +49,18 @@ function phraseCondition(c: StrategyCondition): string {
   const label = FIELD_LABELS[c.field] ?? c.field;
   switch (c.op) {
     case "is_true":
-      return c.field === "watchlist_membership"
-        ? "the ticker is on your watchlist"
-        : `${label} is present`;
+      if (c.field === "watchlist_membership") {
+        return "the ticker is on your watchlist";
+      }
+      if (c.field === "resumption_flag") {
+        return "resumption information is active";
+      }
+      return `${label} is present`;
     case "is_false":
-      return c.field === "watchlist_membership"
-        ? "the ticker is not on your watchlist"
-        : `${label} is absent`;
+      if (c.field === "watchlist_membership") {
+        return "the ticker is not on your watchlist";
+      }
+      return `${label} is absent`;
     case "eq":
       return `${label} equals ${fmtValue(c.value)}`;
     case "neq":
@@ -55,8 +69,14 @@ function phraseCondition(c: StrategyCondition): string {
       if (c.field === "ticker_exclusion") {
         return `ticker is not one of: ${fmtValue(c.value)}`;
       }
+      if (c.field === "risk_flag") {
+        return `includes risk flag(s): ${fmtValue(c.value)}`;
+      }
       return `${label} is one of: ${fmtValue(c.value)}`;
     case "not_in":
+      if (c.field === "risk_flag") {
+        return `excludes risk flag(s): ${fmtValue(c.value)}`;
+      }
       return `${label} is not one of: ${fmtValue(c.value)}`;
     case "gte":
       return `${label} is at least ${fmtValue(c.value)}`;
@@ -90,6 +110,7 @@ const DELIVERY_PHRASE: Record<AlertStrategy["delivery"], string> = {
 
 /**
  * Plain-language “This rule will alert when…” summary.
+ * For Monitor inspection use summarizeMonitorPreset.
  */
 export function summarizeStrategy(strategy: AlertStrategy): {
   headline: string;
@@ -136,4 +157,18 @@ export function summarizeStrategyPlain(strategy: AlertStrategy): string {
   return [s.headline, s.delivery, s.channels, s.limits, s.mutes]
     .filter(Boolean)
     .join(" ");
+}
+
+/** Monitor-facing plain summary — inspection filter, not an alert promise. */
+export function summarizeMonitorPreset(strategy: AlertStrategy): {
+  headline: string;
+  when: string;
+  versionLabel: string;
+} {
+  const when = phraseGroup(strategy.root);
+  return {
+    headline: `Shows tickers when ${when}.`,
+    when,
+    versionLabel: `v${strategy.version} · ${strategy.schemaVersion} · preset ${strategy.presetId}`,
+  };
 }

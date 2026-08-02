@@ -8,6 +8,10 @@ import {
   type CachedQuote,
 } from "@/lib/quote-cache-service";
 import { estimateRvolFromMove } from "@/lib/volume-utils";
+import {
+  SSE_ENTITLEMENT_RECHECK_MS,
+  userStillHasPro,
+} from "@/lib/sse-entitlement";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -42,6 +46,7 @@ export async function GET(req: NextRequest) {
   const gate = await requirePro();
   if (gate.error) return gate.error;
 
+  const userId = gate.user.id;
   const symbols = parseSymbols(req.nextUrl.searchParams.get("symbols"));
   const encoder = new TextEncoder();
   let closed = false;
@@ -58,6 +63,22 @@ export async function GET(req: NextRequest) {
       };
 
       send({ type: "connected", timestamp: new Date().toISOString() });
+
+      let interval: ReturnType<typeof setInterval> | null = null;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+      let entitlementTimer: ReturnType<typeof setInterval> | null = null;
+
+      const cleanup = () => {
+        closed = true;
+        if (interval) clearInterval(interval);
+        if (heartbeat) clearInterval(heartbeat);
+        if (entitlementTimer) clearInterval(entitlementTimer);
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      };
 
       const poll = async () => {
         if (closed) return;
@@ -79,22 +100,22 @@ export async function GET(req: NextRequest) {
 
       await poll();
       const live = await isLiveQuoteStreamFresh();
-      const interval = setInterval(poll, live ? 500 : 1_000);
+      interval = setInterval(poll, live ? 500 : 1_000);
 
-      const heartbeat = setInterval(() => {
+      heartbeat = setInterval(() => {
         send({ type: "heartbeat", timestamp: new Date().toISOString() });
       }, 15_000);
 
-      const cleanup = () => {
-        closed = true;
-        clearInterval(interval);
-        clearInterval(heartbeat);
-        try {
-          controller.close();
-        } catch {
-          /* already closed */
-        }
-      };
+      entitlementTimer = setInterval(() => {
+        void (async () => {
+          if (closed) return;
+          const ok = await userStillHasPro(userId);
+          if (!ok) {
+            send({ type: "entitlement_revoked", code: "PRO_REQUIRED" });
+            cleanup();
+          }
+        })();
+      }, SSE_ENTITLEMENT_RECHECK_MS);
 
       req.signal.addEventListener("abort", cleanup);
       setTimeout(cleanup, 30 * 60_000);

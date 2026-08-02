@@ -7,10 +7,17 @@ import {
   setFeedMeta,
 } from "@/lib/system-health";
 import { getIngestLatencyStats } from "@/lib/speed-wins";
+import {
+  collectMarketReadiness,
+  toPublicMarketReadiness,
+} from "@/lib/workers/market-readiness";
 
 export const dynamic = "force-dynamic";
 
-/** Public liveness — no internal error payloads or pipeline dumps. */
+/**
+ * Public liveness + sanitized market readiness aggregate.
+ * No secrets, provider credentials, stack traces, or internal error strings.
+ */
 export async function GET() {
   const { items, meta } = await getCachedFeed("all");
 
@@ -43,10 +50,28 @@ export async function GET() {
     }
   }
 
+  const marketInternal = await collectMarketReadiness().catch(() => null);
+  const market = marketInternal
+    ? toPublicMarketReadiness(marketInternal)
+    : {
+        ready: false,
+        status: "not_ready" as const,
+        session: "unknown",
+        checks: {
+          providerConnected: "unknown" as const,
+          symbolUniverseLoaded: "unknown" as const,
+          previousSessionBaselinesLoaded: "unknown" as const,
+          activeSnapshotPublished: "unknown" as const,
+          redisReachable: "unknown" as const,
+          databaseReachable: "unknown" as const,
+          eventStreamWritable: "unknown" as const,
+          workerHeartbeat: "unknown" as const,
+        },
+      };
+
   return NextResponse.json(
     {
       status: freshness.status,
-      /** Cache rewrite age — prefer newestHeadlineAgeSec for “how old is news” */
       feedAgeSec: freshness.feedAgeSec,
       newestHeadlineAt,
       newestHeadlineAgeSec,
@@ -57,10 +82,11 @@ export async function GET() {
       feedSource: health.feedSource === "none" ? "none" : "ok",
       pipelineInFlight: health.pipelineInFlight,
       wireInFlight: health.wireInFlight,
-      /** Desk/wire p50 seconds — not editorial RSS publish age */
       avgIngestDelaySec:
         avgIngestDelaySec != null ? Math.round(avgIngestDelaySec) : null,
       latencyMetric: latency?.metric ?? null,
+      /** Sanitized aggregate — no snapshot ids, ages, or provider secrets. */
+      market,
     },
     {
       headers: {

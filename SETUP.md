@@ -259,7 +259,7 @@ TrustTicker uses **issuer PR wires + SEC + Finnhub + Yahoo ticker RSS + editoria
 
 | Piece | What to buy / run | Role |
 |--------|-------------------|------|
-| **Always-on worker** | Railway / Fly / VPS: `npm run realtime:worker` | Priority ingest + Yahoo volume/quote stream |
+| **Always-on worker** | Railway / Fly / VPS: `npm run realtime:worker` | Priority ingest + quote stream + Monitor market warm (see `docs/MARKET_WORKERS.md`) |
 | **Redis** | Upstash | Shared quote + feed cache across Vercel + workers |
 | **Finnhub** | `FINNHUB_API_KEY` | Market + company news on the wire tier |
 
@@ -279,7 +279,7 @@ FINNHUB_API_KEY=...             # recommended
 npm run realtime:worker
 ```
 
-That runs `ingest:priority` (PR/SEC Tier 0 + Finnhub/Yahoo/editorial Tier 1) and `quote:stream`. Cursor/`npm run dev` alone will **not** keep this alive.
+That runs `ingest:priority`, `quote:stream`, and `monitor:market` (lease-gated snapshot warm). Cursor/`npm run dev` alone will **not** keep this alive. User traffic must never warm providers — see `docs/MARKET_WORKERS.md`.
 
 **Honest latency:** with the worker up, expect **tens of seconds** from publisher update on free RSS/PR wires — not a sub-second licensed newsfeed.
 

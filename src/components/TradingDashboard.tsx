@@ -40,7 +40,11 @@ import { MarketMonitor } from "./MarketMonitor";
 import { PlatformGuide } from "./PlatformGuide";
 import { HelpTip } from "./HelpTip";
 import { DashboardShellV3 } from "./dashboard-shell/DashboardShellV3";
-import { isDashboardShellV3Enabled } from "@/lib/dashboard-shell";
+import {
+  isDashboardShellV3Enabled,
+  type DashboardDestination,
+} from "@/lib/dashboard-shell";
+import type { MonitorInitialSnapshot } from "@/lib/monitor/ssr";
 import { cn } from "@/lib/utils";
 
 const FEED_TABS: {
@@ -61,6 +65,8 @@ export function TradingDashboard({
   initialFilters = null,
   initialScanner = null,
   shellV3,
+  initialDestination,
+  initialMonitorSnapshot = null,
 }: {
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
@@ -68,6 +74,8 @@ export function TradingDashboard({
   initialScanner?: MarketScannerSnapshot | null;
   /** Server-resolved feature flag; falls back to client env helper */
   shellV3?: boolean;
+  initialDestination?: DashboardDestination;
+  initialMonitorSnapshot?: MonitorInitialSnapshot | null;
 }) {
   const useShellV3 = shellV3 ?? isDashboardShellV3Enabled();
 
@@ -78,6 +86,8 @@ export function TradingDashboard({
         initialWatchlist={initialWatchlist}
         initialFilters={initialFilters}
         initialScanner={initialScanner}
+        initialDestination={initialDestination}
+        initialMonitorSnapshot={initialMonitorSnapshot}
       />
     );
   }

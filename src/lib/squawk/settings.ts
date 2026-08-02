@@ -33,6 +33,7 @@ export function normalizeSquawkSettings(raw: unknown): SquawkSettings {
     enabled: o.enabled === true,
     watchlistOnly: o.watchlistOnly === true,
     riskOnly: o.riskOnly === true,
+    strategyMatchOnly: o.strategyMatchOnly === true,
     minPriority,
     muted: o.muted === true,
     quietHours: {

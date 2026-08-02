@@ -1,6 +1,11 @@
 export { ALERT_STRATEGY_SCHEMA_VERSION } from "./version.ts";
 export * from "./types.ts";
-export { buildPreset, STRATEGY_PRESET_META } from "./presets.ts";
+export { STRATEGY_LIMITS } from "./limits.ts";
+export {
+  buildPreset,
+  STRATEGY_PRESET_META,
+  MONITOR_PRESET_IDS,
+} from "./presets.ts";
 export { evaluateCondition } from "./conditions.ts";
 export {
   evaluateStrategy,
@@ -8,7 +13,23 @@ export {
   isMuteActive,
 } from "./evaluate.ts";
 export { validateStrategy } from "./validate.ts";
-export { summarizeStrategy, summarizeStrategyPlain } from "./summarize.ts";
+export {
+  summarizeStrategy,
+  summarizeStrategyPlain,
+  summarizeMonitorPreset,
+} from "./summarize.ts";
+export {
+  monitorPresetCatalog,
+  instantiateMonitorPreset,
+  factsFromMonitorSymbol,
+  evaluateMonitorPreset,
+  explainWhyTickerMatched,
+  explainWhyTickerDidNotMatch,
+  filterSymbolsByMonitorPreset,
+  replayMonitorPresetPreview,
+  assertPresetNotSilentlyMutated,
+  type MonitorSymbolFactsInput,
+} from "./monitor-presets.ts";
 export {
   checkStrategyCooldown,
   recordStrategyFire,
@@ -35,6 +56,7 @@ export {
 export {
   scrubStrategyAnalyticsProps,
   strategyAnalyticsSafeSummary,
+  monitorPresetAnalyticsSafe,
 } from "./privacy.ts";
 export {
   normalizeAlertStrategies,

@@ -185,30 +185,53 @@ export function factsFromCatalyst(
       ? (Date.now() - Date.parse(c.publishedAt)) / 60_000
       : null;
 
+  const verifiedConfidence = extras?.verifiedConfidence ?? null;
+  let sourceVerification = extras?.sourceVerification ?? null;
+  if (!sourceVerification) {
+    if (verifiedConfidence != null && verifiedConfidence >= 70) {
+      sourceVerification = "verified";
+    } else if (verifiedConfidence != null && verifiedConfidence >= 40) {
+      sourceVerification = "partial";
+    } else if (verifiedConfidence != null) {
+      sourceVerification = "unverified";
+    } else {
+      sourceVerification = null;
+    }
+  }
+
   return {
     symbol: c.symbol.toUpperCase(),
     onWatchlist: extras?.onWatchlist ?? false,
     price: c.price ?? null,
     floatM,
     floatConfidence: extras?.floatConfidence ?? null,
+    marketCapM: extras?.marketCapM ?? null,
     catalystCategory: c.catalystType ?? null,
     sourceTier: c.sourceTier ?? null,
+    sourceVerification,
     confirmationCount: c.newsCount ?? extras?.confirmationCount ?? null,
     catalystStrength: c.judgmentV2?.catalystStrength ?? extras?.catalystStrength ?? null,
     reactionStage: extras?.reactionStage ?? null,
     relativeVolume: c.rVol ?? null,
     dollarVolume: extras?.dollarVolume ?? dollarVolume,
+    dollarVolumeVelocity: extras?.dollarVolumeVelocity ?? null,
+    tradesPerSecond: extras?.tradesPerSecond ?? null,
     pctMove: c.changePercent ?? null,
     spreadBps: extras?.spreadBps ?? null,
     tradeability: extras?.tradeability ?? null,
     dilutionFlags: extras?.dilutionFlags ?? [],
+    riskFlags: extras?.riskFlags ?? extras?.dilutionFlags ?? [],
     marketSession: extras?.marketSession ?? null,
     haltStatus: extras?.haltStatus ?? null,
+    resumptionFlag: extras?.resumptionFlag ?? false,
+    momentumState: extras?.momentumState ?? null,
+    momentumIntensity: extras?.momentumIntensity ?? null,
+    attentionPriority: extras?.attentionPriority ?? null,
     catalystAgeMin: ageMin,
     sector: extras?.sector ?? null,
     exchange: extras?.exchange ?? null,
     headline: extras?.headline ?? null,
     summary: extras?.summary ?? null,
-    verifiedConfidence: extras?.verifiedConfidence ?? null,
+    verifiedConfidence,
   };
 }

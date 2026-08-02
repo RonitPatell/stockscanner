@@ -13,11 +13,16 @@ export function DashboardTopBar({
   lastEventAt,
   searchValue,
   onSearchChange,
+  onSearchSubmit,
+  searchPlaceholder = "Search any ticker (e.g. AAPL)",
   className,
 }: {
   lastEventAt: Date | null;
   searchValue: string;
   onSearchChange: (v: string) => void;
+  /** Enter / submit — Floor uses this to load any symbol without filtering the news tape. */
+  onSearchSubmit?: (value: string) => void;
+  searchPlaceholder?: string;
   className?: string;
 }) {
   return (
@@ -31,17 +36,27 @@ export function DashboardTopBar({
       <div className="max-w-[1680px] mx-auto px-3 sm:px-4 h-12 flex items-center gap-2 sm:gap-3">
         <BrandHomeLink />
 
-        <label className="flex-1 min-w-0 max-w-xs lg:max-w-md relative">
-          <span className="sr-only">Search tickers</span>
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-          <input
-            value={searchValue}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search ticker or headline"
-            className="w-full h-8 rounded-md border border-zinc-700 bg-zinc-950/80 pl-8 pr-2 text-[12px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-            data-testid="global-ticker-search"
-          />
-        </label>
+        <form
+          className="flex-1 min-w-0 max-w-xs lg:max-w-md relative"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSearchSubmit?.(searchValue);
+          }}
+        >
+          <label className="block">
+            <span className="sr-only">Search tickers</span>
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+            <input
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full h-8 rounded-md border border-zinc-700 bg-zinc-950/80 pl-8 pr-2 text-[12px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+              data-testid="global-ticker-search"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+        </form>
 
         <TrustStatusBar className="hidden sm:flex flex-1 min-w-0 overflow-x-auto" />
 

@@ -32,6 +32,20 @@ export {
 } from "./settings.ts";
 export { catalystToUtterance } from "./from-catalyst.ts";
 export {
+  buildMonitorSquawkScript,
+  type MonitorSquawkScriptInput,
+} from "./monitor-script.ts";
+export {
+  MONITOR_SQUAWK_EVENT_TYPES,
+  isHighValueMonitorSquawkType,
+  monitorEventPriority,
+  tapeItemToMonitorSquawkInput,
+  attentionLeaderToMonitorSquawkInput,
+  monitorEventToUtterance,
+  type MonitorSquawkEventInput,
+  type MonitorSquawkEventType,
+} from "./from-monitor.ts";
+export {
   detectSpeechSynthesis,
   detectNotificationActions,
 } from "./browser-support.ts";

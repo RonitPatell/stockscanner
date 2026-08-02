@@ -53,11 +53,14 @@ export function TradingViewMiniChart({
   exchange,
   className,
   height = 280,
+  /** Show range controls + scroll/pinch zoom affordances for desk use. */
+  interactive = false,
 }: {
   symbol: string;
   exchange?: string | null;
   className?: string;
   height?: number;
+  interactive?: boolean;
 }) {
   const reactId = useId().replace(/:/g, "");
   const containerId = `tt_tv_${reactId}`;
@@ -72,7 +75,8 @@ export function TradingViewMiniChart({
     host.innerHTML = "";
     const mount = document.createElement("div");
     mount.id = containerId;
-    mount.style.height = `${height}px`;
+    mount.style.height = "100%";
+    mount.style.minHeight = `${height}px`;
     host.appendChild(mount);
 
     void loadTradingViewScript()
@@ -90,10 +94,11 @@ export function TradingViewMiniChart({
           toolbar_bg: "#0b0f14",
           enable_publishing: false,
           hide_top_toolbar: false,
+          hide_side_toolbar: !interactive,
           hide_legend: false,
           save_image: false,
           container_id: containerId,
-          withdateranges: false,
+          withdateranges: interactive,
           allow_symbol_change: false,
           details: false,
           hotlist: false,
@@ -112,17 +117,17 @@ export function TradingViewMiniChart({
       cancelled = true;
       if (host) host.innerHTML = "";
     };
-  }, [symbol, tvSymbol, containerId, height]);
+  }, [symbol, tvSymbol, containerId, height, interactive]);
 
   return (
     <div
       className={cn(
-        "overflow-hidden rounded border border-[var(--border)] bg-[#0b0f14]",
+        "overflow-hidden rounded border border-[var(--border)] bg-[#0b0f14] h-full min-h-0",
         className
       )}
       data-testid="tradingview-mini-chart"
     >
-      <div ref={hostRef} style={{ height }} />
+      <div ref={hostRef} className="h-full w-full" style={{ minHeight: height }} />
     </div>
   );
 }

@@ -11,13 +11,33 @@ import { SubscriptionActivating } from "@/components/SubscriptionActivating";
 import { UserMenu } from "@/components/UserMenu";
 import { CheckoutButton } from "@/components/CheckoutButton";
 import { BrandHomeLink } from "@/components/BrandHomeLink";
-import { isDashboardShellV3Enabled } from "@/lib/dashboard-shell";
+import {
+  destinationFromSearchParams,
+  isDashboardShellV3Enabled,
+  type DashboardDestination,
+} from "@/lib/dashboard-shell";
+import { isMonitorV1Enabled } from "@/lib/monitor";
+import { loadMonitorInitialSnapshot } from "@/lib/monitor/ssr";
+import type { MonitorInitialSnapshot } from "@/lib/monitor/ssr";
 import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/types";
 
+/**
+ * Dashboard is request-time dynamic via auth() / Prisma.
+ * Next.js 16.2: do not wrap personalized Monitor prefs in `"use cache"` or
+ * unstable_cache — that would mix incompatible caching with per-user data.
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ subscribed?: string; view?: string; shell?: string }>;
+  searchParams: Promise<{
+    subscribed?: string;
+    view?: string;
+    shell?: string;
+    symbol?: string;
+    panel?: string;
+    tab?: string;
+    focus?: string;
+  }>;
 }) {
   const session = await auth();
   const params = await searchParams;
@@ -25,11 +45,19 @@ export default async function DashboardPage({
     params.shell === "v3" ||
     (params.shell !== "legacy" && isDashboardShellV3Enabled());
 
+  const destParams = new URLSearchParams();
+  if (params.view) destParams.set("view", params.view);
+  if (params.panel) destParams.set("panel", params.panel);
+  if (params.tab) destParams.set("tab", params.tab);
+  const initialDestination: DashboardDestination =
+    destinationFromSearchParams(destParams);
+
   let isSubscribed = false;
   let initialCatalysts: CatalystItem[] = [];
   let initialWatchlist: string[] = [];
   let initialFilters: ScannerFilters | null = null;
   let initialScanner: MarketScannerSnapshot | null = null;
+  let initialMonitorSnapshot: MonitorInitialSnapshot | null = null;
 
   if (session?.user?.id) {
     try {
@@ -45,24 +73,43 @@ export default async function DashboardPage({
       isSubscribed = hasActiveSubscription(user ?? undefined);
 
       if (isSubscribed) {
-        const [cached, scannerSnap] = await Promise.all([
-          getCachedFeed("all"),
-          getCachedScannerSnapshot(),
-        ]);
-        initialCatalysts = cached.items.slice(0, 150);
-        if (initialCatalysts.length === 0) {
-          try {
-            initialCatalysts = await Promise.race([
-              getCatalysts(150),
-              new Promise<CatalystItem[]>((r) =>
-                setTimeout(() => r([]), 2_500)
-              ),
-            ]);
-          } catch {
-            initialCatalysts = [];
+        // Unified shell: Scanner + Feed default on — seed both on first paint.
+        const loadMonitor = shellV3 && isMonitorV1Enabled();
+
+        const feedWork = async () => {
+          const [cached, scannerSnap] = await Promise.all([
+            getCachedFeed("all"),
+            getCachedScannerSnapshot(),
+          ]);
+          let catalysts = cached.items.slice(0, 150);
+          if (catalysts.length === 0) {
+            try {
+              catalysts = await Promise.race([
+                getCatalysts(150),
+                new Promise<CatalystItem[]>((r) =>
+                  setTimeout(() => r([]), 2_500)
+                ),
+              ]);
+            } catch {
+              catalysts = [];
+            }
           }
-        }
-        initialScanner = scannerSnap;
+          return { catalysts, scanner: scannerSnap };
+        };
+
+        const [feedBundle, monitorSnap] = await Promise.all([
+          feedWork(),
+          loadMonitor
+            ? loadMonitorInitialSnapshot({
+                userId: session.user.id,
+                deepLinkSymbol: params.symbol ?? null,
+              })
+            : Promise.resolve(null),
+        ]);
+
+        initialCatalysts = feedBundle.catalysts;
+        initialScanner = feedBundle.scanner;
+        initialMonitorSnapshot = monitorSnap;
         initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
         if (user?.scannerFilters && typeof user.scannerFilters === "object") {
           initialFilters = user.scannerFilters as ScannerFilters;
@@ -153,6 +200,8 @@ export default async function DashboardPage({
             initialFilters={initialFilters}
             initialScanner={initialScanner}
             shellV3={shellV3}
+            initialDestination={initialDestination}
+            initialMonitorSnapshot={initialMonitorSnapshot}
           />
         ) : (
           <div className="text-center py-20 max-w-md mx-auto">

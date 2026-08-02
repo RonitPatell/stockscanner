@@ -610,6 +610,65 @@ body {
   min-height: 860px;
 }
 
+/* Trading floor — movers rail + big chart/news stage */
+.tt-floor__grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: min(82vh, 960px);
+}
+
+.tt-floor__panel {
+  background: color-mix(in srgb, var(--background) 92%, #111);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tt-floor__rail,
+.tt-floor__stage {
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Volume list + Wire share the left rail 50/50 */
+.tt-floor__rail > .tt-floor__panel {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.tt-floor__chart-news {
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+  /* Chart/news get the full stage height now that movers aren't a bottom strip */
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 0%;
+  min-height: 460px;
+}
+
+@media (max-width: 1200px) {
+  .tt-floor__chart-news {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, 52vh) minmax(240px, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .tt-floor__grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .tt-floor__rail {
+    max-height: 420px;
+  }
+
+  .tt-floor__panel {
+    min-height: 200px;
+  }
+}
+
 .market-monitor-primary {
   grid-template-rows: minmax(220px, 0.9fr) minmax(280px, 1.1fr);
 }

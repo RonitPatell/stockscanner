@@ -26,6 +26,8 @@ export default async function AdminReliabilityPage() {
             <Link href="/admin/ingest">Ingest</Link>
             <Link href="/admin/latency">Latency</Link>
             <Link href="/admin/alert-backbone">Alerts</Link>
+            <Link href="/admin/monitor-ops">Monitor ops</Link>
+            <Link href="/admin/monitor-calibration">Monitor calibration</Link>
             <Link href="/status">Public status</Link>
           </div>
         </div>

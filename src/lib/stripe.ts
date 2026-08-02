@@ -104,7 +104,7 @@ export async function createCheckoutSession(
         quantity: 1,
       },
     ],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?subscribed=true`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?view=monitor&subscribed=true`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
     metadata: { userId, plan },
     subscription_data: {

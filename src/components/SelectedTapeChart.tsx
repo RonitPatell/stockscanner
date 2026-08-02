@@ -18,11 +18,13 @@ export function SelectedTapeChart({
   headline,
   onOpenDetails,
   className,
+  height = 420,
 }: {
   symbol: string;
   headline?: string | null;
   onOpenDetails?: () => void;
   className?: string;
+  height?: number;
 }) {
   const sym = symbol.toUpperCase();
   useRegisterLiveSymbols("selected-tape-chart", [sym]);
@@ -85,7 +87,7 @@ export function SelectedTapeChart({
           {headline}
         </p>
       )}
-      <TradingViewMiniChart symbol={sym} height={220} />
+      <TradingViewMiniChart symbol={sym} height={height} interactive />
     </div>
   );
 }

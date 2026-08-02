@@ -580,6 +580,72 @@ console.log(
   }, poll ${POLL_MS}ms)`
 );
 
+/** Distributed ownership — second replica stays standby. */
+let quoteLeaseToken = null;
+async function ensureQuoteLease() {
+  if (!CRON_SECRET || !APP_URL) return true;
+  try {
+    const body = quoteLeaseToken
+      ? {
+          action: "renew",
+          name: "quote_stream",
+          token: quoteLeaseToken,
+          ttlMs: 60_000,
+        }
+      : { action: "acquire", name: "quote_stream", ttlMs: 60_000 };
+    const res = await fetch(`${APP_URL}/api/cron/worker-lease`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CRON_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json.acquired && json.token) quoteLeaseToken = json.token;
+    if (json.ok && quoteLeaseToken) return true;
+    if (!quoteLeaseToken && !json.acquired) {
+      console.warn(
+        new Date().toISOString(),
+        "quote-stream lease held elsewhere — standby"
+      );
+      return false;
+    }
+    return Boolean(quoteLeaseToken);
+  } catch {
+    return true; // fail open for local single-node
+  }
+}
+
+async function beatQuoteStream(providerConnected) {
+  if (!CRON_SECRET || !APP_URL) return;
+  try {
+    await fetch(`${APP_URL}/api/cron/worker-lease`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CRON_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "heartbeat",
+        heartbeat: {
+          name: "quote_stream",
+          instanceId: `quote-${process.pid}`,
+          meta: {
+            providerConnected,
+            universeLoaded: true,
+            baselinesLoaded: true,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 if (redis) {
   try {
     const existing = (await redis.get(QUOTES_KEY)) || {};
@@ -589,12 +655,28 @@ if (redis) {
   }
 }
 
-void yahooPollLoop();
-setInterval(() => void yahooPollLoop(), POLL_MS);
-connectFinnhub();
+let finnhubStarted = false;
+
+async function leaderTick() {
+  const ok = await ensureQuoteLease();
+  if (!ok) {
+    void beatQuoteStream(false);
+    return;
+  }
+  if (!finnhubStarted) {
+    finnhubStarted = true;
+    connectFinnhub();
+  }
+  await yahooPollLoop();
+  void beatQuoteStream(true);
+}
+
+void leaderTick();
+setInterval(() => void leaderTick(), POLL_MS);
 
 setInterval(async () => {
   try {
+    if (!(await ensureQuoteLease())) return;
     const symbols = await loadWatchSymbols();
     subscribeFinnhub(symbols);
   } catch {

@@ -620,24 +620,36 @@ export function LiveScanner({
     onCatalystActivate,
   ]);
 
+  const lastFocusedIdRef = useRef<string | null | undefined>(undefined);
+  const onFocusedRef = useRef(onFocusedCatalystChange);
+  onFocusedRef.current = onFocusedCatalystChange;
+  const focusedRowId = filtered[focusIndex]?.id ?? null;
+
   useEffect(() => {
-    const c = filtered[focusIndex] ?? null;
-    onFocusedCatalystChange?.(c ?? null);
-  }, [filtered, focusIndex, onFocusedCatalystChange]);
+    if (lastFocusedIdRef.current === focusedRowId) return;
+    lastFocusedIdRef.current = focusedRowId;
+    const c =
+      focusedRowId == null
+        ? null
+        : (filtered.find((row) => row.id === focusedRowId) ?? null);
+    onFocusedRef.current?.(c);
+  }, [focusedRowId, filtered]);
 
   useEffect(() => {
     setFocusIndex(0);
     setHotkeyExpanded(false);
   }, [tab, moversOnly, filters.search]);
 
-  // Align keyboard focus with deep-linked / drawer-selected catalyst
-  // (runs after tab reset so deep-link wins when drawer is open)
+  // Align keyboard focus with deep-linked / drawer-selected catalyst.
+  // Do not notify parent again — lastFocusedIdRef stays on focusCatalystId.
   useEffect(() => {
     if (!focusCatalystId) return;
+    if (filtered[focusIndex]?.id === focusCatalystId) return;
     const idx = filtered.findIndex((c) => c.id === focusCatalystId);
     if (idx < 0) return;
-    setFocusIndex((prev) => (prev === idx ? prev : idx));
-  }, [focusCatalystId, filtered]);
+    lastFocusedIdRef.current = focusCatalystId;
+    setFocusIndex(idx);
+  }, [focusCatalystId, filtered, focusIndex]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
