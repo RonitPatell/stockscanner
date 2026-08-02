@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
 
   const diagnostics = await getMonitorSnapshotDiagnostics();
   return NextResponse.json({
+    ...diagnostics,
     schemaVersion: MONITOR_SNAPSHOT_SCHEMA_VERSION,
     calculationVersion: MONITOR_SNAPSHOT_CALCULATION_VERSION,
-    ...diagnostics,
   });
 }
 

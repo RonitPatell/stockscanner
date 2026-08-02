@@ -150,10 +150,11 @@ export function stepMachine(
   } else {
     const dwell = thresholds.dwellMs[current] ?? 0;
     const elapsed = input.asOfMs - memory.sinceMs;
-    const override =
-      proposed === "HALTED" ||
-      proposed === "UNKNOWN" ||
-      (current === "HALTED" && proposed === "UNKNOWN");
+    // Compare via Set so control-flow narrowing from isPermittedTransition
+    // does not treat UNKNOWN as unreachable here.
+    const override = (
+      new Set<MomentumLifecycleState>(["HALTED", "UNKNOWN"])
+    ).has(proposed);
 
     if (!override && dwell > 0 && elapsed < dwell) {
       next = current;

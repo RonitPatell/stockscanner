@@ -4,11 +4,11 @@ import {
   MONITOR_MARKET_DATA_VERSION,
 } from "../../../domain/monitor/market-data/index.ts";
 import type {
-  BackfillRequest,
   MarketDataListener,
   MarketDataProvider,
 } from "../../../domain/monitor/market-data/ports.ts";
 import type {
+  BackfillRequest,
   NormalizedMarketEvent,
   NormalizedTrade,
   ProviderCapabilities,
@@ -170,10 +170,10 @@ export class FakeMarketDataProvider implements MarketDataProvider {
     const trade: NormalizedTrade = {
       type: "trade",
       schemaVersion: MONITOR_MARKET_DATA_VERSION,
-      tape: "C",
       delayedByMs: null,
       ...partial,
       symbol: sym,
+      tape: partial.tape ?? "C",
       provider: partial.provider ?? this.id,
       sequenceNumber,
       trustTickerReceivedAt: partial.trustTickerReceivedAt ?? now,

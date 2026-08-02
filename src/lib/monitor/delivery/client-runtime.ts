@@ -59,12 +59,13 @@ export class MonitorClientRuntime {
 
   /** Enqueue a server message; visual obsolescence handled by queue. */
   accept(message: MonitorStreamMessage, nowMs = Date.now()): void {
+    // entitlement_revoked has no sequence — drop here (auth gate handles logout).
     if (!("sequence" in message)) return;
     if (this.seenSequences.has(message.sequence)) return;
     const priority =
       message.type === "delta"
         ? message.priority
-        : message.type === "health" || message.type === "entitlement_revoked"
+        : message.type === "health"
           ? "critical"
           : "state";
     this.queue.enqueue({

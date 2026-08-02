@@ -43,7 +43,9 @@ function upstashAsSnapshotRedis(): SnapshotRedisLike | null {
     get: (key) => redis.get<string>(key),
     set: async (key, value, opts) => {
       if (opts?.nx) {
-        return redis.set(key, value, { nx: true, ex: opts.ex });
+        return opts.ex != null
+          ? redis.set(key, value, { nx: true, ex: opts.ex })
+          : redis.set(key, value, { nx: true });
       }
       if (opts?.ex != null) {
         return redis.set(key, value, { ex: opts.ex });

@@ -32,8 +32,10 @@ function fingerprint(event: NormalizedMarketEvent): string {
       return `${event.sequenceNumber}|${event.type}|${"eventAt" in event ? event.eventAt : ""}`;
     case "connection_health":
       return `${event.sequenceNumber}|${event.state}|${event.attempt ?? ""}`;
-    default:
-      return String(event.sequenceNumber);
+    default: {
+      const _exhaustive: never = event;
+      return String((_exhaustive as NormalizedMarketEvent).sequenceNumber);
+    }
   }
 }
 

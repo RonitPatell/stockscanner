@@ -39,8 +39,8 @@ import {
 const TRADE_CAP = 2048;
 const QUOTE_CAP = 512;
 const SECOND_BARS = 300; // 5 minutes
-const SHORT_WINDOWS: WindowKey[] = ["w5s", "w15s", "w30s", "w1m"];
-const BAR_WINDOWS: WindowKey[] = ["w3m", "w5m"];
+const SHORT_WINDOWS = ["w5s", "w15s", "w30s", "w1m"] as const;
+const BAR_WINDOWS = ["w3m", "w5m"] as const;
 
 export class SymbolState {
   readonly symbol: string;

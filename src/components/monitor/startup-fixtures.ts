@@ -69,6 +69,13 @@ function ticker(
   };
 }
 
+function ladderDirection(
+  d: MonitorPublicSnapshot["priorityLadder"][number]["direction"] | undefined
+): MonitorLadderRow["direction"] {
+  if (d === "up" || d === "down" || d === "neutral") return d;
+  return "neutral";
+}
+
 function ladderFromSnap(snap: MonitorPublicSnapshot): MonitorLadderRow[] {
   return snap.priorityLadder.map((t) => ({
     symbol: t.symbol,
@@ -76,7 +83,7 @@ function ladderFromSnap(snap: MonitorPublicSnapshot): MonitorLadderRow[] {
     attentionPriority: t.attentionPriority ?? 0,
     momentumState: t.momentumState ?? "BUILDING",
     momentumIntensity: t.momentumIntensity ?? 0,
-    direction: t.direction ?? "neutral",
+    direction: ladderDirection(t.direction),
     tier:
       (t.attentionPriority ?? 0) >= 85
         ? "CRITICAL"

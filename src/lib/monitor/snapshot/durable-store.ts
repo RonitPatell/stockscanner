@@ -3,6 +3,7 @@
  * Controlled schedule — not every Redis publish.
  */
 
+import type { Prisma } from "@prisma/client";
 import type { MonitorPublicSnapshot } from "@/domain/monitor/snapshot";
 import { prisma } from "@/lib/prisma";
 
@@ -52,7 +53,7 @@ export async function persistDurableMonitorSnapshot(
         generatedAt: new Date(snap.generatedAtMs),
         marketSession: snap.marketSession,
         isRecovery: snap.recovery,
-        payloadJson: compactPayload(snap),
+        payloadJson: compactPayload(snap) as Prisma.InputJsonValue,
       },
       update: {
         schemaVersion: snap.schemaVersion,
@@ -61,7 +62,7 @@ export async function persistDurableMonitorSnapshot(
         generatedAt: new Date(snap.generatedAtMs),
         marketSession: snap.marketSession,
         isRecovery: snap.recovery,
-        payloadJson: compactPayload(snap),
+        payloadJson: compactPayload(snap) as Prisma.InputJsonValue,
       },
       select: { id: true },
     });
@@ -82,7 +83,7 @@ export async function recordMonitorSnapshotBuildError(input: {
       data: {
         stage: input.stage.slice(0, 120),
         message: input.message.slice(0, 2_000),
-        detailJson: input.detail ?? undefined,
+        detailJson: (input.detail as Prisma.InputJsonValue | undefined) ?? undefined,
       },
     });
   } catch {
