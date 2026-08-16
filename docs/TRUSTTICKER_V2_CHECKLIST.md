@@ -103,7 +103,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 - [x] CompanyEvent classifier + persist (deterministic; Watchtower feed UI later)
 - [ ] Portfolio-scoped event feed
-- [ ] Deterministic event significance
+- [x] Deterministic event significance
 - [ ] Evidence/source on events
 
 ### Thesis
