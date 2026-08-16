@@ -10,6 +10,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] Persistent Cursor workflow rule (`.cursor/rules/trustticker-v2-workflow.mdc`)
 - [x] Implementation plan document (`docs/TRUSTTICKER_V2_IMPLEMENTATION.md`)
 - [x] This checklist (`docs/TRUSTTICKER_V2_CHECKLIST.md`)
+- [x] Pre-migration quality baseline (`docs/V2_BASELINE.md`)
 
 ---
 
