@@ -45,6 +45,22 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ---
 
+## Data model (Prisma V2 foundation)
+
+- [x] `PortfolioItem` (+ watchlist backfill / settings sync) — ADR §13
+- [x] `CompanyEvent` + central event types (`src/lib/company-events/types.ts`)
+- [x] `MetricObservation`
+- [x] `InvestmentThesis` / `ThesisCondition` / `ThesisEvaluation`
+- [x] `CapitalRiskSnapshot` (keeps `DilutionInstrument`)
+- [x] `FilingSectionSnapshot`
+- [x] `InsiderTransaction`
+- [x] `InstitutionalHoldingSnapshot`
+- [x] `UserCompanyEventState`
+- [x] `NotificationDelivery` (keeps catalyst `AlertLog`)
+- [x] Additive migration inspected + applied (`prisma/migrations/20260816200000_trustticker_v2_foundation`)
+
+---
+
 ## Primary product surfaces (IA)
 
 - [ ] **Portfolio** primary surface
@@ -187,8 +203,8 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 - [ ] Prefer reuse/refactor over rewrite
 - [ ] Strict TypeScript — no `@ts-ignore` / broad eslint-disable to hide issues
-- [ ] Migrations additive when schema changes
-- [ ] Targeted tests + applicable `lint` / `typecheck` / `test` / e2e / `build`
+- [x] Migrations additive when schema changes
+- [x] Targeted tests + applicable `lint` / `typecheck` / `test` / e2e / `build`
 - [ ] Auto-commit only after validation; never push unless requested
 
 ---

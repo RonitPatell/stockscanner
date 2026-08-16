@@ -309,6 +309,43 @@ Each numbered product prompt after this plan should implement **one checkpoint**
 
 ---
 
+## 13. ADR — Prisma V2 foundation (2026-08)
+
+**Status:** Accepted for expand-contract rollout.  
+**Context:** Investor OS needs durable portfolio membership, typed company events, thesis/health, financial observations, capital-risk rollups, filing section diffs, structured insider/13F facts, per-user read state, and notification delivery beyond catalyst alerts — without duplicating `Catalyst`, `DilutionInstrument`, `AlertLog`, or inventing advice.
+
+### Decision summary
+
+| Concept | Decision | Why |
+|---------|----------|-----|
+| Portfolio membership | **New `PortfolioItem`** (user-owned). Keep `User.watchlist[]` during expand-contract; backfill via `syncPortfolioItemsFromWatchlist`. | `String[]` cannot store kind, shares, cost basis, archive, sort, or source; Watchtower joins need `(userId, symbol)` indexes. |
+| Company events | **New shared `CompanyEvent`** with unique `fingerprint`. Optional `catalystId` / `dilutionInstrumentId` links. | `Catalyst` is a news/alert story (headline, judgment, `rawNewsId`). Watchtower needs typed category/eventType, before/after JSON, and idempotent SEC/derived events that are not 1:1 with wire stories. Extending Catalyst alone would overload two product meanings. |
+| Financial metrics | **New shared `MetricObservation`**. | No prior table for period/metric/value/prior with UNKNOWN-as-null. Must not live on User. |
+| Thesis | **New private `InvestmentThesis` + `ThesisCondition` + `ThesisEvaluation`**. | Conditions must be queryable and user-scoped; evaluations need evidence refs without generating buy/sell text. |
+| Capital risk rollup | **New shared `CapitalRiskSnapshot`**. **Keep `DilutionInstrument`**. | Instruments remain the SEC-evidence source of truth; snapshots are point-in-time rollups for Capital / Watchtower UI. |
+| Filing redlines | **New shared `FilingSectionSnapshot`**. | Persistence of section hash + optional diff is not modeled today; needed when redlines ship. |
+| Insider | **New shared `InsiderTransaction`**. | Form 4 structure (codes, owner roles, prices) exceeds Catalyst headline heuristics. |
+| Institutional | **New shared `InstitutionalHoldingSnapshot`**. | 13F period snapshots are not real-time; no existing model. 13D/13G material changes map to `CompanyEvent` (`ownership` category) with evidence JSON. |
+| Event read/dismiss | **New private `UserCompanyEventState`**. | Shared events must not duplicate per user; read state is private. |
+| Notification delivery | **New private `NotificationDelivery`**. **Keep `AlertLog`**. | `AlertLog` requires `catalystId` and cannot audit thesis / company-event / capital deliveries. |
+
+### Non-goals / invariants
+
+- No calculated investment advice columns.
+- Shared company/market facts are never stored once-per-user.
+- Private rows always include `userId` + `onDelete: Cascade` from User.
+- Idempotency via unique fingerprints / natural keys; repeated ingest must upsert, not duplicate.
+- Indexes support `symbol + time` and portfolio joins (`PortfolioItem.symbol` ↔ `CompanyEvent.symbol`).
+- `User.watchlist` is not dropped in this migration; dual-read until settings dual-write lands.
+
+### Consequences
+
+- Ingest engines must validate `eventType` / categories against `src/lib/company-events/types.ts`.
+- Settings/onboarding should eventually dual-write watchlist ↔ `PortfolioItem` (helper already provided).
+- Alert paths for V2 subjects write `NotificationDelivery`; catalyst path may keep `AlertLog`.
+
+---
+
 ## Appendix — High-signal file map
 
 | Concern | Paths |
@@ -323,3 +360,6 @@ Each numbered product prompt after this plan should implement **one checkpoint**
 | Ticker | `src/lib/ticker-hub.ts`, `src/app/ticker/[symbol]/page.tsx` |
 | Guide | `src/lib/platform-guide.ts` |
 | Schema | `prisma/schema.prisma` |
+| V2 portfolio sync | `src/lib/portfolio/sync-from-watchlist.ts` |
+| Company event types | `src/lib/company-events/types.ts` |
+| Thesis types | `src/lib/thesis/types.ts` |

@@ -279,6 +279,7 @@ export async function PATCH(req: NextRequest) {
       }),
     },
     select: {
+      id: true,
       discordWebhook: true,
       phoneNumber: true,
       smsAlertsEnabled: true,
@@ -304,6 +305,18 @@ export async function PATCH(req: NextRequest) {
 
   if (watchlist !== undefined) {
     await syncCoverageFromWatchlist(user.watchlist);
+    try {
+      const { syncPortfolioItemsFromWatchlist } = await import(
+        "@/lib/portfolio/sync-from-watchlist"
+      );
+      await syncPortfolioItemsFromWatchlist({
+        userId: user.id,
+        watchlist: user.watchlist,
+        source: "settings",
+      });
+    } catch (err) {
+      console.error("portfolio sync from watchlist failed", err);
+    }
   }
 
   return NextResponse.json({

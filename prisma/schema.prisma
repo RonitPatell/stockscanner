@@ -68,6 +68,11 @@ model User {
   traderCalls      TraderCall[]
   judgmentFeedback JudgmentFeedback[]
   traderDecisions  TraderDecision[]
+  /// V2 relational portfolio — prefer over watchlist[] for new features.
+  portfolioItems   PortfolioItem[]
+  investmentTheses InvestmentThesis[]
+  companyEventStates UserCompanyEventState[]
+  notificationDeliveries NotificationDelivery[]
 
   @@index([trialEndsAt])
   @@index([subscriptionStatus, trialEndsAt])
@@ -780,4 +785,318 @@ model FounderMessage {
   @@index([createdAt])
   @@index([status])
   @@index([userId])
+}
+
+// =============================================================================
+// TrustTicker V2 — Investor OS foundation (additive; see ADR in
+// docs/TRUSTTICKER_V2_IMPLEMENTATION.md). Does not replace Catalyst,
+// DilutionInstrument, AlertLog, or User.watchlist during expand-contract.
+// =============================================================================
+
+/// User-owned monitored portfolio membership (richer than User.watchlist[]).
+/// Shared company facts stay on CompanyEvent / instruments — not duplicated here.
+model PortfolioItem {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol             String
+  cik                String?
+  /// watch | holding | both
+  kind               String    @default("watch")
+  /// Optional position metadata — null means unknown / not provided (never invent).
+  shares             Float?
+  costBasisPerShare  Float?
+  notes              String?
+  sortOrder          Int       @default(0)
+  /// Set when removed from active monitoring without hard-delete.
+  archivedAt         DateTime?
+  /// watchlist_migration | settings | onboarding | api | import
+  source             String    @default("api")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([userId, symbol])
+  @@index([userId, archivedAt])
+  @@index([userId, sortOrder])
+  @@index([symbol])
+  @@index([symbol, archivedAt])
+}
+
+/// Shared, idempotent material-change event for Watchtower / What Changed.
+/// Parallel to Catalyst (news/alert story) — link via catalystId when both exist.
+model CompanyEvent {
+  id              String   @id @default(cuid())
+  symbol          String
+  cik             String?
+  /// filing | financial | capital | insider | management | governance | ownership | guidance | corporate
+  category        String
+  /// Strongly typed in src/lib/company-events/types.ts — stored as string for Prisma.
+  eventType       String
+  /// info | notable | material | critical | unknown
+  severity        String   @default("unknown")
+  title           String
+  /// Factual summary only — never investment advice.
+  summary         String?
+  occurredAt      DateTime
+  detectedAt      DateTime @default(now())
+  /// sec | news | derived | manual | wire
+  sourceType      String
+  /// Accession number, provider id, or other durable source key.
+  sourceId        String?
+  sourceUrl       String?
+  evidenceJson    Json     @default("{}")
+  beforeJson      Json?
+  afterJson       Json?
+  /// Content-addressed dedupe key — unique across ingest retries.
+  fingerprint     String   @unique
+  catalystId      String?
+  dilutionInstrumentId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userStates      UserCompanyEventState[]
+  notificationDeliveries NotificationDelivery[]
+
+  @@index([symbol, occurredAt])
+  @@index([symbol, category, occurredAt])
+  @@index([category, eventType, occurredAt])
+  @@index([detectedAt])
+  @@index([sourceType, sourceId])
+  @@index([catalystId])
+}
+
+/// Shared normalized financial / metric observation (UNKNOWN stays null — never coerce to 0).
+model MetricObservation {
+  id               String    @id @default(cuid())
+  symbol           String
+  cik              String?
+  periodEnd        DateTime?
+  periodLabel      String?
+  metricKey        String
+  /// null = UNKNOWN / unavailable
+  value            Float?
+  unit             String?
+  currency         String?
+  priorValue       Float?
+  priorPeriodLabel String?
+  sourceType       String
+  sourceId         String?
+  sourceUrl        String?
+  /// high | medium | low | unknown
+  confidence       String    @default("unknown")
+  fingerprint      String    @unique
+  observedAt       DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  @@index([symbol, metricKey, periodEnd])
+  @@index([symbol, observedAt])
+  @@index([metricKey, periodEnd])
+}
+
+/// Private investment thesis for a user+symbol (user text + conditions — not advice we generate).
+model InvestmentThesis {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol          String
+  title           String?
+  /// active | paused | archived
+  status          String   @default("active")
+  /// User-authored premise — informational framing only.
+  premise         String?
+  /// healthy | watch | broken | unknown — last computed health label
+  healthStatus    String   @default("unknown")
+  lastEvaluatedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  conditions      ThesisCondition[]
+  evaluations     ThesisEvaluation[]
+
+  @@unique([userId, symbol])
+  @@index([userId, status])
+  @@index([symbol, status])
+  @@index([userId, updatedAt])
+}
+
+/// Private thesis condition row (queryable; not buried only in JSON).
+model ThesisCondition {
+  id            String   @id @default(cuid())
+  thesisId      String
+  thesis        InvestmentThesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  sortOrder     Int      @default(0)
+  /// Typed in src/lib/thesis/types.ts
+  conditionType String
+  label         String
+  paramsJson    Json     @default("{}")
+  /// support_if | risk_if | invalidate_if
+  polarity      String   @default("support_if")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([thesisId, sortOrder])
+  @@index([conditionType])
+}
+
+/// Private thesis evaluation snapshot — condition outcomes + evidence refs (not buy/sell).
+model ThesisEvaluation {
+  id               String   @id @default(cuid())
+  thesisId         String
+  thesis           InvestmentThesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  evaluatedAt      DateTime @default(now())
+  healthStatus     String
+  /// Optional numeric health 0–100 for UI — not a return forecast.
+  score            Float?
+  summary          String?
+  resultsJson      Json     @default("{}")
+  companyEventIds  String[] @default([])
+  createdAt        DateTime @default(now())
+
+  @@index([thesisId, evaluatedAt])
+  @@index([evaluatedAt])
+}
+
+/// Point-in-time capital-risk rollup per symbol — does NOT replace DilutionInstrument rows.
+model CapitalRiskSnapshot {
+  id            String   @id @default(cuid())
+  symbol        String
+  cik           String?
+  asOf          DateTime
+  /// elevated | moderate | low | unknown
+  status        String   @default("unknown")
+  /// Factual capacity / program summary — shelf ≠ dilution.
+  summary       String?
+  metricsJson   Json     @default("{}")
+  instrumentIds String[] @default([])
+  fingerprint   String   @unique
+  createdAt     DateTime @default(now())
+
+  @@index([symbol, asOf])
+  @@index([status, asOf])
+}
+
+/// Filing section text/hash (+ optional diff) for amendment redlines — shared facts.
+model FilingSectionSnapshot {
+  id              String   @id @default(cuid())
+  symbol          String
+  cik             String?
+  accessionNumber String
+  formType        String
+  sectionKey      String
+  filingDate      DateTime?
+  textHash        String
+  /// Bounded excerpt for evidence UI — not full filing dump when large.
+  textExcerpt     String?
+  priorAccession  String?
+  priorTextHash   String?
+  diffJson        Json?
+  sourceUrl       String?
+  fingerprint     String   @unique
+  createdAt       DateTime @default(now())
+
+  @@unique([accessionNumber, sectionKey])
+  @@index([symbol, filingDate])
+  @@index([symbol, formType])
+  @@index([priorAccession])
+}
+
+/// Structured Form 4 (and similar) insider transaction — Catalyst headlines alone are insufficient.
+model InsiderTransaction {
+  id                String    @id @default(cuid())
+  symbol            String
+  cik               String?
+  accessionNumber   String
+  filedAt           DateTime
+  transactionDate   DateTime?
+  ownerName         String
+  ownerCik          String?
+  isDirector        Boolean?
+  isOfficer         Boolean?
+  isTenPercent      Boolean?
+  officerTitle      String?
+  transactionCode   String?
+  shares            Float?
+  /// null = UNKNOWN
+  pricePerShare     Float?
+  sharesOwnedAfter  Float?
+  isDirect          Boolean?
+  securityTitle     String?
+  footnotesJson     Json?
+  sourceUrl         String?
+  fingerprint       String    @unique
+  companyEventId    String?
+  createdAt         DateTime  @default(now())
+
+  @@index([symbol, filedAt])
+  @@index([symbol, transactionDate])
+  @@index([accessionNumber])
+  @@index([companyEventId])
+}
+
+/// Institutional 13F (and similar) position snapshot — not real-time ownership.
+model InstitutionalHoldingSnapshot {
+  id                   String    @id @default(cuid())
+  symbol               String
+  cusip                String?
+  filerCik             String
+  filerName            String
+  reportDate           DateTime
+  filedAt              DateTime?
+  shares               Float?
+  /// null = UNKNOWN
+  valueUsd             Float?
+  putCall              String?
+  investmentDiscretion String?
+  accessionNumber      String?
+  sourceUrl            String?
+  fingerprint          String    @unique
+  createdAt            DateTime  @default(now())
+
+  @@index([symbol, reportDate])
+  @@index([filerCik, reportDate])
+  @@index([accessionNumber])
+}
+
+/// Private per-user read / dismiss state for shared CompanyEvent rows.
+model UserCompanyEventState {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyEventId String
+  companyEvent   CompanyEvent @relation(fields: [companyEventId], references: [id], onDelete: Cascade)
+  readAt         DateTime?
+  dismissedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, companyEventId])
+  @@index([userId, readAt])
+  @@index([userId, dismissedAt])
+  @@index([userId, updatedAt])
+}
+
+/// Notification delivery audit beyond catalyst-scoped AlertLog (thesis, company events, etc.).
+model NotificationDelivery {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// discord | sms | email | push | in_app
+  channel       String
+  /// queued | sent | failed | blocked | cooldown
+  status        String
+  /// company_event | catalyst | thesis | capital_risk | system
+  subjectType   String
+  subjectId     String
+  /// Stable dedupe key within user+channel (e.g. event fingerprint + template).
+  dedupeKey     String
+  /// Non-secret delivery metadata only — never webhooks, phones, or raw PII dumps.
+  payloadJson   Json?
+  errorMessage  String?
+  companyEventId String?
+  companyEvent  CompanyEvent? @relation(fields: [companyEventId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, channel, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([subjectType, subjectId])
+  @@index([companyEventId])
+  @@index([status, createdAt])
 }
