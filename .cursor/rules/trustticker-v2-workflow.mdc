@@ -1,0 +1,134 @@
+---
+description: Mandatory TrustTicker V2 development workflow — explore, implement completely, self-review, test, fix, commit, stop
+alwaysApply: true
+---
+
+# TrustTicker V2 mandatory workflow
+
+For every implementation, refactor, or fix prompt in this repository, run the complete workflow below automatically. Do **not** wait to be reminded to review, test, fix, or commit.
+
+This rule **does not** weaken `.cursor/rules/security.mdc`, `.cursor/rules/platform-guide.mdc`, or `.cursor/rules/global-requirements.mdc`. Those remain mandatory.
+
+Repo quality scripts (from `package.json`): `lint`, `typecheck`, `test`, `build`, `verify`, targeted `test:*` / `test:e2e:*`, Prisma via `db:push` / `prisma generate` (prefer validate + generate; never casually run destructive production migrations).
+
+---
+
+## A. Before editing
+
+1. Read files explicitly named in the prompt.
+2. Inspect relevant callers, imports, models, APIs, tests, and neighboring modules.
+3. Search the repo for existing implementations before creating parallel ones.
+4. Read applicable `.cursor/rules/*` and `AGENTS.md` when relevant.
+5. Preserve working functionality; prefer extending/refactoring over parallel systems.
+6. Before major work, briefly identify (internally): files likely to change; reusable functionality; security/auth implications; database implications; billing implications if any; tests to add or update.
+7. Do not rewrite large sections without understanding the existing implementation.
+
+## B. Protect existing user work
+
+1. Run `git status` before changing code.
+2. Never overwrite, revert, delete, stage, or commit unrelated user changes.
+3. Never use destructive Git (`git reset --hard`, `git clean -fd`, or equivalents) unless the user explicitly requests them.
+4. Do not revert changes merely because you did not create them.
+5. When committing, include only files for the completed task plus intentional supporting changes required by that task.
+
+## C. Implement the request completely
+
+1. Implement the requested functionality fully — not scaffolding.
+2. No placeholder controls or TODO behavior for required functionality.
+3. Wire frontend → API → service → database where applicable.
+4. Add migrations when schema changes require them.
+5. Add/update tests for the functionality.
+6. Add loading, empty, success, and error states for user-facing async work.
+7. Ensure buttons, links, forms, dialogs, filters, tabs, and mutations actually work.
+8. Preserve responsive layout, accessibility, and keyboard behavior.
+9. Preserve server-side authorization; never rely solely on client entitlement checks.
+10. Never expose secrets; never fabricate financial data.
+11. Keep TrustTicker informational only — not investment advice.
+12. Do not add paid API dependencies unless the user explicitly authorizes them.
+13. Core platform must work without optional Finnhub, Redis/Upstash, Twilio, LLM APIs, or paid news/data APIs.
+
+## D. Self-review the diff
+
+After implementation, before calling the task done, run `git diff` (and targeted status/diff as needed). Fix issues found — do not only report them.
+
+Review for: unrelated changes; incomplete work; dead imports; duplicated logic; stale Free/Plus/Pro logic; auth mistakes; client-trusted user IDs or subscription state; secrets; unsafe HTML; bad loading/error states; buttons without handlers; links to missing routes; inconsistent naming; TypeScript problems; debug logging; commented-out temp code; TODOs from the task; hardcoded production values; hardcoded Stripe price IDs; financial-data correctness problems.
+
+## E. Run targeted tests first
+
+Run the smallest relevant test set for the changed functionality (entitlements, Stripe, SEC parsers, thesis, Playwright UI, Prisma validation, etc.).
+
+If failures are from this task: fix, rerun, repeat until pass. Do not delete, skip, weaken, or rewrite a legitimate test to get green. Do not use `@ts-ignore`, broad `eslint-disable`, or equivalents to hide problems.
+
+## F. Run project quality checks
+
+After targeted tests pass, run applicable repo-level validation. Inspect `package.json` and use real scripts — do not invent commands.
+
+Where applicable: Prisma validate/generate (inspect migration SQL; no casual destructive prod migrations); `typecheck`; `lint`; unit/integration tests; relevant Playwright; `build` for substantial changes.
+
+Major UI: relevant Playwright, watch for console/page errors and unexpected same-origin failures, check responsive where applicable. Security-sensitive: negative auth tests. Billing: no real Stripe charges in automated tests.
+
+## G. Automatically fix failures
+
+If validation fails and the failure was introduced by this task: fix and rerun until pass. Do not stop at “tests failed because…” when you can fix it.
+
+If a failure clearly pre-existed: confirm against baseline when possible; do not modify unrelated systems just to force green; document in the completion report.
+
+If an external credential/service is unavailable: use mocks/fixtures for isolated tests; confirm graceful fallback; do not fabricate successful external responses.
+
+## H. Final diff review
+
+Re-check `git status` and `git diff`. Verify: only intentional files; no secrets; no debug/temp artifacts; unrelated user files unstaged; tests exist for the feature; requested docs exist; prompt fully satisfied; search stale terminology when applicable.
+
+For TrustTicker V2, watch obsolete: Free plan, Plus, Pro, `requirePlus`, `requirePro`, `hasPlusAccess`, `hasProAccess`, `planTier`-based feature access. Do **not** blindly remove legacy compatibility unless the current migration step makes it safe.
+
+## I. Automatic commit after success
+
+Once implementation is complete and relevant validation passes, create a Git commit automatically. Do **not** ask whether to commit.
+
+Use a concise descriptive message (e.g. `feat: add thesis monitoring`). Never vague (`changes`, `update`, `fix stuff`).
+
+Before commit: exclude unrelated user changes; stage only task files; inspect staged diff; then commit.
+
+**DO NOT PUSH** unless the user explicitly requests it.
+
+## J. If the task cannot safely be committed
+
+Do not create a knowingly broken or misleading “successful” commit.
+
+Genuine blockers only (missing required credential; unmockable external service; destructive migration needing human approval; irreconcilable pre-existing corruption): complete what is safe; preserve working state; report the exact blocker and remaining action. Do not use this exception merely because the work is difficult.
+
+## K. Completion report
+
+End every task with a concise report:
+
+- **Implemented** — what changed
+- **Files** — important created/modified paths
+- **Validation** — checks run and results
+- **Fixes During QA** — issues found and fixed in review/testing
+- **Commit** — hash and message
+- **Remaining Issues** — genuine known issues only
+
+No long narrative unless something important needs explanation.
+
+## L. Do not continue into the next numbered prompt
+
+After finishing, testing, reviewing, and committing the current prompt: **STOP**. Do not infer or start the next TrustTicker V2 prompt. Wait for the user to paste it. Each numbered prompt is an independent checkpoint.
+
+## M. TrustTicker-specific non-negotiables
+
+- No permanent free Investor OS tier.
+- 7-day trial = full platform access.
+- Paid pricing: **$19.99 USD/month** or **$149.99 USD/year**.
+- Monthly and annual unlock identical functionality.
+- Old active Plus/Pro customers retain appropriate legacy paid access during migration.
+- New subscriptions use only the new pricing model.
+- All real entitlement enforcement is server-side.
+- Trust checkout/webhook state; never checkout-return query parameters for access.
+- Private data scoped by authenticated session user ID; never trust client-supplied user IDs.
+- Cron fail-closed in production; Stripe webhook signatures verified.
+- SEC ingestion polite, bounded, and idempotent.
+- Financial facts retain source/evidence where practical.
+- UNKNOWN must never silently become zero.
+- Shelf registration ≠ actual dilution; Form 4 disposition ≠ automatic open-market insider sale; 13F is not real-time.
+- No generated buy/sell recommendation; no guaranteed-return language.
+- No required paid data provider; no required LLM.
