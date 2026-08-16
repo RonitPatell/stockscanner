@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getCachedScannerSnapshot } from "@/lib/market-scanner";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
@@ -12,7 +12,7 @@ export const maxDuration = 15;
  * or warm the Monitor snapshot. Warming is cron/worker-owned.
  */
 export async function GET(req: Request) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const ip = clientIp(req);

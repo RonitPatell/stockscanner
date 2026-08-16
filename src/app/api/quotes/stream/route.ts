@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { isValidTickerFormat } from "@/lib/ticker-utils";
 import { isQuotableMarketSymbol } from "@/lib/index-quotes";
 import {
@@ -43,7 +43,7 @@ function withRvolEstimates(
 }
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const userId = gate.user.id;

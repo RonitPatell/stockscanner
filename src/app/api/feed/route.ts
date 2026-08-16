@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getCachedFeed, getFeedMeta } from "@/lib/feed-cache";
 import { isScaleMode } from "@/lib/redis";
 import { collapseStoryClusters } from "@/lib/story-cluster";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /** Lightweight feed read — cache only, no DB. */
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const moversOnly = req.nextUrl.searchParams.get("moversOnly") === "true";

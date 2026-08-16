@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import {
   getAnalogueReportForCatalyst,
@@ -30,7 +30,7 @@ function parseCriteria(raw: unknown): AnalogueMatchCriteria | undefined {
 }
 
 export async function GET(req: NextRequest) {
-  const authz = await requirePro();
+  const authz = await requireTrustTickerAccess();
   if (authz.error) return authz.error;
 
   const ip = clientIp(req);
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authz = await requirePro();
+  const authz = await requireTrustTickerAccess();
   if (authz.error) return authz.error;
 
   const ip = clientIp(req);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed, getFeedMeta } from "@/lib/feed-cache";
 import { markTracesFirstDelivery } from "@/lib/latency-trace";
@@ -18,7 +18,7 @@ async function withBudget<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   try {

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { previewAlertModes } from "@/lib/alerts/modes";
 import { getCoverageBadges } from "@/lib/coverage/coverage-service";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { mapPublicCatalyst } from "@/lib/coverage/public-catalyst";
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const ip = clientIp(req);

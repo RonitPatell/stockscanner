@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ async function translate(textRaw: string, toRaw: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const ip = clientIp(req);
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const ip = clientIp(req);

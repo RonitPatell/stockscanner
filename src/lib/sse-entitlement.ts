@@ -1,16 +1,16 @@
 /**
- * Mid-stream Pro entitlement re-check for SSE / long-lived connections.
+ * Mid-stream entitlement re-check for SSE / long-lived connections.
  * Handshake-only auth is insufficient — subscription lapse must terminate the stream.
  */
 
 import { prisma } from "@/lib/prisma";
-import { hasActiveSubscription } from "@/lib/subscription";
+import { hasTrustTickerAccess } from "@/lib/subscription";
 
-/** Default how often live streams re-verify Pro status. */
+/** Default how often live streams re-verify product access. */
 export const SSE_ENTITLEMENT_RECHECK_MS = 60_000;
 
 /**
- * Returns true when the user still has Pro access.
+ * Returns true when the user still has TrustTicker access.
  * Fail closed on missing user / DB errors.
  */
 export async function userStillHasPro(userId: string): Promise<boolean> {
@@ -21,11 +21,16 @@ export async function userStillHasPro(userId: string): Promise<boolean> {
       select: {
         subscriptionStatus: true,
         subscriptionEndsAt: true,
+        hasUsedTrial: true,
+        cancelAtPeriodEnd: true,
       },
     });
     if (!user) return false;
-    return hasActiveSubscription(user);
+    return hasTrustTickerAccess(user);
   } catch {
     return false;
   }
 }
+
+/** @deprecated Alias — use userStillHasPro / hasTrustTickerAccess semantics. */
+export const userStillHasTrustTickerAccess = userStillHasPro;

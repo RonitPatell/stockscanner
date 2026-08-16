@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getDilutionRadar, getDilutionTimeline } from "@/lib/dilution-radar";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const url = new URL(req.url);

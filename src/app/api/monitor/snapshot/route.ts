@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { getMonitorDeliveryHub } from "@/lib/monitor/delivery/server-hub";
 import { MONITOR_DELIVERY_VERSION } from "@/domain/monitor/delivery";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * falls back to the process-local delivery hub.
  */
 export async function GET(req: Request) {
-  const auth = await requirePro();
+  const auth = await requireTrustTickerAccess();
   if (auth.error) return auth.error;
 
   await loadMonitorOpsControls();

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasActiveSubscription } from "@/lib/subscription";
+import { hasTrustTickerAccess } from "@/lib/subscription";
 import {
   authorizeCron,
   getAdminEmails,
@@ -15,7 +15,20 @@ export type AuthedUser = {
   email: string | null;
   subscriptionStatus: string | null;
   subscriptionEndsAt: Date | null;
+  planTier: string | null;
+  hasUsedTrial: boolean;
+  cancelAtPeriodEnd: boolean;
 };
+
+const USER_SELECT = {
+  id: true,
+  email: true,
+  subscriptionStatus: true,
+  subscriptionEndsAt: true,
+  planTier: true,
+  hasUsedTrial: true,
+  cancelAtPeriodEnd: true,
+} as const;
 
 export async function requireUser(): Promise<
   { user: AuthedUser; error?: undefined } | { user?: undefined; error: NextResponse }
@@ -26,12 +39,7 @@ export async function requireUser(): Promise<
   }
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: {
-      id: true,
-      email: true,
-      subscriptionStatus: true,
-      subscriptionEndsAt: true,
-    },
+    select: USER_SELECT,
   });
   if (!user) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -39,21 +47,45 @@ export async function requireUser(): Promise<
   return { user };
 }
 
-/** Paid product APIs — active / trialing / grace period. */
-export async function requirePro(): Promise<
+/**
+ * Full TrustTicker product access (trial or paid / grace / past_due).
+ * Server-side only — never trust client plan or query params.
+ */
+export async function requireTrustTickerAccess(): Promise<
   { user: AuthedUser; error?: undefined } | { user?: undefined; error: NextResponse }
 > {
   const result = await requireUser();
   if (result.error) return result;
-  if (!hasActiveSubscription(result.user)) {
+  if (!hasTrustTickerAccess(result.user)) {
     return {
       error: NextResponse.json(
-        { error: "Pro subscription required", code: "PRO_REQUIRED" },
+        {
+          error: "TrustTicker subscription required",
+          code: "SUBSCRIPTION_REQUIRED",
+        },
         { status: 403 }
       ),
     };
   }
   return result;
+}
+
+/**
+ * @deprecated Use requireTrustTickerAccess — Plus is not a feature tier.
+ */
+export async function requirePlus(): Promise<
+  { user: AuthedUser; error?: undefined } | { user?: undefined; error: NextResponse }
+> {
+  return requireTrustTickerAccess();
+}
+
+/**
+ * @deprecated Use requireTrustTickerAccess — Pro is not a feature tier.
+ */
+export async function requirePro(): Promise<
+  { user: AuthedUser; error?: undefined } | { user?: undefined; error: NextResponse }
+> {
+  return requireTrustTickerAccess();
 }
 
 export function cronUnauthorized(): NextResponse {

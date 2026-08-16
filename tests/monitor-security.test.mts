@@ -63,9 +63,9 @@ test("admin Monitor routes use requireAdmin", () => {
   }
 });
 
-test("event-tape GET is Pro-gated; POST uses authorizeCron", () => {
+test("event-tape GET is product-gated; POST uses authorizeCron", () => {
   const src = readSrc("src/app/api/monitor/event-tape/route.ts");
-  assert.match(src, /requirePro/);
+  assert.match(src, /requireTrustTickerAccess/);
   assert.match(src, /authorizeCron/);
   assert.match(src, /safeHttpUrl/);
   assert.match(src, /rateLimit/);
@@ -77,11 +77,12 @@ test("SSE streams re-check entitlement after connect", () => {
     "src/app/api/catalysts/stream/route.ts",
   ]) {
     const src = readSrc(f);
-    assert.match(src, /requirePro/);
+    assert.match(src, /requireTrustTickerAccess/);
     assert.match(src, /userStillHasPro/);
     assert.match(src, /entitlement_revoked/);
   }
   assert.match(readSrc("src/lib/sse-entitlement.ts"), /SSE_ENTITLEMENT_RECHECK_MS\s*=\s*\d+/);
+  assert.match(readSrc("src/lib/sse-entitlement.ts"), /hasTrustTickerAccess/);
 });
 
 test("public health route does not expose secrets or env", () => {

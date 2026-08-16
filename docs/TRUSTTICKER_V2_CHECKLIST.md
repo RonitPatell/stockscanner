@@ -16,18 +16,18 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ## Business model & entitlements
 
-- [ ] Remove permanent free Investor OS tier (OS requires trial or paid)
-- [ ] Single product entitlement (no Plus vs Pro feature differences)
-- [ ] 7-day trial grants **full** product access
-- [ ] Trial not restartable via route revisit / client state clear (`hasUsedTrial` + `TrialClaim`)
+- [x] Remove permanent free Investor OS tier (OS requires trial or paid)
+- [x] Single product entitlement (no Plus vs Pro feature differences)
+- [x] 7-day trial grants **full** product access
+- [x] Trial not restartable via route revisit / client state clear (`hasUsedTrial` + `TrialClaim`)
 - [ ] Paid pricing display: **$19.99/mo** and **$149.99/yr**
-- [ ] Monthly and annual unlock identical functionality
-- [ ] Server-side entitlement only (`requireEntitled` / equivalent)
-- [ ] Client UI hiding never sole protection
-- [ ] Trust webhook/DB state — never checkout-return query params for access
-- [ ] Legacy active Plus/Pro remain entitled until period end / cancel (no forced Stripe price change)
+- [x] Monthly and annual unlock identical functionality
+- [x] Server-side entitlement only (`requireEntitled` / equivalent)
+- [x] Client UI hiding never sole protection
+- [x] Trust webhook/DB state — never checkout-return query params for access
+- [x] Legacy active Plus/Pro remain entitled until period end / cancel (no forced Stripe price change)
 - [ ] New checkout uses only new monthly/annual prices
-- [ ] Access matrix covered: anonymous, trial-eligible, active trial, expired trial, monthly, annual, cancel-at-period-end, canceled/expired, past_due, webhook delay, direct API, direct route, webhook replay
+- [x] Access matrix covered: anonymous, trial-eligible, active trial, expired trial, monthly, annual, cancel-at-period-end, canceled/expired, past_due, webhook delay, direct API, direct route, webhook replay
 
 ---
 
@@ -205,7 +205,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ## Implementation order (checkpoint tracker)
 
-- [ ] 1. Entitlement core + access matrix tests
+- [x] 1. Entitlement core + access matrix tests
 - [ ] 2. Stripe single-SKU migration
 - [ ] 3. API gate sweep → `requireEntitled`
 - [ ] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump

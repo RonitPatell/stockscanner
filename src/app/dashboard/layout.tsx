@@ -20,7 +20,12 @@ export default async function DashboardLayout({
       if (session?.user?.id) {
         const user = await prisma.user.findUnique({
           where: { id: session.user.id },
-          select: { subscriptionStatus: true, subscriptionEndsAt: true },
+          select: {
+            subscriptionStatus: true,
+            subscriptionEndsAt: true,
+            hasUsedTrial: true,
+            cancelAtPeriodEnd: true,
+          },
         });
         entitled = hasActiveSubscription(user ?? undefined);
       }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { auth } from "@/lib/auth";
 import { buildWatchlistBrief } from "@/lib/briefs";
 import { getMarketSession } from "@/lib/market-scanner";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** Premarket command center — gappers, overnight catalysts, brief */
 export async function GET() {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const session = await auth();

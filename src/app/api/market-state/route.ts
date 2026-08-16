@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getCachedQuotes } from "@/lib/quote-cache-service";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +62,7 @@ async function buildFromQuoteCache(): Promise<MarketStatePayload> {
  * Never opens provider connections from user traffic.
  */
 export async function GET() {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   try {

@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasActiveSubscription } from "@/lib/subscription";
+import { hasActiveSubscription, hasTrustTickerAccess, resolvePlanTier } from "@/lib/subscription";
+import type { PlanTier } from "@/lib/subscription";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed } from "@/lib/feed-cache";
 import { getCachedScannerSnapshot } from "@/lib/market-scanner";
@@ -23,8 +24,7 @@ import type { CatalystItem, MarketScannerSnapshot, ScannerFilters } from "@/type
 
 /**
  * Dashboard is request-time dynamic via auth() / Prisma.
- * Next.js 16.2: do not wrap personalized Monitor prefs in `"use cache"` or
- * unstable_cache — that would mix incompatible caching with per-user data.
+ * Free tier: Portfolio. Plus/Pro unlock paid modules.
  */
 export default async function DashboardPage({
   searchParams,
@@ -37,9 +37,14 @@ export default async function DashboardPage({
     panel?: string;
     tab?: string;
     focus?: string;
+    tier?: string;
   }>;
 }) {
   const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login?next=/dashboard");
+  }
+
   const params = await searchParams;
   const shellV3 =
     params.shell === "v3" ||
@@ -53,97 +58,97 @@ export default async function DashboardPage({
     destinationFromSearchParams(destParams);
 
   let isSubscribed = false;
+  let planTier: PlanTier = "free";
   let initialCatalysts: CatalystItem[] = [];
   let initialWatchlist: string[] = [];
   let initialFilters: ScannerFilters | null = null;
   let initialScanner: MarketScannerSnapshot | null = null;
   let initialMonitorSnapshot: MonitorInitialSnapshot | null = null;
 
-  if (session?.user?.id) {
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-          subscriptionStatus: true,
-          subscriptionEndsAt: true,
-          watchlist: true,
-          scannerFilters: true,
-        },
-      });
-      isSubscribed = hasActiveSubscription(user ?? undefined);
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        subscriptionStatus: true,
+        subscriptionEndsAt: true,
+        planTier: true,
+        watchlist: true,
+        scannerFilters: true,
+      },
+    });
+    isSubscribed = hasActiveSubscription(user ?? undefined);
+    planTier = resolvePlanTier(user ?? undefined);
 
-      if (isSubscribed) {
-        // Unified shell: Scanner + Feed default on — seed both on first paint.
-        const loadMonitor = shellV3 && isMonitorV1Enabled();
-
-        const feedWork = async () => {
-          const [cached, scannerSnap] = await Promise.all([
-            getCachedFeed("all"),
-            getCachedScannerSnapshot(),
-          ]);
-          let catalysts = cached.items.slice(0, 150);
-          if (catalysts.length === 0) {
-            try {
-              catalysts = await Promise.race([
-                getCatalysts(150),
-                new Promise<CatalystItem[]>((r) =>
-                  setTimeout(() => r([]), 2_500)
-                ),
-              ]);
-            } catch {
-              catalysts = [];
-            }
-          }
-          return { catalysts, scanner: scannerSnap };
-        };
-
-        const [feedBundle, monitorSnap] = await Promise.all([
-          feedWork(),
-          loadMonitor
-            ? loadMonitorInitialSnapshot({
-                userId: session.user.id,
-                deepLinkSymbol: params.symbol ?? null,
-              })
-            : Promise.resolve(null),
-        ]);
-
-        initialCatalysts = feedBundle.catalysts;
-        initialScanner = feedBundle.scanner;
-        initialMonitorSnapshot = monitorSnap;
-        initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
-        if (user?.scannerFilters && typeof user.scannerFilters === "object") {
-          initialFilters = user.scannerFilters as ScannerFilters;
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Database unavailable";
-      const offline =
-        message.includes("Can't reach database server") ||
-        message.includes("Connection timed out") ||
-        message.includes("ENOTFOUND");
-      if (offline) {
-        return (
-          <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
-            <div className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 space-y-3">
-              <h1 className="text-lg font-semibold text-amber-200">Temporarily unavailable</h1>
-              <p className="text-sm text-zinc-300">
-                We couldn’t reach the database. Please try again in a minute. If this keeps
-                happening, contact support.
-              </p>
-            </div>
-          </div>
-        );
-      }
-      throw error;
+    initialWatchlist = (user?.watchlist ?? []).map((s) => s.toUpperCase());
+    if (user?.scannerFilters && typeof user.scannerFilters === "object") {
+      initialFilters = user.scannerFilters as ScannerFilters;
     }
+
+    if (hasTrustTickerAccess(user ?? undefined)) {
+      const loadMonitor = shellV3 && isMonitorV1Enabled();
+
+      const feedWork = async () => {
+        const [cached, scannerSnap] = await Promise.all([
+          getCachedFeed("all"),
+          getCachedScannerSnapshot(),
+        ]);
+        let catalysts = cached.items.slice(0, 150);
+        if (catalysts.length === 0) {
+          try {
+            catalysts = await Promise.race([
+              getCatalysts(150),
+              new Promise<CatalystItem[]>((r) =>
+                setTimeout(() => r([]), 2_500)
+              ),
+            ]);
+          } catch {
+            catalysts = [];
+          }
+        }
+        return { catalysts, scanner: scannerSnap };
+      };
+
+      const [feedBundle, monitorSnap] = await Promise.all([
+        feedWork(),
+        loadMonitor
+          ? loadMonitorInitialSnapshot({
+              userId: session.user.id,
+              deepLinkSymbol: params.symbol ?? null,
+            })
+          : Promise.resolve(null),
+      ]);
+
+      initialCatalysts = feedBundle.catalysts;
+      initialScanner = feedBundle.scanner;
+      initialMonitorSnapshot = monitorSnap;
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Database unavailable";
+    const offline =
+      message.includes("Can't reach database server") ||
+      message.includes("Connection timed out") ||
+      message.includes("ENOTFOUND");
+    if (offline) {
+      return (
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
+          <div className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 space-y-3">
+            <h1 className="text-lg font-semibold text-amber-200">
+              Temporarily unavailable
+            </h1>
+            <p className="text-sm text-zinc-300">
+              We couldn’t reach the database. Please try again in a minute. If
+              this keeps happening, contact support.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    throw error;
   }
 
   const activatingCheckout =
     params.subscribed === "true" && !!session && !isSubscribed;
-
-  if (!isSubscribed && !activatingCheckout) {
-    redirect("/demo");
-  }
 
   return (
     <div
@@ -159,20 +164,23 @@ export default async function DashboardPage({
             <BrandHomeLink />
 
             <div className="flex items-center gap-2">
-              {session ? (
-                <>
-                  <Link
-                    href="/desk"
-                    className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden sm:inline transition-colors"
-                  >
-                    Prop Desk
-                  </Link>
-                  {!isSubscribed && (
-                    <CheckoutButton size="sm">Subscribe $19.99/mo</CheckoutButton>
-                  )}
-                  <UserMenu />
-                </>
-              ) : null}
+              <Link
+                href="/desk"
+                className="text-[11px] text-zinc-400 hover:text-emerald-300 hidden sm:inline transition-colors"
+              >
+                Prop Desk
+              </Link>
+              {planTier === "free" && (
+                <CheckoutButton size="sm" tier="plus">
+                  Upgrade Plus
+                </CheckoutButton>
+              )}
+              {planTier === "plus" && (
+                <CheckoutButton size="sm" tier="pro">
+                  Upgrade Pro
+                </CheckoutButton>
+              )}
+              <UserMenu />
             </div>
           </div>
         </header>
@@ -187,13 +195,15 @@ export default async function DashboardPage({
       >
         {params.subscribed === "true" && isSubscribed && (
           <div className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 shrink-0 mx-3 mt-2">
-            Subscription active — welcome to TrustTicker Pro!
+            {planTier === "plus"
+              ? "Plus is active — alerts and deeper research unlocked."
+              : "Pro is active — welcome to the full Investor OS."}
           </div>
         )}
 
         {activatingCheckout && <SubscriptionActivating />}
 
-        {isSubscribed ? (
+        {!activatingCheckout ? (
           <TradingDashboard
             initialCatalysts={initialCatalysts}
             initialWatchlist={initialWatchlist}
@@ -202,11 +212,12 @@ export default async function DashboardPage({
             shellV3={shellV3}
             initialDestination={initialDestination}
             initialMonitorSnapshot={initialMonitorSnapshot}
+            planTier={planTier}
           />
         ) : (
           <div className="text-center py-20 max-w-md mx-auto">
             <p className="text-zinc-400 text-sm">
-              Your live scanner will unlock as soon as subscription activation completes.
+              Your desk unlocks as soon as subscription activation completes.
             </p>
           </div>
         )}

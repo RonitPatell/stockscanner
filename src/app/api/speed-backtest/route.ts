@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { runSpeedBacktest } from "@/lib/speed-backtest";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 /** Candle-verified speed edge (Finnhub 1m bars). */
 export async function GET(req: Request) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const url = new URL(req.url);

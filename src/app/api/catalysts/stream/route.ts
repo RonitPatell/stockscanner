@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getCatalysts } from "@/lib/catalyst-engine";
 import { getCachedFeed } from "@/lib/feed-cache";
 import { feedFingerprint } from "@/lib/feed-fingerprint";
@@ -19,7 +19,7 @@ const POLL_MS = 2_000;
 const HEARTBEAT_MS = 12_000;
 
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) {
     recordBrowserStreamHandshake(false);
     return gate.error;

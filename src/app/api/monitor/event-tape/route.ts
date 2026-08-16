@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeCron, requirePro } from "@/lib/api-guard";
+import { authorizeCron, requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { safeHttpUrl } from "@/lib/utils";
 import {
@@ -24,7 +24,7 @@ const WINDOW_MS = 60_000;
  * Never returns secrets or provider credentials.
  */
 export async function GET(req: Request) {
-  const auth = await requirePro();
+  const auth = await requireTrustTickerAccess();
   if (auth.error) return auth.error;
 
   const rl = await rateLimit(

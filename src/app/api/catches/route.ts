@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { getSpeedWins } from "@/lib/speed-wins";
 import { prisma } from "@/lib/prisma";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** Public “who caught it” board — speed wins + recent call board activity */
 export async function GET(req: Request) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   const url = new URL(req.url);

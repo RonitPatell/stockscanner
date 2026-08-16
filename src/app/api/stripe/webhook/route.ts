@@ -6,7 +6,14 @@ import {
 import { prisma } from "@/lib/prisma";
 import { recordTrialClaims } from "@/lib/trial-claims";
 import { track } from "@/lib/analytics/track";
+import { planTierFromCheckoutMeta } from "@/lib/subscription";
 import Stripe from "stripe";
+
+function priceIdFromSubscription(sub: Stripe.Subscription): string | null {
+  const item = sub.items?.data?.[0];
+  const price = item?.price;
+  return typeof price === "string" ? price : price?.id ?? null;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -42,10 +49,8 @@ export async function POST(req: NextRequest) {
           select: { subscriptionId: true },
         });
 
-        // Safety net: never leave two open subs on one customer
         let sub: Stripe.Subscription | null = null;
         if (customerId) {
-          // Prefer the subscription already on the user; otherwise keep oldest open.
           sub = await enforceSingleOpenSubscription(
             customerId,
             prior?.subscriptionId ?? null
@@ -60,12 +65,20 @@ export async function POST(req: NextRequest) {
         const periodEnd = (
           sub as Stripe.Subscription & { current_period_end?: number }
         ).current_period_end;
+        const planTier = planTierFromCheckoutMeta({
+          tier: session.metadata?.tier ?? sub.metadata?.tier,
+          plan: session.metadata?.plan ?? sub.metadata?.plan,
+          priceId: priceIdFromSubscription(sub),
+        });
+
         const user = await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionId: sub.id,
             subscriptionStatus: sub.status,
+            planTier,
             hasUsedTrial: true,
+            cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
             ...(customerId ? { stripeCustomerId: customerId } : {}),
             subscriptionEndsAt: periodEnd
               ? new Date(periodEnd * 1000)
@@ -85,9 +98,9 @@ export async function POST(req: NextRequest) {
         });
 
         if (sub.status === "trialing") {
-          void track("trial_started");
+          void track("trial_started", { tier: planTier });
         } else if (sub.status === "active") {
-          void track("paid_conversion");
+          void track("paid_conversion", { tier: planTier });
         }
 
         if (user && !user.welcomeEmailSent && process.env.RESEND_API_KEY) {
@@ -107,7 +120,9 @@ export async function POST(req: NextRequest) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = sub.metadata?.userId;
       if (userId) {
-        const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+        const periodEnd = (
+          sub as Stripe.Subscription & { current_period_end?: number }
+        ).current_period_end;
         const prevStatus = (
           event.data.previous_attributes as { status?: string } | undefined
         )?.status;
@@ -118,17 +133,26 @@ export async function POST(req: NextRequest) {
               ? "active"
               : sub.status;
 
+        const planTier = planTierFromCheckoutMeta({
+          tier: sub.metadata?.tier,
+          plan: sub.metadata?.plan,
+          priceId: priceIdFromSubscription(sub),
+        });
+
         await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionStatus: status,
-            ...(periodEnd ? { subscriptionEndsAt: new Date(periodEnd * 1000) } : {}),
+            planTier,
+            cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+            ...(periodEnd
+              ? { subscriptionEndsAt: new Date(periodEnd * 1000) }
+              : {}),
           },
         });
 
-        // Trial → paid
         if (prevStatus === "trialing" && sub.status === "active") {
-          void track("paid_conversion");
+          void track("paid_conversion", { tier: planTier });
         }
       }
       break;
@@ -142,6 +166,8 @@ export async function POST(req: NextRequest) {
           data: {
             subscriptionStatus: "canceled",
             subscriptionId: null,
+            planTier: "free",
+            cancelAtPeriodEnd: false,
           },
           select: { cancelReason: true },
         });

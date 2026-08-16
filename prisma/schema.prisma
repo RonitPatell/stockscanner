@@ -15,9 +15,13 @@ model User {
   image            String?
   stripeCustomerId String?   @unique
   subscriptionId   String?
-  subscriptionStatus String @default("inactive") // inactive, active, past_due, canceled
+  subscriptionStatus String @default("inactive") // inactive, active, past_due, canceled, trialing
   subscriptionEndsAt DateTime?
+  /// Legacy freemium label: free | plus | pro — not used for V2 feature gating
+  planTier           String    @default("free")
   hasUsedTrial     Boolean   @default(false)
+  /// Stripe cancel_at_period_end — access continues until subscriptionEndsAt
+  cancelAtPeriodEnd  Boolean   @default(false)
   discordWebhook   String?
   phoneNumber      String?   @unique
   smsAlertsEnabled Boolean   @default(false)

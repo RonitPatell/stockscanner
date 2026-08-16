@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { isScaleMode } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
 /** Legacy client kick — in scale mode ingest is cron-only. */
 export async function POST() {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   if (isScaleMode()) {

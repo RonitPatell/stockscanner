@@ -6,6 +6,10 @@ import type { ScannerFilters } from "@/types";
 import { normalizeAlertRules } from "@/lib/alert-rules";
 import { assertDiscordWebhookOrThrow } from "@/lib/discord-webhook";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import {
+  hasTrustTickerAccess,
+  watchlistLimitFor,
+} from "@/lib/subscription";
 
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
@@ -161,10 +165,48 @@ export async function PATCH(req: NextRequest) {
       smsAlertsEnabled: true,
       hasUsedTrial: true,
       email: true,
+      subscriptionStatus: true,
+      subscriptionEndsAt: true,
+      planTier: true,
+      cancelAtPeriodEnd: true,
     },
   });
   if (!existing) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!hasTrustTickerAccess(existing)) {
+    return NextResponse.json(
+      {
+        error: "TrustTicker subscription required",
+        code: "SUBSCRIPTION_REQUIRED",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (watchlist !== undefined) {
+    const limit = watchlistLimitFor(existing);
+    if (watchlist.length > limit) {
+      return NextResponse.json(
+        {
+          error: "Watchlist update exceeds the allowed size for your account.",
+          code: "SUBSCRIPTION_REQUIRED",
+          limit: Number.isFinite(limit) ? limit : undefined,
+        },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (alertRules !== undefined && !hasTrustTickerAccess(existing)) {
+    return NextResponse.json(
+      {
+        error: "TrustTicker subscription required for alert rules",
+        code: "SUBSCRIPTION_REQUIRED",
+      },
+      { status: 403 }
+    );
   }
 
   let phoneNumber: string | null | undefined;

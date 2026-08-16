@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import {
   SSE_ENTITLEMENT_RECHECK_MS,
   userStillHasPro,
@@ -27,7 +27,7 @@ const MAX_REPLAY = 256;
  * Calculations stay on the server hub; browsers only apply envelopes.
  */
 export async function GET(req: NextRequest) {
-  const gate = await requirePro();
+  const gate = await requireTrustTickerAccess();
   if (gate.error) return gate.error;
 
   await loadMonitorOpsControls();

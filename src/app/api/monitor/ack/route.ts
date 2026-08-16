@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePro } from "@/lib/api-guard";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { getMonitorDeliveryHub } from "@/lib/monitor/delivery/server-hub";
 import {
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * Never accepts watchlists, strategies, or other private fields.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requirePro();
+  const auth = await requireTrustTickerAccess();
   if (auth.error) return auth.error;
 
   const rl = await rateLimit(
