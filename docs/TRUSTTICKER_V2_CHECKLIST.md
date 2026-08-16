@@ -95,9 +95,9 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### Portfolio monitoring
 
-- [ ] Entitled users monitor a portfolio/watchlist without free-tier caps
-- [ ] Portfolio-scoped queries always `session.user.id`
-- [ ] Mutations validated and rate-limited
+- [x] Entitled users monitor a portfolio/watchlist without free-tier caps
+- [x] Portfolio-scoped queries always `session.user.id`
+- [x] Mutations validated and rate-limited
 
 ### What Changed
 

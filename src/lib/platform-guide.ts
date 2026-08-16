@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 55;
+export const PLATFORM_GUIDE_VERSION = 58;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -27,26 +27,51 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
     title: "Welcome to TrustTicker",
-    body: "The dashboard opens on the Trading Floor: live movers, wire, news, and chart. That is the main desk.",
+    body: "Investor OS: Portfolio is where you tell TrustTicker which companies to monitor. Research opens ticker hubs. Markets and Structure unlock with full TrustTicker access.",
     tip: "Tap any ? icon if something is unclear · Esc exits the guide",
   },
   {
     id: "secondary-nav",
     target: "dashboard-secondary-nav",
     title: "View switcher",
-    body: "Floor is the main desk. Watchlist is your saved symbols. Separate News/Scanner tabs were removed — Floor already has the live tape.",
+    body: "Portfolio · Research · Markets · Structure. Portfolio works during trial or paid access — no free-tier symbol cap.",
+  },
+  {
+    id: "portfolio",
+    target: "watchlist-destination",
+    title: "Portfolio",
+    body: "Add or remove companies you own or follow. Optional label, note, and entry price. Quotes enrich when available; monitoring works without live prices.",
+  },
+  {
+    id: "research-desk",
+    target: "research-desk",
+    title: "Research",
+    body: "Look up any ticker. Opens the hub with catalysts, Form 4 context, EDGAR links, and dilution badges.",
   },
   {
     id: "trading-floor",
     target: "trading-floor",
-    title: "Trading Floor",
-    body: "Default desk. Left list switches Volume / Biggest % (same full-height rail — no cramped bottom strip). Wire below. Chart + news stay large on the right. Search any ticker for float, market cap, and chart; session news keeps running. Names stay sticky ~30 minutes.",
+    title: "Markets Floor",
+    body: "Pro desk for volume and biggest % leaders, wire, and charts. Search any ticker for float and market cap.",
+  },
+  {
+    id: "structure-desk",
+    target: "structure-desk",
+    title: "Structure Desk",
+    body: "Pro: can new share supply crush this move? Dilution Radar reads SEC capital filings with evidence links.",
+  },
+  {
+    id: "dilution-radar",
+    target: "dilution-radar",
+    title: "Dilution Radar",
+    body: "Live capital-structure alerts from EDGAR. Open the filing. Skip names that look like supply traps.",
+    requiresExtras: true,
   },
   {
     id: "floor-wire",
     target: "floor-wire",
     title: "Wire alerts",
-    body: "Constant notifications when names surge on volume, hit highs, or show momentum. Click an alert to load that symbol on the chart.",
+    body: "Notifications when names surge on volume, hit highs, or show momentum. Click an alert to load that symbol on the chart.",
     requiresExtras: true,
   },
   {

@@ -6,10 +6,10 @@
  * with richer metadata). Only upserts symbols present on the watchlist.
  */
 
-import { prisma } from "@/lib/prisma";
-import { normalizePortfolioSymbol } from "./symbols";
+import { prisma } from "../prisma.ts";
+import { normalizePortfolioSymbol } from "./symbols.ts";
 
-export { normalizePortfolioSymbol } from "./symbols";
+export { normalizePortfolioSymbol } from "./symbols.ts";
 
 export async function syncPortfolioItemsFromWatchlist(opts: {
   userId: string;

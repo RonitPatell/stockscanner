@@ -33,6 +33,7 @@ import { HelpTip } from "../HelpTip";
 import { FeedShortcutsHelpButton } from "../catalyst-feed/FeedShortcutsHelpButton";
 import { FocusModeV2 } from "../focus/FocusModeV2";
 import { SelectedTapeChart } from "../SelectedTapeChart";
+import { PortfolioDesk } from "./PortfolioDesk";
 import type { DashboardDestination } from "@/lib/dashboard-shell";
 
 export type DashboardNonMonitorBodyProps = {
@@ -237,49 +238,8 @@ export function DashboardNonMonitorBody(props: DashboardNonMonitorBodyProps) {
 
       {!focusV2Active && destination === "watchlist" && (
         <section data-guide="watchlist-destination" className="space-y-3">
+          <PortfolioDesk />
           <WatchlistBrief />
-          <section
-            data-guide="live-tape-chart"
-            className="desk-panel desk-panel--raised"
-          >
-            <div className="desk-panel-header px-3 py-2">
-              <span className="desk-label">Chart</span>
-            </div>
-            <div className="p-2">
-              {selected ? (
-                <SelectedTapeChart
-                  symbol={selected.symbol}
-                  headline={selected.headline}
-                  onOpenDetails={() => openDrawerFor(selected)}
-                />
-              ) : (
-                <p className="px-2 py-6 text-center text-[12px] text-[var(--text-muted)]">
-                  Select a watchlist row to open its chart
-                </p>
-              )}
-            </div>
-          </section>
-          <section
-            data-guide="news-feed"
-            className="desk-panel desk-panel--raised flex flex-col min-h-[60vh]"
-          >
-            <div className="desk-panel-header px-3 py-2">
-              <span className="desk-label">Watchlist feed</span>
-            </div>
-            <LiveScanner
-              embedded
-              tab="watchlist"
-              onTabChange={setTab}
-              initialCatalysts={initialCatalysts}
-              initialWatchlist={initialWatchlist}
-              initialFilters={filtersWithSearch}
-              focusCompact={focused}
-              onFocusedCatalystChange={handleFocusedCatalystChange}
-              onLastEventAtChange={onLastEventAtChange}
-              onCatalystActivate={openDrawerFor}
-              focusCatalystId={selected?.id ?? null}
-            />
-          </section>
           <WatchlistAutopsy symbols={initialWatchlist} />
         </section>
       )}

@@ -803,8 +803,13 @@ model PortfolioItem {
   cik                String?
   /// watch | holding | both
   kind               String    @default("watch")
+  /// Optional personal label (e.g. "core holding") — never advice.
+  label              String?
+  /// When the user started monitoring this name (defaults to create time).
+  monitoredSince     DateTime  @default(now())
   /// Optional position metadata — null means unknown / not provided (never invent).
   shares             Float?
+  /// Optional entry / cost basis per share — null means unknown.
   costBasisPerShare  Float?
   notes              String?
   sortOrder          Int       @default(0)
