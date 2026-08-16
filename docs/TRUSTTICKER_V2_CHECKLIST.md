@@ -102,9 +102,9 @@ Check items only when implemented, tested, and committed for that checkpoint.
 ### What Changed
 
 - [x] CompanyEvent classifier + persist (deterministic; Watchtower feed UI later)
-- [ ] Portfolio-scoped event feed
+- [x] Portfolio-scoped event feed (Watchtower backend; UI later)
 - [x] Deterministic event significance
-- [ ] Evidence/source on events
+- [x] Evidence/source on events (Watchtower response model)
 
 ### Thesis
 
