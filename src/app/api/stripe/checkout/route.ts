@@ -8,6 +8,7 @@ import {
   listOpenSubscriptions,
 } from "@/lib/stripe";
 import { hasTrialClaim } from "@/lib/trial-claims";
+import { evaluateTrialEligibility } from "@/lib/trial";
 import { track } from "@/lib/analytics/track";
 import { isOpenSubscriptionStatus } from "@/lib/subscription";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const plan = body?.plan === "annual" ? "annual" : "monthly";
+    const tier =
+      body?.tier === "plus" || body?.tier === "pro" ? body.tier : "pro";
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -41,15 +44,30 @@ export async function POST(req: NextRequest) {
         subscriptionId: true,
         subscriptionStatus: true,
         hasUsedTrial: true,
+        trialConsumedAt: true,
       },
     });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (plan === "annual" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
+    if (plan === "annual") {
+      if (tier === "plus" && !process.env.STRIPE_PRICE_ID_PLUS_ANNUAL) {
+        return NextResponse.json(
+          { error: "Plus annual is not available right now — use monthly." },
+          { status: 400 }
+        );
+      }
+      if (tier === "pro" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
+        return NextResponse.json(
+          { error: "Annual plan is not available right now — use monthly." },
+          { status: 400 }
+        );
+      }
+    }
+    if (tier === "plus" && !process.env.STRIPE_PRICE_ID_PLUS && !process.env.STRIPE_PRICE_ID) {
       return NextResponse.json(
-        { error: "Annual plan is not available right now — use monthly." },
+        { error: "Plus plan is not configured yet." },
         { status: 400 }
       );
     }
@@ -85,21 +103,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Trial abuse: account flag + durable email/phone hash claims (no phone required at signup)
+    // Trial abuse: account flags + durable email/phone hash claims (no client clocks).
     const claimUsed = await hasTrialClaim({
       email: user.email,
       phoneNumber: user.phoneNumber,
     });
-    const allowTrial = !user.hasUsedTrial && !claimUsed;
+    const { eligible: allowTrial } = evaluateTrialEligibility({
+      user,
+      durableClaimExists: claimUsed,
+    });
 
-    void track("checkout_started", { plan });
+    void track("checkout_started", { plan, tier });
 
     const checkoutSession = await createCheckoutSession(
       customerId,
       user.id,
       user.email,
       allowTrial,
-      plan
+      plan,
+      tier
     );
 
     return NextResponse.json({ url: checkoutSession.url });

@@ -10,6 +10,7 @@ import {
   hasTrustTickerAccess,
   watchlistLimitFor,
 } from "@/lib/subscription";
+import { getTrialAccessDisplay } from "@/lib/trial";
 
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
@@ -86,6 +87,10 @@ export async function GET() {
       alertRules: true,
       subscriptionStatus: true,
       subscriptionEndsAt: true,
+      hasUsedTrial: true,
+      trialConsumedAt: true,
+      trialStartedAt: true,
+      trialEndsAt: true,
       emailAlertsEnabled: true,
       emailBriefEnabled: true,
       onboardingCompleted: true,
@@ -98,6 +103,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const trialAccess = getTrialAccessDisplay(user);
+
   return NextResponse.json({
     discordWebhookConfigured: Boolean(user.discordWebhook),
     discordWebhookMasked: redactWebhook(user.discordWebhook),
@@ -109,6 +116,10 @@ export async function GET() {
     alertRules: user.alertRules,
     subscriptionStatus: user.subscriptionStatus,
     subscriptionEndsAt: user.subscriptionEndsAt,
+    trialAccessLabel: trialAccess.label,
+    trialAccessKind: trialAccess.kind,
+    trialEndsAt: user.trialEndsAt,
+    hasTrustTickerAccess: hasTrustTickerAccess(user),
     emailAlertsEnabled: user.emailAlertsEnabled,
     emailBriefEnabled: user.emailBriefEnabled,
     onboardingCompleted: user.onboardingCompleted,

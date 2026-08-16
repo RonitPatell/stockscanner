@@ -26,6 +26,10 @@ interface SettingsData {
   watchlist?: string[];
   subscriptionStatus?: string | null;
   subscriptionEndsAt?: string | null;
+  trialAccessLabel?: string | null;
+  trialAccessKind?: "none" | "active" | "expired" | null;
+  trialEndsAt?: string | null;
+  hasTrustTickerAccess?: boolean;
   alertRules?: AlertRule[];
 }
 
@@ -42,7 +46,14 @@ export default function SettingsPage() {
   const [watchlistInput, setWatchlistInput] = useState("");
   const [saveError, setSaveError] = useState("");
   const [billing, setBilling] = useState<
-    Pick<SettingsData, "subscriptionStatus" | "subscriptionEndsAt">
+    Pick<
+      SettingsData,
+      | "subscriptionStatus"
+      | "subscriptionEndsAt"
+      | "trialAccessLabel"
+      | "trialAccessKind"
+      | "hasTrustTickerAccess"
+    >
   >({});
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -71,6 +82,9 @@ export default function SettingsPage() {
           setBilling({
             subscriptionStatus: data.subscriptionStatus,
             subscriptionEndsAt: data.subscriptionEndsAt,
+            trialAccessLabel: data.trialAccessLabel ?? null,
+            trialAccessKind: data.trialAccessKind ?? null,
+            hasTrustTickerAccess: data.hasTrustTickerAccess,
           });
           if (Array.isArray(data.alertRules) && data.alertRules.length > 0) {
             setAlertRules(data.alertRules as AlertRule[]);
@@ -189,7 +203,9 @@ export default function SettingsPage() {
 
   const accessUntil = formatSubscriptionEnd(billing.subscriptionEndsAt);
   const isSubscribed =
-    billing.subscriptionStatus === "active" || billing.subscriptionStatus === "trialing";
+    billing.hasTrustTickerAccess === true ||
+    billing.subscriptionStatus === "active" ||
+    billing.subscriptionStatus === "trialing";
   const blocksDelete =
     billing.subscriptionStatus === "active" ||
     billing.subscriptionStatus === "trialing" ||
@@ -417,12 +433,26 @@ export default function SettingsPage() {
                     Status:{" "}
                     <span className="text-emerald-400 capitalize">{billing.subscriptionStatus}</span>
                   </p>
-                  {accessUntil && (
+                  {billing.trialAccessLabel && (
+                    <p
+                      className={
+                        billing.trialAccessKind === "expired"
+                          ? "text-amber-400"
+                          : "text-emerald-300"
+                      }
+                    >
+                      {billing.trialAccessLabel}
+                    </p>
+                  )}
+                  {accessUntil && !billing.trialAccessLabel && (
                     <p className="text-zinc-500">
                       {billing.subscriptionStatus === "trialing"
                         ? `Trial ends ${accessUntil}`
                         : `Current period ends ${accessUntil}`}
                     </p>
+                  )}
+                  {accessUntil && billing.trialAccessKind === "active" && (
+                    <p className="text-zinc-500">Access through {accessUntil}</p>
                   )}
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed">

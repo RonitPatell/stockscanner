@@ -20,6 +20,10 @@ model User {
   /// Legacy freemium label: free | plus | pro — not used for V2 feature gating
   planTier           String    @default("free")
   hasUsedTrial     Boolean   @default(false)
+  /// First time the 7-day trial was consumed (server clock). Never cleared on cancel.
+  trialConsumedAt    DateTime?
+  trialStartedAt     DateTime?
+  trialEndsAt        DateTime?
   /// Stripe cancel_at_period_end — access continues until subscriptionEndsAt
   cancelAtPeriodEnd  Boolean   @default(false)
   discordWebhook   String?
@@ -64,6 +68,9 @@ model User {
   traderCalls      TraderCall[]
   judgmentFeedback JudgmentFeedback[]
   traderDecisions  TraderDecision[]
+
+  @@index([trialEndsAt])
+  @@index([subscriptionStatus, trialEndsAt])
 }
 
 /// Durable trial-abuse claims (email/phone hashes) — survives account delete.

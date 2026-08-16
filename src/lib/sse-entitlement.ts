@@ -23,6 +23,8 @@ export async function userStillHasPro(userId: string): Promise<boolean> {
         subscriptionEndsAt: true,
         hasUsedTrial: true,
         cancelAtPeriodEnd: true,
+        trialConsumedAt: true,
+        trialEndsAt: true,
       },
     });
     if (!user) return false;

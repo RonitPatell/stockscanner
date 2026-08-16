@@ -5,6 +5,7 @@ import {
 } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { recordTrialClaims } from "@/lib/trial-claims";
+import { consumeTrialForUser, hasConsumedTrial } from "@/lib/trial";
 import { track } from "@/lib/analytics/track";
 import { planTierFromCheckoutMeta } from "@/lib/subscription";
 import Stripe from "stripe";
@@ -46,14 +47,24 @@ export async function POST(req: NextRequest) {
             : session.customer?.id ?? null;
         const prior = await prisma.user.findUnique({
           where: { id: userId },
-          select: { subscriptionId: true },
+          select: {
+            subscriptionId: true,
+            email: true,
+            phoneNumber: true,
+            hasUsedTrial: true,
+            trialConsumedAt: true,
+            trialEndsAt: true,
+            welcomeEmailSent: true,
+            name: true,
+          },
         });
+        if (!prior) break;
 
         let sub: Stripe.Subscription | null = null;
         if (customerId) {
           sub = await enforceSingleOpenSubscription(
             customerId,
-            prior?.subscriptionId ?? null
+            prior.subscriptionId ?? null
           );
         }
         if (!sub) {
@@ -65,47 +76,86 @@ export async function POST(req: NextRequest) {
         const periodEnd = (
           sub as Stripe.Subscription & { current_period_end?: number }
         ).current_period_end;
+        const stripeEndsAt = periodEnd
+          ? new Date(periodEnd * 1000)
+          : undefined;
         const planTier = planTierFromCheckoutMeta({
           tier: session.metadata?.tier ?? sub.metadata?.tier,
           plan: session.metadata?.plan ?? sub.metadata?.plan,
           priceId: priceIdFromSubscription(sub),
         });
 
-        const user = await prisma.user.update({
-          where: { id: userId },
-          data: {
-            subscriptionId: sub.id,
-            subscriptionStatus: sub.status,
-            planTier,
-            hasUsedTrial: true,
-            cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
-            ...(customerId ? { stripeCustomerId: customerId } : {}),
-            subscriptionEndsAt: periodEnd
-              ? new Date(periodEnd * 1000)
-              : undefined,
-          },
-          select: {
-            email: true,
-            name: true,
-            phoneNumber: true,
-            welcomeEmailSent: true,
-          },
-        });
-
-        await recordTrialClaims({
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-        });
-
         if (sub.status === "trialing") {
+          const consumed = await consumeTrialForUser({
+            userId,
+            email: prior.email,
+            phoneNumber: prior.phoneNumber,
+            stripe: {
+              subscriptionId: sub.id,
+              stripeCustomerId: customerId,
+              planTier,
+              cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+            },
+          });
+
+          if (!consumed.ok) {
+            // Race / replay: keep existing server trial window; attach Stripe ids only.
+            await prisma.user.update({
+              where: { id: userId },
+              data: {
+                subscriptionId: sub.id,
+                subscriptionStatus: "trialing",
+                planTier,
+                hasUsedTrial: true,
+                cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+                ...(customerId ? { stripeCustomerId: customerId } : {}),
+                // Do not extend or reset trialEndsAt on replay.
+                ...(prior.trialEndsAt
+                  ? { subscriptionEndsAt: prior.trialEndsAt }
+                  : stripeEndsAt
+                    ? { subscriptionEndsAt: stripeEndsAt }
+                    : {}),
+              },
+            });
+            await recordTrialClaims({
+              email: prior.email,
+              phoneNumber: prior.phoneNumber,
+            });
+          }
+
           void track("trial_started", { tier: planTier });
-        } else if (sub.status === "active") {
-          void track("paid_conversion", { tier: planTier });
+        } else {
+          // Paid immediately (no trial) or returning checkout — never restart trial.
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              subscriptionId: sub.id,
+              subscriptionStatus: sub.status,
+              planTier,
+              hasUsedTrial: true,
+              ...(hasConsumedTrial(prior)
+                ? {}
+                : {
+                    trialConsumedAt: new Date(),
+                    // No free trial window when starting paid without trial.
+                  }),
+              cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+              ...(customerId ? { stripeCustomerId: customerId } : {}),
+              ...(stripeEndsAt ? { subscriptionEndsAt: stripeEndsAt } : {}),
+            },
+          });
+          await recordTrialClaims({
+            email: prior.email,
+            phoneNumber: prior.phoneNumber,
+          });
+          if (sub.status === "active") {
+            void track("paid_conversion", { tier: planTier });
+          }
         }
 
-        if (user && !user.welcomeEmailSent && process.env.RESEND_API_KEY) {
+        if (!prior.welcomeEmailSent && process.env.RESEND_API_KEY) {
           const { sendWelcomeEmail } = await import("@/lib/email-brief");
-          const sent = await sendWelcomeEmail(user.email, user.name);
+          const sent = await sendWelcomeEmail(prior.email, prior.name);
           if (sent) {
             await prisma.user.update({
               where: { id: userId },
@@ -139,15 +189,23 @@ export async function POST(req: NextRequest) {
           priceId: priceIdFromSubscription(sub),
         });
 
+        const existing = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { trialEndsAt: true, trialConsumedAt: true, hasUsedTrial: true },
+        });
+
         await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionStatus: status,
             planTier,
             cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
-            ...(periodEnd
-              ? { subscriptionEndsAt: new Date(periodEnd * 1000) }
-              : {}),
+            // Never clear trialConsumedAt / trialEndsAt / hasUsedTrial here.
+            ...(status === "trialing" && existing?.trialEndsAt
+              ? { subscriptionEndsAt: existing.trialEndsAt }
+              : periodEnd
+                ? { subscriptionEndsAt: new Date(periodEnd * 1000) }
+                : {}),
           },
         });
 
@@ -161,6 +219,7 @@ export async function POST(req: NextRequest) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = sub.metadata?.userId;
       if (userId) {
+        // Keep trialConsumedAt / trialEndsAt / hasUsedTrial — trial must not reset.
         const user = await prisma.user.update({
           where: { id: userId },
           data: {

@@ -29,6 +29,9 @@ export interface SubscriptionAccess {
   hasUsedTrial?: boolean | null;
   /** Stripe cancel_at_period_end; when true with active status → grace. */
   cancelAtPeriodEnd?: boolean | null;
+  trialConsumedAt?: Date | string | null;
+  trialStartedAt?: Date | string | null;
+  trialEndsAt?: Date | string | null;
 }
 
 /** Stripe / DB statuses that mean an open billable subscription (block second checkout). */
@@ -81,9 +84,21 @@ function normalizeStatus(status: string | null | undefined): string {
   return (status ?? "").trim().toLowerCase();
 }
 
+function trialConsumed(user: SubscriptionAccess): boolean {
+  if (user.hasUsedTrial) return true;
+  if (user.trialConsumedAt == null) return false;
+  const d =
+    user.trialConsumedAt instanceof Date
+      ? user.trialConsumedAt
+      : new Date(user.trialConsumedAt);
+  return !Number.isNaN(d.getTime());
+}
+
 /**
  * Authoritative access-state resolver (server-side).
  * Pass `now` in tests for deterministic expiry edges.
+ * Never accepts client-supplied entitlement timestamps as authority —
+ * callers must pass DB user fields only.
  */
 export function resolveAccessState(
   user: SubscriptionAccess | null | undefined,
@@ -95,12 +110,9 @@ export function resolveAccessState(
   const cancelAtEnd = Boolean(user.cancelAtPeriodEnd);
   const futureEnd = endsAtInFuture(user.subscriptionEndsAt, now);
   const pastEnd = endsAtInPastOrEqual(user.subscriptionEndsAt, now);
+  const consumed = trialConsumed(user);
 
-  if (status === "trialing") {
-    if (pastEnd) return "expired";
-    return "trialing";
-  }
-
+  // Paid / billable statuses take priority over an overlapping trial window.
   if (status === "active") {
     if (pastEnd) return "expired";
     if (cancelAtEnd) return "grace";
@@ -112,17 +124,34 @@ export function resolveAccessState(
     return "past_due";
   }
 
-  // Terminal / failed payment collection — no access (do not treat as grace via endsAt).
   if (
     status === "unpaid" ||
     status === "incomplete" ||
     status === "incomplete_expired"
   ) {
-    if (!user.hasUsedTrial) return "trial_eligible";
+    if (!consumed) return "trial_eligible";
     return "expired";
   }
 
-  // Canceled / inactive / empty — paid period may still be open (grace).
+  // Server trial window (trialEndsAt) is authoritative when present.
+  const trialEnd = toDate(user.trialEndsAt) ?? (
+    normalizeStatus(user.subscriptionStatus) === "trialing"
+      ? toDate(user.subscriptionEndsAt)
+      : null
+  );
+
+  if (status === "trialing") {
+    if (trialEnd && trialEnd.getTime() <= now.getTime()) return "expired";
+    // Missing end stamp (webhook lag) still counts as trialing.
+    return "trialing";
+  }
+
+  if (trialEnd && trialEnd.getTime() > now.getTime() && consumed) {
+    // Canceled mid-trial but window still open.
+    return "trialing";
+  }
+
+  // Canceled / inactive — paid period may still be open (grace).
   if (futureEnd) {
     return "grace";
   }
@@ -133,12 +162,11 @@ export function resolveAccessState(
     status === "inactive" ||
     status === ""
   ) {
-    if (!user.hasUsedTrial) return "trial_eligible";
+    if (!consumed) return "trial_eligible";
     return "expired";
   }
 
-  // Unknown status: fail closed unless period still open (already handled).
-  if (!user.hasUsedTrial) return "trial_eligible";
+  if (!consumed) return "trial_eligible";
   return "expired";
 }
 

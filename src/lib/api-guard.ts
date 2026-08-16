@@ -18,6 +18,9 @@ export type AuthedUser = {
   planTier: string | null;
   hasUsedTrial: boolean;
   cancelAtPeriodEnd: boolean;
+  trialConsumedAt: Date | null;
+  trialStartedAt: Date | null;
+  trialEndsAt: Date | null;
 };
 
 const USER_SELECT = {
@@ -28,6 +31,9 @@ const USER_SELECT = {
   planTier: true,
   hasUsedTrial: true,
   cancelAtPeriodEnd: true,
+  trialConsumedAt: true,
+  trialStartedAt: true,
+  trialEndsAt: true,
 } as const;
 
 export async function requireUser(): Promise<
