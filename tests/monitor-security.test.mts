@@ -103,21 +103,22 @@ test("authorizeCron rejects when secret missing outside local next-dev", () => {
   const prevSecret = process.env.CRON_SECRET;
   const prevNode = process.env.NODE_ENV;
   const prevVercel = process.env.VERCEL;
+  const env = process.env as Record<string, string | undefined>;
   try {
-    delete process.env.CRON_SECRET;
-    process.env.NODE_ENV = "production";
-    process.env.VERCEL = "1";
+    delete env.CRON_SECRET;
+    env.NODE_ENV = "production";
+    env.VERCEL = "1";
     const req = new Request("http://localhost/api/cron", {
       headers: { authorization: "Bearer x" },
     });
     assert.equal(authorizeCron(req), false);
   } finally {
-    if (prevSecret == null) delete process.env.CRON_SECRET;
-    else process.env.CRON_SECRET = prevSecret;
-    if (prevNode == null) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = prevNode;
-    if (prevVercel == null) delete process.env.VERCEL;
-    else process.env.VERCEL = prevVercel;
+    if (prevSecret == null) delete env.CRON_SECRET;
+    else env.CRON_SECRET = prevSecret;
+    if (prevNode == null) delete env.NODE_ENV;
+    else env.NODE_ENV = prevNode;
+    if (prevVercel == null) delete env.VERCEL;
+    else env.VERCEL = prevVercel;
   }
 });
 

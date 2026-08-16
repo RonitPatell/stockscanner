@@ -204,23 +204,22 @@ test("effectiveLiveLabel never calls disconnected data live", () => {
 
 test("LiveSyncController: event during hydration then LIVE", () => {
   const messages: string[] = [];
-  let handler: ((ev: MessageEvent) => void) | null = null;
+  type Es = {
+    onmessage: ((ev: MessageEvent) => void) | null;
+    onerror: ((ev: Event) => void) | null;
+    close: () => void;
+  };
+  let esRef: Es | null = null;
   const ctrl = new MonitorLiveSyncController({
     initialSnapshot: snap(10),
     initialLastEventId: "10",
     eventSourceFactory: () => {
-      const es = {
-        onmessage: null as ((ev: MessageEvent) => void) | null,
-        onerror: null as ((ev: Event) => void) | null,
+      esRef = {
+        onmessage: null,
+        onerror: null,
         close: () => {},
       };
-      Object.defineProperty(es, "onmessage", {
-        get: () => handler,
-        set: (v) => {
-          handler = v;
-        },
-      });
-      return es;
+      return esRef;
     },
     nowMs: () => 5_000,
   });
@@ -229,50 +228,48 @@ test("LiveSyncController: event during hydration then LIVE", () => {
   ctrl.start();
   assert.equal(ctrl.getSyncState(), "CONNECTING");
 
-  handler?.({
-    data: JSON.stringify({
-      type: "catchup_start",
-      id: "1",
-      fromEventId: "10",
-      mode: "replay",
-      reason: "none",
-    }),
-  } as MessageEvent);
+  const fire = (data: unknown) => {
+    esRef?.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
+  };
+
+  fire({
+    type: "catchup_start",
+    id: "1",
+    fromEventId: "10",
+    mode: "replay",
+    reason: "none",
+  });
   assert.equal(ctrl.getSyncState(), "CATCHING_UP");
 
-  handler?.({
-    data: JSON.stringify({
-      type: "delta",
-      id: "11",
-      sequence: 11,
-      priority: "state",
-      payload: [
-        {
-          symbol: "AAAA",
-          sequence: 2,
-          asOfMs: 5_000,
-          rank: 1,
-          attentionPriority: 85,
-          momentumState: "BREAKING",
-          momentumIntensity: 0.9,
-          direction: "up",
-          halted: false,
-          criticalEvent: false,
-          dataAvailability: "ok",
-          stale: false,
-        },
-      ],
-    }),
-  } as MessageEvent);
+  fire({
+    type: "delta",
+    id: "11",
+    sequence: 11,
+    priority: "state",
+    payload: [
+      {
+        symbol: "AAAA",
+        sequence: 2,
+        asOfMs: 5_000,
+        rank: 1,
+        attentionPriority: 85,
+        momentumState: "BREAKING",
+        momentumIntensity: 0.9,
+        direction: "up",
+        halted: false,
+        criticalEvent: false,
+        dataAvailability: "ok",
+        stale: false,
+      },
+    ],
+  });
 
-  handler?.({
-    data: JSON.stringify({
-      type: "catchup_complete",
-      id: "2",
-      lastEventId: "11",
-      replayed: 1,
-    }),
-  } as MessageEvent);
+  fire({
+    type: "catchup_complete",
+    id: "2",
+    lastEventId: "11",
+    replayed: 1,
+  });
 
   // Drain apply queue
   for (let i = 0; i < 5; i++) ctrl.applyFrame(true);
@@ -286,28 +283,27 @@ test("LiveSyncController: event during hydration then LIVE", () => {
 });
 
 test("LiveSyncController: duplicate event ignored; out-of-order entity skipped", () => {
-  let handler: ((ev: MessageEvent) => void) | null = null;
+  type Es = {
+    onmessage: ((ev: MessageEvent) => void) | null;
+    onerror: ((ev: Event) => void) | null;
+    close: () => void;
+  };
+  let esRef: Es | null = null;
   const ctrl = new MonitorLiveSyncController({
     initialSnapshot: snap(1),
     initialLastEventId: "1",
     eventSourceFactory: () => {
-      const es = {
-        onmessage: null as ((ev: MessageEvent) => void) | null,
-        onerror: null as ((ev: Event) => void) | null,
+      esRef = {
+        onmessage: null,
+        onerror: null,
         close: () => {},
       };
-      Object.defineProperty(es, "onmessage", {
-        get: () => handler,
-        set: (v) => {
-          handler = v;
-        },
-      });
-      return es;
+      return esRef;
     },
   });
   ctrl.start();
   const delta = (seq: number, entity: number, intensity: number) =>
-    handler?.({
+    esRef?.onmessage?.({
       data: JSON.stringify({
         type: "delta",
         id: String(seq),
@@ -341,38 +337,32 @@ test("LiveSyncController: duplicate event ignored; out-of-order entity skipped",
 });
 
 test("LiveSyncController: network offline → reconnecting keeps snapshot; online retries", () => {
-  let handler: ((ev: MessageEvent) => void) | null = null;
-  let err: ((ev: Event) => void) | null = null;
+  type Es = {
+    onmessage: ((ev: MessageEvent) => void) | null;
+    onerror: ((ev: Event) => void) | null;
+    close: () => void;
+  };
+  let lastEs: Es | null = null;
   let opens = 0;
   const ctrl = new MonitorLiveSyncController({
     initialSnapshot: snap(5),
     initialLastEventId: "5",
     random: () => 0,
-    eventSourceFactory: () => {
+    eventSourceFactory: (): Es => {
       opens += 1;
-      const es = {
-        onmessage: null as ((ev: MessageEvent) => void) | null,
-        onerror: null as ((ev: Event) => void) | null,
+      const es: Es = {
+        onmessage: null,
+        onerror: null,
         close: () => {},
       };
-      Object.defineProperty(es, "onmessage", {
-        get: () => handler,
-        set: (v) => {
-          handler = v;
-        },
-      });
-      Object.defineProperty(es, "onerror", {
-        get: () => err,
-        set: (v) => {
-          err = v;
-        },
-      });
+      lastEs = es;
       return es;
     },
   });
   ctrl.start();
   assert.equal(opens, 1);
-  err?.({} as Event);
+  assert.ok(lastEs != null);
+  (lastEs as Es).onerror?.({} as Event);
   assert.equal(ctrl.getSyncState(), "RECONNECTING");
   assert.equal(syncKeepsSnapshotVisible("RECONNECTING"), true);
   assert.ok(ctrl.runtime.getState().symbols.has("AAAA"));

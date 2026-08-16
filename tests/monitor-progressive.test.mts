@@ -34,6 +34,7 @@ function minimalDossier(symbol: string): MonitorSelectedTicker {
       company: t("Test Co"),
       price: n(1.25),
       sessionChangePct: n(12.5),
+      momentumRank: n(null),
       pinned: false,
     },
     currentState: {
@@ -83,7 +84,7 @@ function minimalDossier(symbol: string): MonitorSelectedTicker {
     },
     actions: { tradingViewUrl: "https://www.tradingview.com", sourceUrl: null },
     disclaimer: "Informational only",
-  } as MonitorSelectedTicker;
+  } as unknown as MonitorSelectedTicker;
 }
 
 test("essential selected ticker keeps real symbol — never fabricated placeholders", () => {
