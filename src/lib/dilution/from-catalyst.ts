@@ -43,8 +43,14 @@ export function shouldExtractDilution(input: {
  */
 export async function processCatalystForDilution(
   input: CatalystDilutionHookInput
-): Promise<{ extracted: number; ids: string[] }> {
-  if (!shouldExtractDilution(input)) return { extracted: 0, ids: [] };
+): Promise<{
+  extracted: number;
+  ids: string[];
+  results: import("./types.ts").DilutionExtractionResult[];
+}> {
+  if (!shouldExtractDilution(input)) {
+    return { extracted: 0, ids: [], results: [] };
+  }
 
   const formType =
     parseFormFromRawNewsId(input.rawNewsId) ||

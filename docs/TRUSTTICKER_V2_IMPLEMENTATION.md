@@ -362,4 +362,5 @@ Each numbered product prompt after this plan should implement **one checkpoint**
 | Schema | `prisma/schema.prisma` |
 | V2 portfolio sync | `src/lib/portfolio/sync-from-watchlist.ts` |
 | Company event types | `src/lib/company-events/types.ts` |
+| Company event engine | `src/lib/company-events/` · `docs/V2_COMPANY_EVENTS.md` |
 | Thesis types | `src/lib/thesis/types.ts` |

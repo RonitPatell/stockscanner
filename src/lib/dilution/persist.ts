@@ -179,9 +179,13 @@ export async function flagConflicts(symbol: string): Promise<number> {
 
 export async function processFilingForDilution(
   input: DilutionExtractionInput
-): Promise<{ extracted: number; ids: string[] }> {
-  const extracted = extractDilutionInstruments(input);
-  if (extracted.length === 0) return { extracted: 0, ids: [] };
-  const ids = await persistDilutionExtractions(input, extracted);
-  return { extracted: extracted.length, ids };
+): Promise<{
+  extracted: number;
+  ids: string[];
+  results: DilutionExtractionResult[];
+}> {
+  const results = extractDilutionInstruments(input);
+  if (results.length === 0) return { extracted: 0, ids: [], results: [] };
+  const ids = await persistDilutionExtractions(input, results);
+  return { extracted: results.length, ids, results };
 }

@@ -101,6 +101,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### What Changed
 
+- [x] CompanyEvent classifier + persist (deterministic; Watchtower feed UI later)
 - [ ] Portfolio-scoped event feed
 - [ ] Deterministic event significance
 - [ ] Evidence/source on events
@@ -114,7 +115,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### SEC & company events
 
-- [ ] SEC event detection (existing 8-K / 4 / capital forms retained)
+- [x] SEC event detection (existing 8-K / 4 / capital forms retained; expanded Atom + CompanyEvent classifier)
 - [ ] Polite, bounded, idempotent SEC ingestion
 - [ ] Extended events as needed without paid data vendors
 
@@ -226,7 +227,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 3. API gate sweep → `requireEntitled`
 - [ ] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
 - [ ] 5. Company workspace tab shell
-- [ ] 6. CompanyEvent / What Changed engine
+- [x] 6. CompanyEvent / What Changed engine *(classifier + persist; Watchtower UI later)*
 - [ ] 7. Thesis + Thesis Health
 - [ ] 8. Portfolio Brief
 - [ ] 9. Capital Risk / dilution surfacing

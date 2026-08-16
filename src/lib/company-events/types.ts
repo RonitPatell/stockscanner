@@ -40,61 +40,87 @@ export type CompanyEventSourceType = (typeof COMPANY_EVENT_SOURCE_TYPES)[number]
 
 /**
  * Central event-type registry. Add new types here before ingest writes them.
- * Grouped by category for documentation; runtime validation is flat.
+ * See docs/V2_COMPANY_EVENTS.md for supported SEC forms and confidence rules.
  */
 export const COMPANY_EVENT_TYPES = [
-  // filing
+  // —— Filings (form-level) ——
   "sec_8k",
   "sec_10k",
   "sec_10q",
+  "sec_nt_10k",
+  "sec_nt_10q",
   "sec_s1",
+  "sec_s1_a",
   "sec_s3",
-  "sec_424b",
+  "sec_s3_a",
+  "sec_424b5",
+  "sec_effect",
+  "sec_def_14a",
+  "sec_form3",
   "sec_form4",
+  "sec_form5",
+  "sec_form144",
   "sec_13d",
+  "sec_13d_a",
   "sec_13g",
+  "sec_13g_a",
   "sec_13f",
   "sec_other",
-  // financial
+  // —— Material 8-K items (only when reliably identifiable) ——
+  "auditor_change",
+  "management_change",
+  "director_change",
+  "material_agreement",
+  "bankruptcy_receivership",
+  "impairment",
+  "financial_results_8k",
+  "non_reliance_restatement",
+  // —— Financial (structured deltas — separate engines) ——
   "earnings_release",
   "revenue_delta",
   "eps_delta",
   "cash_delta",
   "margin_delta",
   "metric_observation",
-  // capital
+  // —— Capital (from dilution extraction when confident) ——
   "shelf_registration",
+  "s1_registration",
+  "prospectus_424b5",
   "atm_program",
   "registered_direct",
+  "convertible_instrument",
+  "warrant_issuance",
+  "warrant_reprice",
+  "share_issuance",
+  "reverse_split",
+  "effective_registration",
   "offering_priced",
   "dilution_capacity_change",
   "warrant_exercise_window",
-  // insider
+  // —— Insider ——
   "insider_purchase",
   "insider_sale",
   "insider_grant",
   "insider_disposition_other",
   "insider_form4",
-  // management
+  // —— Management / governance ——
   "ceo_change",
   "cfo_change",
   "executive_departure",
   "executive_appointment",
-  // governance
   "board_change",
-  "auditor_change",
   "shareholder_meeting",
   "charter_amendment",
-  // ownership
+  // —— Ownership ——
   "beneficial_ownership_13d",
   "beneficial_ownership_13g",
   "institutional_13f_update",
-  // guidance
+  // —— Guidance ——
   "guidance_raised",
   "guidance_lowered",
   "guidance_withdrawn",
   "guidance_issued",
-  // corporate
+  // —— Corporate ——
   "merger_announced",
   "acquisition_announced",
   "spinoff",
@@ -107,6 +133,9 @@ export const COMPANY_EVENT_TYPES = [
 ] as const;
 
 export type CompanyEventType = (typeof COMPANY_EVENT_TYPES)[number];
+
+/** Minimum dilution extraction confidence to emit a capital CompanyEvent. */
+export const CAPITAL_EVENT_MIN_CONFIDENCE = 0.55;
 
 const CATEGORY_SET = new Set<string>(COMPANY_EVENT_CATEGORIES);
 const TYPE_SET = new Set<string>(COMPANY_EVENT_TYPES);
@@ -129,7 +158,34 @@ export function isCompanyEventSourceType(v: string): v is CompanyEventSourceType
   return SOURCE_SET.has(v);
 }
 
-/** Build a stable fingerprint for idempotent CompanyEvent upserts. */
+/**
+ * Stable fingerprint for SEC / derived events.
+ * Prefer accession (or rawNewsId) — do NOT include volatile titles/timestamps
+ * so reprocessing the same filing stays idempotent.
+ */
+export function filingEventFingerprint(parts: {
+  symbol: string;
+  eventType: string;
+  accession?: string | null;
+  rawNewsId?: string | null;
+  /** Distinguishes multiple events from one filing (e.g. 8-K item key). */
+  discriminant?: string | null;
+}): string {
+  const src = (
+    parts.accession?.trim() ||
+    parts.rawNewsId?.trim() ||
+    "nosrc"
+  ).toUpperCase();
+  return [
+    parts.symbol.trim().toUpperCase(),
+    parts.eventType,
+    "sec",
+    src,
+    (parts.discriminant ?? "base").trim().toLowerCase() || "base",
+  ].join("|");
+}
+
+/** @deprecated Prefer filingEventFingerprint for SEC ingest. */
 export function companyEventFingerprint(parts: {
   symbol: string;
   eventType: string;
@@ -138,6 +194,14 @@ export function companyEventFingerprint(parts: {
   occurredAt: Date | string;
   title?: string | null;
 }): string {
+  if (parts.sourceType === "sec") {
+    return filingEventFingerprint({
+      symbol: parts.symbol,
+      eventType: parts.eventType,
+      accession: parts.sourceId,
+      discriminant: parts.title?.slice(0, 40) ?? "base",
+    });
+  }
   const occurred =
     typeof parts.occurredAt === "string"
       ? parts.occurredAt

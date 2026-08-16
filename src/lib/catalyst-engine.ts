@@ -696,11 +696,15 @@ export async function ingestAndAnalyzeNews(
       }
     })();
 
-    // Dilution Radar V2 — SEC evidence extraction (non-blocking / enrichment path)
+    // Dilution Radar V2 + Company Event Engine (non-blocking / enrichment path)
     void (async () => {
       try {
         const { processCatalystForDilution } = await import("./dilution/from-catalyst");
-        await processCatalystForDilution({
+        const { processCatalystForCompanyEvents } = await import(
+          "./company-events/from-catalyst"
+        );
+
+        const dilution = await processCatalystForDilution({
           catalystId: catalyst.id,
           symbol,
           headline: article.headline,
@@ -711,8 +715,24 @@ export async function ingestAndAnalyzeNews(
           publishedAt: article.publishedAt,
           floatShares: quote?.floatShares ?? null,
         });
+
+        await processCatalystForCompanyEvents(
+          {
+            catalystId: catalyst.id,
+            symbol,
+            headline: article.headline,
+            summary: article.summary ?? analysis.summary,
+            source: article.source,
+            sourceUrl: article.url,
+            rawNewsId: article.id,
+            publishedAt: article.publishedAt,
+          },
+          dilution.results.length > 0
+            ? { extracted: dilution.results, instrumentIds: dilution.ids }
+            : undefined
+        );
       } catch {
-        /* non-fatal */
+        /* non-fatal — Catalyst consumers must not break */
       }
     })();
 

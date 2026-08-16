@@ -375,8 +375,35 @@ export function parseAccessionFromUrl(url?: string | null): string | null {
 export function parseFormFromRawNewsId(rawNewsId?: string | null): string | null {
   if (!rawNewsId) return null;
   const m = rawNewsId.match(
-    /^sec-(424b5|s-1\/a|s-3\/a|s-1|s-3|8-k|4)(?:-|$)/i
+    /^sec-(nt-10-q|nt-10-k|10-q|10-k|424b5|s-1\/a|s-3\/a|s-1|s-3|8-k|def-14a|effect|sc-13d\/a|sc-13g\/a|sc-13d|sc-13g|13f-hr|form3|form5|form144|3|4|5|144)(?:-|$)/i
   );
   if (!m) return null;
-  return m[1].toUpperCase();
+  const slug = m[1].toLowerCase();
+  const map: Record<string, string> = {
+    "8-k": "8-K",
+    "10-q": "10-Q",
+    "10-k": "10-K",
+    "nt-10-q": "NT 10-Q",
+    "nt-10-k": "NT 10-K",
+    "s-1": "S-1",
+    "s-1/a": "S-1/A",
+    "s-3": "S-3",
+    "s-3/a": "S-3/A",
+    "424b5": "424B5",
+    effect: "EFFECT",
+    "def-14a": "DEF 14A",
+    "3": "3",
+    form3: "3",
+    "4": "4",
+    "5": "5",
+    form5: "5",
+    "144": "144",
+    form144: "144",
+    "sc-13d": "SC 13D",
+    "sc-13d/a": "SC 13D/A",
+    "sc-13g": "SC 13G",
+    "sc-13g/a": "SC 13G/A",
+    "13f-hr": "13F-HR",
+  };
+  return map[slug] ?? m[1].toUpperCase();
 }
