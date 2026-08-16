@@ -4,14 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { CheckoutPlan } from "@/lib/stripe";
+import type { BillingPeriod } from "@/lib/billing/pricing";
 
 interface CheckoutButtonProps {
   children?: React.ReactNode;
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   showIcon?: boolean;
-  plan?: CheckoutPlan;
+  billingPeriod?: BillingPeriod;
+  /** @deprecated Use billingPeriod */
+  plan?: BillingPeriod;
+  /** @deprecated Ignored — feature tiers removed */
+  tier?: string;
 }
 
 export function CheckoutButton({
@@ -19,11 +23,13 @@ export function CheckoutButton({
   size = "default",
   className,
   showIcon = true,
-  plan = "monthly",
+  billingPeriod,
+  plan,
 }: CheckoutButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const period: BillingPeriod = billingPeriod ?? plan ?? "monthly";
 
   const handleCheckout = async () => {
     setLoading(true);
@@ -33,7 +39,7 @@ export function CheckoutButton({
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ billingPeriod: period }),
       });
       const data = await res.json();
 
@@ -42,7 +48,6 @@ export function CheckoutButton({
         return;
       }
 
-      // Already subscribed → billing portal (url present with 409)
       if (data.url) {
         window.location.href = data.url;
         return;

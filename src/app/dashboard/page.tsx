@@ -170,14 +170,9 @@ export default async function DashboardPage({
               >
                 Prop Desk
               </Link>
-              {planTier === "free" && (
-                <CheckoutButton size="sm" tier="plus">
-                  Upgrade Plus
-                </CheckoutButton>
-              )}
-              {planTier === "plus" && (
-                <CheckoutButton size="sm" tier="pro">
-                  Upgrade Pro
+              {!isSubscribed && (
+                <CheckoutButton size="sm" billingPeriod="monthly">
+                  Start trial
                 </CheckoutButton>
               )}
               <UserMenu />

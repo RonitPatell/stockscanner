@@ -96,16 +96,20 @@ Paste result into `NEXTAUTH_SECRET` and `CRON_SECRET`.
 
 Without this key, Yahoo Finance RSS is used automatically.
 
-### 5. Stripe ($19.99/mo subscriptions — free to set up)
+### 5. Stripe (TrustTicker — $19.99/mo or $149.99/yr)
 
 1. Create account at [stripe.com](https://stripe.com)
-2. **Products** → Add product: `TrustTicker Pro`
-3. Price: **$19.99 / month / recurring**
-4. Optional: add **7-day free trial**
-5. Copy `price_...` → `STRIPE_PRICE_ID`
-6. Copy API keys → `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`
+2. **Products** → Add product: `TrustTicker`
+3. Add two recurring prices on that product:
+   - **$19.99 / month** → `STRIPE_PRICE_ID_MONTHLY`
+   - **$149.99 / year** → `STRIPE_PRICE_ID_ANNUAL`
+4. Trial is applied in Checkout (`trial_period_days: 7` when eligible) — card collected at checkout
+5. Copy API keys → `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`
+6. Webhook endpoint → `STRIPE_WEBHOOK_SECRET` (see docs/V2_BILLING.md)
 
-Stripe costs you nothing until someone subscribes. When they do, you keep ~$19.11 of the $19.99.
+Stripe costs you nothing until someone subscribes.
+
+Optional migration fallbacks (deprecated): `STRIPE_PRICE_ID`, `STRIPE_PRICE_ID_PLUS`, `STRIPE_PRICE_ID_PLUS_ANNUAL`.
 
 ### 6. Run locally
 

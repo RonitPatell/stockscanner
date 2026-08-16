@@ -20,28 +20,28 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] Single product entitlement (no Plus vs Pro feature differences)
 - [x] 7-day trial grants **full** product access
 - [x] Trial not restartable via route revisit / client state clear (`hasUsedTrial` + `TrialClaim`)
-- [ ] Paid pricing display: **$19.99/mo** and **$149.99/yr**
+- [x] Paid pricing display: **$19.99/mo** and **$149.99/yr**
 - [x] Monthly and annual unlock identical functionality
 - [x] Server-side entitlement only (`requireEntitled` / equivalent)
 - [x] Client UI hiding never sole protection
 - [x] Trust webhook/DB state — never checkout-return query params for access
 - [x] Legacy active Plus/Pro remain entitled until period end / cancel (no forced Stripe price change)
-- [ ] New checkout uses only new monthly/annual prices
+- [x] New checkout uses only new monthly/annual prices
 - [x] Access matrix covered: anonymous, trial-eligible, active trial, expired trial, monthly, annual, cancel-at-period-end, canceled/expired, past_due, webhook delay, direct API, direct route, webhook replay
 
 ---
 
 ## Stripe & billing
 
-- [ ] Stripe Price objects for $19.99 and $149.99
-- [ ] Checkout API accepts interval only (no tier)
-- [ ] Webhook signature verification retained
-- [ ] Webhook updates status / period end / trial flags correctly
-- [ ] Webhook event idempotency
-- [ ] Duplicate open-subscription prevention retained
-- [ ] Billing portal manage/cancel path retained
-- [ ] No real charges in automated tests
-- [ ] Legacy price IDs still resolve as entitled in webhooks
+- [ ] Stripe Price objects for $19.99 and $149.99 *(create in Stripe Dashboard / env — app code ready)*
+- [x] Checkout API accepts interval only (no tier)
+- [x] Webhook signature verification retained
+- [x] Webhook updates status / period end / trial flags correctly
+- [x] Webhook event idempotency
+- [x] Duplicate open-subscription prevention retained
+- [x] Billing portal manage/cancel path retained
+- [x] No real charges in automated tests
+- [x] Legacy price IDs still resolve as entitled in webhooks
 
 ---
 
@@ -206,8 +206,8 @@ Check items only when implemented, tested, and committed for that checkpoint.
 ## Implementation order (checkpoint tracker)
 
 - [x] 1. Entitlement core + access matrix tests
-- [ ] 2. Stripe single-SKU migration
-- [ ] 3. API gate sweep → `requireEntitled`
+- [x] 2. Stripe single-SKU migration
+- [x] 3. API gate sweep → `requireEntitled`
 - [ ] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
 - [ ] 5. Company workspace tab shell
 - [ ] 6. CompanyEvent / What Changed engine

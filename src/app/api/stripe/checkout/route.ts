@@ -7,6 +7,7 @@ import {
   getOrCreateStripeCustomer,
   listOpenSubscriptions,
 } from "@/lib/stripe";
+import { parseCheckoutRequest } from "@/lib/billing/pricing";
 import { hasTrialClaim } from "@/lib/trial-claims";
 import { evaluateTrialEligibility } from "@/lib/trial";
 import { track } from "@/lib/analytics/track";
@@ -30,9 +31,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const plan = body?.plan === "annual" ? "annual" : "monthly";
-    const tier =
-      body?.tier === "plus" || body?.tier === "pro" ? body.tier : "pro";
+    const parsed = parseCheckoutRequest(body);
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { error: parsed.error, code: parsed.code },
+        { status: 400 }
+      );
+    }
+    const { billingPeriod } = parsed;
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -51,23 +57,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (plan === "annual") {
-      if (tier === "plus" && !process.env.STRIPE_PRICE_ID_PLUS_ANNUAL) {
-        return NextResponse.json(
-          { error: "Plus annual is not available right now — use monthly." },
-          { status: 400 }
-        );
-      }
-      if (tier === "pro" && !process.env.STRIPE_PRICE_ID_ANNUAL) {
-        return NextResponse.json(
-          { error: "Annual plan is not available right now — use monthly." },
-          { status: 400 }
-        );
-      }
-    }
-    if (tier === "plus" && !process.env.STRIPE_PRICE_ID_PLUS && !process.env.STRIPE_PRICE_ID) {
+    try {
+      // Validate price env early for clearer errors
+      const { resolveCheckoutPriceId } = await import("@/lib/billing/pricing");
+      resolveCheckoutPriceId(billingPeriod);
+    } catch {
       return NextResponse.json(
-        { error: "Plus plan is not configured yet." },
+        {
+          error:
+            billingPeriod === "annual"
+              ? "Annual plan is not configured yet."
+              : "Monthly plan is not configured yet.",
+        },
         { status: 400 }
       );
     }
@@ -85,7 +86,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Block second subscription: DB status and live Stripe customer check
     const openOnStripe = await listOpenSubscriptions(customerId);
     const alreadyOpen =
       isOpenSubscriptionStatus(user.subscriptionStatus) || openOnStripe.length > 0;
@@ -103,7 +103,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Trial abuse: account flags + durable email/phone hash claims (no client clocks).
     const claimUsed = await hasTrialClaim({
       email: user.email,
       phoneNumber: user.phoneNumber,
@@ -113,15 +112,14 @@ export async function POST(req: NextRequest) {
       durableClaimExists: claimUsed,
     });
 
-    void track("checkout_started", { plan, tier });
+    void track("checkout_started", { plan: billingPeriod });
 
     const checkoutSession = await createCheckoutSession(
       customerId,
       user.id,
       user.email,
       allowTrial,
-      plan,
-      tier
+      billingPeriod
     );
 
     return NextResponse.json({ url: checkoutSession.url });

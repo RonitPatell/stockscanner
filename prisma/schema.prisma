@@ -73,6 +73,16 @@ model User {
   @@index([subscriptionStatus, trialEndsAt])
 }
 
+/// Idempotent Stripe webhook processing — event.id is unique.
+model StripeProcessedEvent {
+  id          String   @id // evt_...
+  type        String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+  @@index([type])
+}
+
 /// Durable trial-abuse claims (email/phone hashes) — survives account delete.
 model TrialClaim {
   id        String   @id @default(cuid())
