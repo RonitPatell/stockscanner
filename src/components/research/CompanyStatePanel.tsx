@@ -33,14 +33,17 @@ function trendTone(trend: StateDimension["trend"]): string {
 export function CompanyStatePanel({
   report,
   onOpenTab,
+  emptyMessage,
 }: {
   report: CompanyStateReport | null;
   onOpenTab?: (tab: string) => void;
+  emptyMessage?: string | null;
 }) {
   if (!report) {
     return (
       <p className="text-sm text-zinc-500" data-testid="company-state-empty">
-        Company state unavailable — hydrate financials or try again shortly.
+        {emptyMessage ||
+          "Company state is not available until financial observations are prepared for this symbol."}
       </p>
     );
   }

@@ -4,13 +4,16 @@ import type { BusinessChangeFingerprint } from "@/lib/company-state/fingerprint"
 
 export function BusinessChangeFingerprintGrid({
   fingerprint,
+  emptyMessage,
 }: {
   fingerprint: BusinessChangeFingerprint | null;
+  emptyMessage?: string | null;
 }) {
   if (!fingerprint || fingerprint.rows.length === 0) {
     return (
       <p className="text-sm text-zinc-500" data-testid="business-fingerprint-empty">
-        Business change fingerprint unavailable — insufficient stored history.
+        {emptyMessage ||
+          "Not enough stored financial history yet to show trend arrows for this company."}
       </p>
     );
   }
@@ -54,7 +57,7 @@ export function BusinessChangeFingerprintGrid({
         </tbody>
       </table>
       <p className="text-[10px] text-zinc-600 mt-2">
-        Arrows reflect deterministic rules on stored SEC metrics — not investment advice.
+        Arrows follow simple rules on stored SEC metrics. Not investment advice.
       </p>
     </div>
   );

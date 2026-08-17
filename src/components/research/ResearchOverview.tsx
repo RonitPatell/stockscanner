@@ -8,8 +8,11 @@ import type { ResearchOverviewDto } from "@/lib/research/types";
 import { AddToPortfolioButton } from "./AddToPortfolioButton";
 import { BusinessChangeFingerprintGrid } from "./BusinessChangeFingerprintGrid";
 import { CompanyStatePanel } from "./CompanyStatePanel";
+import { SinceLastResearchedPanel } from "./SinceLastResearchedPanel";
 import type { BusinessChangeFingerprint } from "@/lib/company-state/fingerprint";
 import type { CompanyStateReport } from "@/lib/company-state";
+import { useResearchReadiness } from "./DatasetStatusBanner";
+import { overviewEmptyCopy } from "@/lib/company-readiness/ui-copy";
 
 function Block({
   title,
@@ -48,6 +51,7 @@ export function ResearchOverview({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
+  const { healthMap, statusMap } = useResearchReadiness(symbol, entitled);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,8 +145,8 @@ export function ResearchOverview({
             {overview.symbol}
           </h2>
           <p className="mt-1 text-[12px] text-zinc-500 max-w-lg">
-            Monitoring snapshot — not a fundamentals terminal. Informational
-            only.
+            A quick snapshot of this company. Plain numbers and events. Not buy or
+            sell advice.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -161,12 +165,33 @@ export function ResearchOverview({
         </div>
       </div>
 
-      <Block title="State of the business" testId="research-overview-company-state">
-        <CompanyStatePanel report={companyState} onOpenTab={onOpenTab} />
+      <SinceLastResearchedPanel
+        symbol={overview.symbol}
+        entitled={entitled}
+        onOpenWhatChanged={() => onOpenTab?.("what-changed")}
+      />
+
+      <Block title="How the business looks" testId="research-overview-company-state">
+        <CompanyStatePanel
+          report={companyState}
+          onOpenTab={onOpenTab}
+          emptyMessage={overviewEmptyCopy(
+            "companyState",
+            healthMap.COMPANY_STATE,
+            statusMap?.COMPANY_STATE ?? null
+          )}
+        />
       </Block>
 
-      <Block title="Business change fingerprint" testId="research-overview-fingerprint">
-        <BusinessChangeFingerprintGrid fingerprint={fingerprint} />
+      <Block title="Trend snapshot" testId="research-overview-fingerprint">
+        <BusinessChangeFingerprintGrid
+          fingerprint={fingerprint}
+          emptyMessage={overviewEmptyCopy(
+            "fingerprint",
+            healthMap.FINANCIALS,
+            statusMap?.FINANCIALS ?? null
+          )}
+        />
       </Block>
 
       <section data-testid="research-overview-what-changed">
@@ -174,7 +199,9 @@ export function ResearchOverview({
           What changed
         </h3>
         {overview.latestEvents.length === 0 ? (
-          <p className="text-sm text-zinc-500">No material events in the recent window.</p>
+          <p className="text-sm text-zinc-500">
+            {overviewEmptyCopy("events", healthMap.COMPANY_EVENTS, statusMap?.COMPANY_EVENTS ?? null)}
+          </p>
         ) : (
           <ul className="space-y-2">
             {overview.latestEvents.map((ev) => (
@@ -242,14 +269,16 @@ export function ResearchOverview({
               ) : null}
             </button>
           ) : (
-            <span className="text-zinc-500">No Capital Risk snapshot yet.</span>
+            <span className="text-zinc-500">
+              {overviewEmptyCopy("capital", healthMap.CAPITAL, statusMap?.CAPITAL ?? null)}
+            </span>
           )}
         </Block>
 
         <Block title="Thesis health" testId="research-overview-thesis">
           {!entitled ? (
             <span className="text-zinc-500">
-              Thesis is private — requires an active plan.
+              Thesis is private and requires an active plan.
             </span>
           ) : overview.thesis?.hasThesis ? (
             <button
@@ -283,7 +312,9 @@ export function ResearchOverview({
                 : ""}
             </button>
           ) : (
-            <span className="text-zinc-500">No comparable delta yet.</span>
+            <span className="text-zinc-500">
+              {overviewEmptyCopy("financial", healthMap.FINANCIALS, statusMap?.FINANCIALS ?? null)}
+            </span>
           )}
         </Block>
 
@@ -300,7 +331,9 @@ export function ResearchOverview({
               </span>
             </button>
           ) : (
-            <span className="text-zinc-500">No structured Form 4 yet.</span>
+            <span className="text-zinc-500">
+              {overviewEmptyCopy("insider", healthMap.INSIDERS, statusMap?.INSIDERS ?? null)}
+            </span>
           )}
         </Block>
 
@@ -318,7 +351,9 @@ export function ResearchOverview({
               </span>
             </button>
           ) : (
-            <span className="text-zinc-500">No recent 13D/13G yet.</span>
+            <span className="text-zinc-500">
+              {overviewEmptyCopy("ownership", healthMap.OWNERSHIP, statusMap?.OWNERSHIP ?? null)}
+            </span>
           )}
         </Block>
 
@@ -335,7 +370,9 @@ export function ResearchOverview({
               {overview.latestFiling.title}
             </button>
           ) : (
-            <span className="text-zinc-500">No filing redlines yet.</span>
+            <span className="text-zinc-500">
+              {overviewEmptyCopy("filing", healthMap.FILINGS, statusMap?.FILINGS ?? null)}
+            </span>
           )}
         </Block>
 

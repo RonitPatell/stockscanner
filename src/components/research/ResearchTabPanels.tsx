@@ -11,6 +11,7 @@ import { FilingsTab } from "@/components/ticker/FilingsTab";
 import { TickerPlaceholderTab } from "@/components/ticker/TickerPlaceholderTab";
 import { ResearchOverview } from "./ResearchOverview";
 import { ResearchPersonalizedGate } from "./ResearchPersonalizedGate";
+import { ResearchTabIntro } from "./ResearchTabIntro";
 import {
   DatasetStatusBanner,
   useResearchReadiness,
@@ -92,18 +93,23 @@ export function ResearchTabPanels({
 }) {
   if (tab === "overview") {
     return (
-      <ResearchOverview
-        symbol={symbol}
-        entitled={entitled}
-        onOpenTab={(t) => onOpenTab(t as TickerTabId)}
-      />
+      <>
+        <ResearchTabIntro tab="overview" />
+        <ResearchOverview
+          symbol={symbol}
+          entitled={entitled}
+          onOpenTab={(t) => onOpenTab(t as TickerTabId)}
+        />
+      </>
     );
   }
 
   if (tab === "thesis") {
     if (!entitled) {
       return (
-        <ResearchPersonalizedGate
+        <>
+          <ResearchTabIntro tab="thesis" />
+          <ResearchPersonalizedGate
           state={
             accessState === "trial_eligible" || accessState === "anonymous"
               ? accessState
@@ -113,13 +119,24 @@ export function ResearchTabPanels({
           title="Thesis requires an active plan"
           body="Your investment thesis and notes stay private. Subscribe to write and monitor conditions."
         />
+        </>
       );
     }
-    return <ThesisPanel symbol={symbol} />;
+    return (
+      <>
+        <ResearchTabIntro tab="thesis" />
+        <ThesisPanel symbol={symbol} />
+      </>
+    );
   }
 
   if (tab === "what-changed") {
-    return <WhatChangedPanel symbol={symbol} entitled={entitled} />;
+    return (
+      <>
+        <ResearchTabIntro tab="what-changed" />
+        <WhatChangedPanel symbol={symbol} entitled={entitled} />
+      </>
+    );
   }
 
   if (tab === "financials") {
@@ -195,7 +212,7 @@ function FinancialsPanel({
   symbol: string;
   entitled: boolean;
 }) {
-  const { statusMap, reasons, retry: retryReady } = useResearchReadiness(
+  const { statusMap, reasons, healthMap, retry: retryReady } = useResearchReadiness(
     symbol,
     entitled
   );
@@ -230,10 +247,12 @@ function FinancialsPanel({
       fin === "UNSUPPORTED");
   return (
     <div className="space-y-4">
+      <ResearchTabIntro tab="financials" />
       <DatasetStatusBanner
         dataset="FINANCIALS"
         status={fin}
         reason={reasons.FINANCIALS}
+        health={healthMap.FINANCIALS}
         onRetry={retryReady}
         testId="research-financials-status"
       />
@@ -249,7 +268,7 @@ function CapitalPanel({
   symbol: string;
   entitled: boolean;
 }) {
-  const { statusMap, reasons, retry: retryReady } = useResearchReadiness(
+  const { statusMap, reasons, healthMap, retry: retryReady } = useResearchReadiness(
     symbol,
     entitled
   );
@@ -284,10 +303,12 @@ function CapitalPanel({
   }
   return (
     <div className="space-y-4">
+      <ResearchTabIntro tab="capital" />
       <DatasetStatusBanner
         dataset="CAPITAL"
         status={statusMap?.CAPITAL ?? null}
         reason={reasons.CAPITAL}
+        health={healthMap.CAPITAL}
         onRetry={retryReady}
         testId="research-capital-status"
       />
@@ -303,7 +324,7 @@ function InsidersPanel({
   symbol: string;
   entitled: boolean;
 }) {
-  const { statusMap, reasons, retry: retryReady } = useResearchReadiness(
+  const { statusMap, reasons, healthMap, retry: retryReady } = useResearchReadiness(
     symbol,
     entitled
   );
@@ -333,10 +354,12 @@ function InsidersPanel({
   const hide = state.data.empty && (ins === "PROCESSING" || ins === "ERROR");
   return (
     <div className="space-y-4">
+      <ResearchTabIntro tab="insiders" />
       <DatasetStatusBanner
         dataset="INSIDERS"
         status={ins}
         reason={reasons.INSIDERS}
+        health={healthMap.INSIDERS}
         onRetry={retryReady}
         testId="research-insiders-status"
       />
@@ -352,7 +375,7 @@ function OwnershipPanel({
   symbol: string;
   entitled: boolean;
 }) {
-  const { statusMap, reasons, retry: retryReady } = useResearchReadiness(
+  const { statusMap, reasons, healthMap, retry: retryReady } = useResearchReadiness(
     symbol,
     entitled
   );
@@ -382,10 +405,12 @@ function OwnershipPanel({
   const hide = state.data.empty && (own === "PROCESSING" || own === "ERROR");
   return (
     <div className="space-y-4">
+      <ResearchTabIntro tab="ownership" />
       <DatasetStatusBanner
         dataset="OWNERSHIP"
         status={own}
         reason={reasons.OWNERSHIP}
+        health={healthMap.OWNERSHIP}
         onRetry={retryReady}
         testId="research-ownership-status"
       />
@@ -401,7 +426,7 @@ function FilingsPanel({
   symbol: string;
   entitled: boolean;
 }) {
-  const { statusMap, reasons, retry: retryReady } = useResearchReadiness(
+  const { statusMap, reasons, healthMap, retry: retryReady } = useResearchReadiness(
     symbol,
     entitled
   );
@@ -431,10 +456,12 @@ function FilingsPanel({
   const hide = state.data.empty && (fil === "PROCESSING" || fil === "ERROR");
   return (
     <div className="space-y-4">
+      <ResearchTabIntro tab="filings" />
       <DatasetStatusBanner
         dataset="FILINGS"
         status={fil}
         reason={reasons.FILINGS}
+        health={healthMap.FILINGS}
         onRetry={retryReady}
         testId="research-filings-status"
       />
@@ -488,13 +515,7 @@ function TimelinePanel({
 
   return (
     <section className="space-y-3" data-testid="research-timeline">
-      <header>
-        <h2 className="text-sm font-semibold text-zinc-200">Timeline</h2>
-        <p className="text-[12px] text-zinc-500 mt-1">
-          Chronological company changes from TrustTicker events. Thesis notes
-          are never shown on public surfaces.
-        </p>
-      </header>
+      <ResearchTabIntro tab="timeline" />
       {cards.length === 0 ? (
         <p className="text-[13px] text-zinc-500">No timeline events yet.</p>
       ) : (

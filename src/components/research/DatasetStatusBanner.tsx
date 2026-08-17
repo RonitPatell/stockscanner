@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { DatasetStatus } from "@/lib/company-readiness/types";
+import type { DataHealthResult } from "@/lib/company-readiness/data-health";
+import { bannerCopyFromHealth } from "@/lib/company-readiness/ui-copy";
 
 const MAX_POLLS = 8;
 
@@ -9,18 +11,20 @@ export function DatasetStatusBanner({
   dataset,
   status,
   reason,
+  health,
   onRetry,
   testId,
 }: {
   dataset: string;
   status: DatasetStatus | null;
   reason?: string | null;
+  health?: DataHealthResult | null;
   onRetry?: () => void;
   testId?: string;
 }) {
   if (!status || status === "READY") return null;
 
-  const copy = bannerCopy(dataset, status, reason);
+  const copy = bannerCopyFromHealth(dataset, status, health, reason);
 
   return (
     <div
@@ -44,68 +48,14 @@ export function DatasetStatusBanner({
   );
 }
 
-function bannerCopy(
-  dataset: string,
-  status: DatasetStatus,
-  reason?: string | null
-): { title: string; body: string } {
-  const name = datasetLabel(dataset);
-  if (status === "PROCESSING") {
-    return {
-      title: `Preparing ${name.toLowerCase()}`,
-      body: `TrustTicker is processing the company's latest SEC ${name.toLowerCase()} data.`,
-    };
-  }
-  if (status === "ERROR") {
-    return {
-      title: "We couldn't refresh this data.",
-      body: reason?.slice(0, 180) || "A refresh failed. You can retry shortly.",
-    };
-  }
-  if (status === "STALE") {
-    return {
-      title: `${name} may be stale`,
-      body: "Showing the last stored observations while a refresh is eligible.",
-    };
-  }
-  if (status === "UNSUPPORTED") {
-    return {
-      title: `${name} unavailable`,
-      body:
-        reason?.slice(0, 180) ||
-        "This company does not provide usable SEC data for this section.",
-    };
-  }
-  return {
-    title: `${name} unavailable`,
-    body:
-      reason?.slice(0, 180) ||
-      `No ${name.toLowerCase()} is in TrustTicker yet for this company.`,
-  };
-}
-
-function datasetLabel(dataset: string): string {
-  switch (dataset) {
-    case "FINANCIALS":
-      return "Financial data";
-    case "CAPITAL":
-      return "Capital data";
-    case "INSIDERS":
-      return "Insider data";
-    case "OWNERSHIP":
-      return "Ownership data";
-    case "FILINGS":
-      return "Filing data";
-    default:
-      return dataset;
-  }
-}
-
 export function useResearchReadiness(symbol: string, entitled: boolean) {
   const [statusMap, setStatusMap] = useState<Record<string, DatasetStatus> | null>(
     null
   );
   const [reasons, setReasons] = useState<Record<string, string | null>>({});
+  const [healthMap, setHealthMap] = useState<Record<string, DataHealthResult | null>>(
+    {}
+  );
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -130,7 +80,11 @@ export function useResearchReadiness(symbol: string, entitled: boolean) {
             ownership: DatasetStatus;
             datasets?: Record<
               string,
-              { status: DatasetStatus; lastErrorSummary: string | null }
+              {
+                status: DatasetStatus;
+                lastErrorSummary: string | null;
+                health?: DataHealthResult | null;
+              }
             >;
           };
         };
@@ -142,12 +96,17 @@ export function useResearchReadiness(symbol: string, entitled: boolean) {
           FILINGS: r.filings,
           INSIDERS: r.insiders,
           OWNERSHIP: r.ownership,
+          COMPANY_STATE: r.datasets?.COMPANY_STATE?.status ?? "MISSING",
+          COMPANY_EVENTS: r.datasets?.COMPANY_EVENTS?.status ?? "MISSING",
         });
         const nextReasons: Record<string, string | null> = {};
+        const nextHealth: Record<string, DataHealthResult | null> = {};
         for (const [k, v] of Object.entries(r.datasets ?? {})) {
-          nextReasons[k] = v.lastErrorSummary;
+          nextReasons[k] = v.health?.reasonSummary ?? v.lastErrorSummary;
+          nextHealth[k] = v.health ?? null;
         }
         setReasons(nextReasons);
+        setHealthMap(nextHealth);
         const processing = [
           r.financials,
           r.capital,
@@ -176,6 +135,7 @@ export function useResearchReadiness(symbol: string, entitled: boolean) {
   return {
     statusMap,
     reasons,
+    healthMap,
     retry: () => setTick((n) => n + 1),
   };
 }
