@@ -63,7 +63,23 @@ Each observation retains:
 - Cash runway quarters are **not** produced here (needs expense / burn model — thesis key remains separate).
 - Thesis key `eps` maps conceptually to `eps_diluted` at evaluation time (health engine later).
 
+## Quarterly Delta
+
+Engine: `src/lib/metrics/quarterly-delta.ts` (`QUARTERLY_DELTA_VERSION`)  
+API: `GET /api/ticker/[symbol]/quarterly-delta`  
+UI: ticker hub `?tab=financials` + compact card on `?tab=what-changed`
+
+Preferred comparison basis:
+
+| Metric | Basis |
+|--------|--------|
+| Revenue, margins, OCF, FCF, diluted shares | YoY |
+| Cash, total debt | QoQ |
+| Shares outstanding | Prior filing |
+
+Rules: no incompatible durations; FCF only when confidence is reliable; amendments/restatements collapse to latest `filedAt` (then accession). Material thresholds: ≥10% or ≥100 bps. Labels: Materially higher / higher / lower / Materially lower / Unchanged / Unavailable.
+
 ## Tests
 
-`tests/metrics-layer.test.mts` + fixtures in `tests/fixtures/companyfacts.ts`
-(tech / legacy revenue alias / sparse styles).
+`tests/metrics-layer.test.mts` + `tests/quarterly-delta.test.mts` + fixtures in `tests/fixtures/companyfacts.ts`
+(tech / legacy revenue alias / sparse styles; YoY, bps, missing, zero denom, FY boundary, amendments, restatements).

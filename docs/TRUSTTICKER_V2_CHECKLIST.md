@@ -76,10 +76,10 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ## Company workspace (per ticker)
 
-- [ ] Overview tab
-- [ ] What Changed tab
+- [x] Overview tab *(ticker hub default)*
+- [x] What Changed tab *(events + compact Quarterly Delta)*
 - [ ] Thesis tab
-- [ ] Financials tab
+- [x] Financials tab *(Quarterly Delta)*
 - [ ] Capital tab
 - [ ] Insiders tab
 - [ ] Ownership tab
@@ -123,8 +123,8 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 - [x] Financial metric deltas (YoY/QoQ/bps/share-count; UNKNOWN-safe)
 - [x] MetricObservation companyfacts extract + derive + persist
-- [ ] Quarterly Delta UI
-- [ ] UNKNOWN never silently becomes zero
+- [x] Quarterly Delta UI
+- [x] UNKNOWN never silently becomes zero
 
 ### Capital risk & dilution
 
@@ -227,12 +227,12 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 2. Stripe single-SKU migration
 - [x] 3. API gate sweep → `requireEntitled`
 - [x] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
-- [ ] 5. Company workspace tab shell
+- [x] 5. Company workspace tab shell *(Overview / What Changed / Financials on ticker hub)*
 - [x] 6. CompanyEvent / What Changed engine *(classifier + persist + Watchtower UI)*
 - [x] 7. Thesis CRUD backend *(Thesis Health evaluation later)*
 - [ ] 8. Portfolio Brief
 - [ ] 9. Capital Risk / dilution surfacing
-- [x] 10. Financials metric layer *(Quarterly Delta UI later)*
+- [x] 10. Financials metric layer + Quarterly Delta UI
 - [ ] 11. Ownership (13D/13G/13F)
 - [ ] 12. Filing redlines
 - [ ] 13. Discover rules

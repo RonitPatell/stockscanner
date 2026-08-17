@@ -8,3 +8,7 @@ export * from "./deltas.ts";
 export * from "./persist.ts";
 export * from "./companyfacts.ts";
 export * from "./pipeline.ts";
+export * from "./quarterly-delta.ts";
+export * from "./format-delta.ts";
+export * from "./load.ts";
+export * from "./get-quarterly-delta.ts";
