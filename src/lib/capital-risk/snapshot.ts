@@ -189,19 +189,39 @@ async function refreshCapitalRiskSnapshotForSymbolInner(
     select: { status: true },
   });
 
-  const row = await prisma.capitalRiskSnapshot.create({
-    data: {
-      symbol: evaluated.symbol,
-      cik: evaluated.cik,
-      asOf,
-      status: evaluated.status,
-      summary: evaluated.summary,
-      metricsJson: metricsJson as Prisma.InputJsonValue,
-      instrumentIds: evaluated.instrumentIds,
-      fingerprint: fp,
-    },
-    select: { id: true, status: true },
-  });
+  let row: { id: string; status: string };
+  try {
+    row = await prisma.capitalRiskSnapshot.create({
+      data: {
+        symbol: evaluated.symbol,
+        cik: evaluated.cik,
+        asOf,
+        status: evaluated.status,
+        summary: evaluated.summary,
+        metricsJson: metricsJson as Prisma.InputJsonValue,
+        instrumentIds: evaluated.instrumentIds,
+        fingerprint: fp,
+      },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "P2002") {
+      const again = await prisma.capitalRiskSnapshot.findUnique({
+        where: { fingerprint: fp },
+        select: { id: true, status: true },
+      });
+      if (again) {
+        return {
+          snapshotId: again.id,
+          status: again.status,
+          changed: false,
+          report: { ...reportBase, snapshotId: again.id },
+        };
+      }
+    }
+    throw err;
+  }
 
   const changed = !prev || prev.status !== row.status;
 
