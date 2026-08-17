@@ -874,8 +874,17 @@ model MetricObservation {
   id               String    @id @default(cuid())
   symbol           String
   cik              String?
+  periodStart      DateTime?
   periodEnd        DateTime?
   periodLabel      String?
+  /// e.g. 2024
+  fiscalYear       Int?
+  /// FY | Q1 | Q2 | Q3 | Q4
+  fiscalPeriod     String?
+  filedAt          DateTime?
+  accession        String?
+  /// Canonical SEC / us-gaap concept used for this row
+  secConcept       String?
   metricKey        String
   /// null = UNKNOWN / unavailable
   value            Float?
@@ -888,6 +897,8 @@ model MetricObservation {
   sourceUrl        String?
   /// high | medium | low | unknown
   confidence       String    @default("unknown")
+  /// Provenance for derived metrics (OCF/CapEx refs) — never secrets.
+  evidenceJson     Json      @default("{}")
   fingerprint      String    @unique
   observedAt       DateTime  @default(now())
   createdAt        DateTime  @default(now())
@@ -895,6 +906,8 @@ model MetricObservation {
   @@index([symbol, metricKey, periodEnd])
   @@index([symbol, observedAt])
   @@index([metricKey, periodEnd])
+  @@index([symbol, metricKey, fiscalYear, fiscalPeriod])
+  @@index([accession])
 }
 
 /// Private investment thesis for a user+symbol (user text + conditions — not advice we generate).

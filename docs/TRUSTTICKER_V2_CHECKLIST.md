@@ -121,8 +121,9 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### Financials
 
-- [ ] Financial metric deltas
-- [ ] Quarterly Delta
+- [x] Financial metric deltas (YoY/QoQ/bps/share-count; UNKNOWN-safe)
+- [x] MetricObservation companyfacts extract + derive + persist
+- [ ] Quarterly Delta UI
 - [ ] UNKNOWN never silently becomes zero
 
 ### Capital risk & dilution
@@ -231,7 +232,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 7. Thesis CRUD backend *(Thesis Health evaluation later)*
 - [ ] 8. Portfolio Brief
 - [ ] 9. Capital Risk / dilution surfacing
-- [ ] 10. Financials / Quarterly Delta
+- [x] 10. Financials metric layer *(Quarterly Delta UI later)*
 - [ ] 11. Ownership (13D/13G/13F)
 - [ ] 12. Filing redlines
 - [ ] 13. Discover rules
