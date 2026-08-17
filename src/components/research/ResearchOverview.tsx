@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import type { ResearchOverviewDto } from "@/lib/research/types";
 import { AddToPortfolioButton } from "./AddToPortfolioButton";
 import { BusinessChangeFingerprintGrid } from "./BusinessChangeFingerprintGrid";
+import { CompanyStatePanel } from "./CompanyStatePanel";
 import type { BusinessChangeFingerprint } from "@/lib/company-state/fingerprint";
+import type { CompanyStateReport } from "@/lib/company-state";
 
 function Block({
   title,
@@ -42,6 +44,7 @@ export function ResearchOverview({
 }) {
   const [overview, setOverview] = useState<ResearchOverviewDto | null>(null);
   const [fingerprint, setFingerprint] = useState<BusinessChangeFingerprint | null>(null);
+  const [companyState, setCompanyState] = useState<CompanyStateReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -77,6 +80,13 @@ export function ResearchOverview({
             fingerprint?: BusinessChangeFingerprint;
           };
           setFingerprint(fpData.fingerprint ?? null);
+        }
+        const stateRes = await fetch(
+          `/api/ticker/${encodeURIComponent(symbol)}/company-state`
+        );
+        if (stateRes.ok && !cancelled) {
+          const stateData = (await stateRes.json()) as { report?: CompanyStateReport };
+          setCompanyState(stateData.report ?? null);
         }
       } catch {
         if (!cancelled) {
@@ -151,7 +161,43 @@ export function ResearchOverview({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <Block title="State of the business" testId="research-overview-company-state">
+        <CompanyStatePanel report={companyState} onOpenTab={onOpenTab} />
+      </Block>
+
+      <Block title="Business change fingerprint" testId="research-overview-fingerprint">
+        <BusinessChangeFingerprintGrid fingerprint={fingerprint} />
+      </Block>
+
+      <section data-testid="research-overview-what-changed">
+        <h3 className="text-[10px] uppercase tracking-wide text-zinc-500 mb-2">
+          What changed
+        </h3>
+        {overview.latestEvents.length === 0 ? (
+          <p className="text-sm text-zinc-500">No material events in the recent window.</p>
+        ) : (
+          <ul className="space-y-2">
+            {overview.latestEvents.map((ev) => (
+              <li key={ev.id}>
+                <button
+                  type="button"
+                  className="text-left text-[13px] text-zinc-200 hover:underline w-full"
+                  onClick={() => onOpenTab?.("what-changed")}
+                >
+                  <span className="text-zinc-500 text-[11px]">{ev.whenLabel}</span>
+                  <span className="block">{ev.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section data-testid="research-overview-my-research">
+        <h3 className="text-[10px] uppercase tracking-wide text-zinc-500 mb-2">
+          My research
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2">
         <Block title="Monitoring status" testId="research-overview-monitoring">
           {!entitled ? (
             <span className="text-zinc-500">
@@ -303,46 +349,7 @@ export function ResearchOverview({
             Search EDGAR <ExternalLink className="w-3 h-3" />
           </a>
         </Block>
-      </div>
-
-      <Block title="Business change fingerprint" testId="research-overview-fingerprint">
-        <BusinessChangeFingerprintGrid fingerprint={fingerprint} />
-      </Block>
-
-      <section data-testid="research-overview-events">
-        <h3 className="text-[10px] uppercase tracking-wide text-zinc-500 mb-2">
-          Latest meaningful events
-        </h3>
-        {overview.latestEvents.length === 0 ? (
-          <p className="text-[13px] text-zinc-500">
-            No high-signal changes in the recent window.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {overview.latestEvents.map((e) => (
-              <li
-                key={e.id}
-                className="rounded-md border border-zinc-800 bg-zinc-950/50 px-3 py-2"
-              >
-                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500 mb-0.5">
-                  <span className="capitalize">{e.category}</span>
-                  {e.significance ? (
-                    <span className="uppercase">{e.significance}</span>
-                  ) : null}
-                  <time>{e.whenLabel}</time>
-                </div>
-                <p className="text-[13px] text-zinc-200">{e.title}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="mt-2 text-[12px] text-emerald-400 hover:underline"
-          onClick={() => onOpenTab?.("what-changed")}
-        >
-          Open What Changed →
-        </button>
+        </div>
       </section>
     </div>
   );
