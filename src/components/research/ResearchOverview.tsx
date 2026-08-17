@@ -6,6 +6,8 @@ import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResearchOverviewDto } from "@/lib/research/types";
 import { AddToPortfolioButton } from "./AddToPortfolioButton";
+import { BusinessChangeFingerprintGrid } from "./BusinessChangeFingerprintGrid";
+import type { BusinessChangeFingerprint } from "@/lib/company-state/fingerprint";
 
 function Block({
   title,
@@ -39,6 +41,7 @@ export function ResearchOverview({
   onOpenTab?: (tab: string) => void;
 }) {
   const [overview, setOverview] = useState<ResearchOverviewDto | null>(null);
+  const [fingerprint, setFingerprint] = useState<BusinessChangeFingerprint | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -65,6 +68,15 @@ export function ResearchOverview({
           const next = data.overview ?? null;
           setOverview(next);
           if (!next) setError("Could not load overview.");
+        }
+        const fpRes = await fetch(
+          `/api/ticker/${encodeURIComponent(symbol)}/business-fingerprint`
+        );
+        if (fpRes.ok && !cancelled) {
+          const fpData = (await fpRes.json()) as {
+            fingerprint?: BusinessChangeFingerprint;
+          };
+          setFingerprint(fpData.fingerprint ?? null);
         }
       } catch {
         if (!cancelled) {
@@ -292,6 +304,10 @@ export function ResearchOverview({
           </a>
         </Block>
       </div>
+
+      <Block title="Business change fingerprint" testId="research-overview-fingerprint">
+        <BusinessChangeFingerprintGrid fingerprint={fingerprint} />
+      </Block>
 
       <section data-testid="research-overview-events">
         <h3 className="text-[10px] uppercase tracking-wide text-zinc-500 mb-2">

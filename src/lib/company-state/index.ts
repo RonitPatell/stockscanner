@@ -10,3 +10,10 @@ export {
 } from "./types.ts";
 export { trendFromChange, combineTrends, formatSignedPercent } from "./trend.ts";
 export { buildCompanyStateReport } from "./build.ts";
+export {
+  buildBusinessChangeFingerprint,
+  getBusinessChangeFingerprintForSymbol,
+  FINGERPRINT_VERSION,
+  type BusinessChangeFingerprint,
+  type FingerprintRow,
+} from "./fingerprint.ts";
