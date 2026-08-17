@@ -1,7 +1,9 @@
 import type { CompanyIdentityResult } from "../company-identity/types.ts";
+import { enrichDatasetHealth } from "./data-health.ts";
 import {
   COMPANY_DATASETS,
   DATASET_STALE_MS,
+  DERIVED_DATASET_STALE_MS,
   type CompanyDataset,
   type CompanyReadiness,
   type DatasetReadiness,
@@ -38,6 +40,30 @@ export function deriveDatasetStatus(opts: {
 
   if (dataset === "IDENTITY") return identityDatasetStatus(identity);
 
+  if (dataset === "COMPANY_STATE") {
+    return deriveDerivedDatasetStatus({
+      inspect: opts.inspect,
+      job,
+      prior,
+      now,
+      staleAfter: DERIVED_DATASET_STALE_MS.COMPANY_STATE,
+      identity,
+      requiresMetrics: true,
+    });
+  }
+
+  if (dataset === "COMPANY_EVENTS") {
+    return deriveDerivedDatasetStatus({
+      inspect: opts.inspect,
+      job,
+      prior,
+      now,
+      staleAfter: DERIVED_DATASET_STALE_MS.COMPANY_EVENTS,
+      identity,
+      requiresMetrics: false,
+    });
+  }
+
   if (dataset === "INSTITUTIONAL_13F" && !include13F && (inspect?.rowCount ?? 0) === 0) {
     return prior?.status === "UNSUPPORTED" ? "UNSUPPORTED" : "MISSING";
   }
@@ -51,7 +77,10 @@ export function deriveDatasetStatus(opts: {
   const pending = job?.status === "PENDING";
   const rows = inspect?.rowCount ?? 0;
   const asOf = inspect?.dataAsOf ?? prior?.dataAsOf ?? null;
-  const staleAfter = DATASET_STALE_MS[dataset];
+  const staleAfter =
+    dataset === "COMPANY_EVENTS" || dataset === "COMPANY_STATE"
+      ? DERIVED_DATASET_STALE_MS[dataset]
+      : DATASET_STALE_MS[dataset as Exclude<CompanyDataset, "IDENTITY" | "COMPANY_EVENTS" | "COMPANY_STATE">];
 
   if (prior?.status === "UNSUPPORTED") return "UNSUPPORTED";
 
@@ -71,6 +100,44 @@ export function deriveDatasetStatus(opts: {
   return "READY";
 }
 
+function deriveDerivedDatasetStatus(opts: {
+  inspect: InspectSnapshot | null;
+  job: HydrationJobRow | null;
+  prior: DatasetStateRow | null;
+  now: Date;
+  staleAfter: number;
+  identity: CompanyIdentityResult;
+  requiresMetrics: boolean;
+}): DatasetStatus {
+  const { inspect, job, prior, now, staleAfter, identity, requiresMetrics } = opts;
+  if (identity.status === "NOT_FOUND") return "MISSING";
+  if (identity.status === "NO_CIK") return "UNSUPPORTED";
+
+  const running = job?.status === "RUNNING";
+  const pending = job?.status === "PENDING";
+  const rows = inspect?.rowCount ?? 0;
+  const asOf = inspect?.dataAsOf ?? prior?.dataAsOf ?? null;
+
+  if (requiresMetrics && rows === 0) {
+    if (running || pending) return "PROCESSING";
+    if (prior?.status === "ERROR") return "ERROR";
+    return "MISSING";
+  }
+
+  if (rows === 0) {
+    if (running || pending) return "PROCESSING";
+    if (prior?.lastSuccessAt || prior?.lastAttemptAt) return "READY";
+    return "MISSING";
+  }
+
+  if (asOf && now.getTime() - asOf.getTime() > staleAfter) {
+    if (running || pending) return "PROCESSING";
+    return "STALE";
+  }
+
+  return "READY";
+}
+
 export function emptyInspect(): ReadinessInspect {
   const z = { rowCount: 0, dataAsOf: null };
   return {
@@ -80,6 +147,8 @@ export function emptyInspect(): ReadinessInspect {
     INSIDERS: { ...z },
     OWNERSHIP: { ...z },
     INSTITUTIONAL_13F: { ...z },
+    COMPANY_EVENTS: { ...z },
+    COMPANY_STATE: { ...z },
   };
 }
 
@@ -100,7 +169,11 @@ export function buildReadinessDto(opts: {
   for (const dataset of COMPANY_DATASETS) {
     const prior = byDataset.get(dataset) ?? null;
     const inspect =
-      dataset === "IDENTITY" ? null : opts.inspect[dataset as Exclude<CompanyDataset, "IDENTITY">];
+      dataset === "IDENTITY"
+        ? null
+        : dataset === "COMPANY_STATE"
+          ? opts.inspect.COMPANY_STATE
+          : opts.inspect[dataset as Exclude<CompanyDataset, "IDENTITY" | "COMPANY_STATE">];
     const status = deriveDatasetStatus({
       dataset,
       identity: opts.identity,
@@ -110,7 +183,7 @@ export function buildReadinessDto(opts: {
       now: opts.now,
       include13F: opts.include13F,
     });
-    datasets[dataset] = {
+    const base: DatasetReadiness = {
       dataset,
       status,
       lastAttemptAt: iso(prior?.lastAttemptAt),
@@ -121,6 +194,7 @@ export function buildReadinessDto(opts: {
       lastErrorCode: prior?.lastErrorCode ?? null,
       lastErrorSummary: prior?.lastErrorSummary ?? null,
     };
+    datasets[dataset] = enrichDatasetHealth(base, opts.identity, opts.job);
   }
 
   if (opts.identity.status === "READY") {
@@ -144,6 +218,8 @@ export function buildReadinessDto(opts: {
     insiders: datasets.INSIDERS.status,
     ownership: datasets.OWNERSHIP.status,
     institutional13F: datasets.INSTITUTIONAL_13F.status,
+    companyEvents: datasets.COMPANY_EVENTS.status,
+    companyState: datasets.COMPANY_STATE.status,
   };
 }
 

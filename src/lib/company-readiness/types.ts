@@ -11,6 +11,8 @@ export const COMPANY_DATASETS = [
   "INSIDERS",
   "OWNERSHIP",
   "INSTITUTIONAL_13F",
+  "COMPANY_EVENTS",
+  "COMPANY_STATE",
 ] as const;
 
 export type CompanyDataset = (typeof COMPANY_DATASETS)[number];
@@ -46,6 +48,8 @@ export type DatasetReadiness = {
   rowCount: number | null;
   lastErrorCode: string | null;
   lastErrorSummary: string | null;
+  /** Resolved reason code + safe summary for UI/API (Phase 1 data-health contract). */
+  health?: import("./data-health.ts").DataHealthResult;
 };
 
 export type CompanyReadiness = {
@@ -65,6 +69,8 @@ export type CompanyReadiness = {
   insiders: DatasetStatus;
   ownership: DatasetStatus;
   institutional13F: DatasetStatus;
+  companyEvents: DatasetStatus;
+  companyState: DatasetStatus;
 };
 
 export type DatasetStateRow = {
@@ -115,13 +121,21 @@ export type EnsureCompanyReadyOptions = {
   identity?: import("../company-identity/types.ts").CompanyIdentityResult;
 };
 
-export const DATASET_STALE_MS: Record<Exclude<CompanyDataset, "IDENTITY">, number> = {
+export const DATASET_STALE_MS: Record<
+  Exclude<CompanyDataset, "IDENTITY" | "COMPANY_EVENTS" | "COMPANY_STATE">,
+  number
+> = {
   FINANCIALS: 45 * 24 * 3600_000,
   CAPITAL: 14 * 24 * 3600_000,
   FILINGS: 45 * 24 * 3600_000,
   INSIDERS: 14 * 24 * 3600_000,
   OWNERSHIP: 30 * 24 * 3600_000,
   INSTITUTIONAL_13F: 120 * 24 * 3600_000,
+};
+
+export const DERIVED_DATASET_STALE_MS: Record<"COMPANY_EVENTS" | "COMPANY_STATE", number> = {
+  COMPANY_EVENTS: 14 * 24 * 3600_000,
+  COMPANY_STATE: 45 * 24 * 3600_000,
 };
 
 export const HYDRATE_DATASETS: CompanyDataset[] = [

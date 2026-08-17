@@ -4,6 +4,14 @@ export { hydrateCompanySymbol } from "./hydrate.ts";
 export type { HydrateSymbolPorts, HydrateSymbolResult } from "./hydrate.ts";
 export { runHydrationCron } from "./cron.ts";
 export { buildReadinessDto, deriveDatasetStatus, needsHydration, emptyInspect } from "./derive.ts";
+export {
+  DATA_HEALTH_REASON_CODES,
+  resolveDataHealthReason,
+  enrichDatasetHealth,
+  enrichReadinessHealth,
+  type DataHealthReasonCode,
+  type DataHealthResult,
+} from "./data-health.ts";
 export { createMemoryReadinessStores, backoffMs, newLockToken } from "./stores.ts";
 export {
   COMPANY_DATASETS,

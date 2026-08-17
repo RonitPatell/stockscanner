@@ -16,6 +16,8 @@ export async function inspectSymbolDatasets(symbol: string): Promise<ReadinessIn
     latestOwner,
     instCount,
     latestInst,
+    eventCount,
+    latestEvent,
   ] = await Promise.all([
     prisma.metricObservation.count({ where: { symbol: sym } }),
     prisma.metricObservation.findFirst({
@@ -53,6 +55,12 @@ export async function inspectSymbolDatasets(symbol: string): Promise<ReadinessIn
       orderBy: { reportDate: "desc" },
       select: { reportDate: true },
     }),
+    prisma.companyEvent.count({ where: { symbol: sym } }),
+    prisma.companyEvent.findFirst({
+      where: { symbol: sym },
+      orderBy: { occurredAt: "desc" },
+      select: { occurredAt: true },
+    }),
   ]);
 
   return {
@@ -67,6 +75,14 @@ export async function inspectSymbolDatasets(symbol: string): Promise<ReadinessIn
     INSTITUTIONAL_13F: {
       rowCount: instCount,
       dataAsOf: latestInst?.reportDate ?? null,
+    },
+    COMPANY_EVENTS: {
+      rowCount: eventCount,
+      dataAsOf: latestEvent?.occurredAt ?? null,
+    },
+    COMPANY_STATE: {
+      rowCount: metricCount,
+      dataAsOf: latestMetric?.filedAt ?? null,
     },
   };
 }
