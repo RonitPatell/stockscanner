@@ -740,6 +740,22 @@ export async function ingestAndAnalyzeNews(
           publishedAt: article.publishedAt,
         });
 
+        // 13F is heavy — kick off without awaiting so cron can also backfill
+        void import("./institutional/from-catalyst")
+          .then(({ processCatalystFor13f }) =>
+            processCatalystFor13f({
+              catalystId: catalyst.id,
+              symbol,
+              headline: article.headline,
+              summary: article.summary ?? analysis.summary,
+              source: article.source,
+              sourceUrl: article.url,
+              rawNewsId: article.id,
+              publishedAt: article.publishedAt,
+            })
+          )
+          .catch(() => {});
+
         await processCatalystForCompanyEvents(
           {
             catalystId: catalyst.id,

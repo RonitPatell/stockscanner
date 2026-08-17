@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 64;
+export const PLATFORM_GUIDE_VERSION = 65;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -52,7 +52,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "research-desk",
     target: "research-desk",
     title: "Research",
-    body: "Look up any ticker. Opens the hub with Overview, What Changed, Thesis, Financials, Capital Risk, Insiders (Form 4), and Ownership (13D/13G when %). Informational only.",
+    body: "Look up any ticker. Opens the hub with Overview, What Changed, Thesis, Financials, Capital Risk, Insiders, and Ownership (13D/13G + delayed Institutional filings / 13F). 13F is never real-time.",
   },
   {
     id: "discover-desk",

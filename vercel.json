@@ -37,6 +37,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/institutional-13f",
+      "schedule": "40 */2 * * *"
+    },
+    {
       "path": "/api/cron/thesis-health",
       "schedule": "15 */3 * * *"
     },

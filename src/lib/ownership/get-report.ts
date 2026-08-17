@@ -1,8 +1,11 @@
 /**
- * Load structured beneficial ownership for ticker Ownership tab.
+ * Load structured beneficial ownership + institutional filings for ticker Ownership tab.
+ * Reads precomputed DB rows only — no live SEC 13F fetch.
  */
 
 import { prisma } from "../prisma.ts";
+import { getCompanyInstitutionalReport } from "../institutional/get-report.ts";
+import type { CompanyInstitutionalReport } from "../institutional/get-report.ts";
 import { OWNERSHIP_ENGINE_VERSION } from "./types.ts";
 import type { OwnershipStructuredKind } from "./types.ts";
 
@@ -28,6 +31,7 @@ export type OwnershipReport = {
   version: string;
   asOf: string;
   filings: BeneficialOwnershipView[];
+  institutional: CompanyInstitutionalReport;
   empty: boolean;
 };
 
@@ -43,11 +47,14 @@ export async function getOwnershipReportForSymbol(
   limit = 40
 ): Promise<OwnershipReport> {
   const sym = symbol.trim().toUpperCase();
-  const rows = await prisma.beneficialOwnershipFiling.findMany({
-    where: { symbol: sym },
-    orderBy: [{ filedAt: "desc" }],
-    take: Math.min(100, Math.max(1, limit)),
-  });
+  const [rows, institutional] = await Promise.all([
+    prisma.beneficialOwnershipFiling.findMany({
+      where: { symbol: sym },
+      orderBy: [{ filedAt: "desc" }],
+      take: Math.min(100, Math.max(1, limit)),
+    }),
+    getCompanyInstitutionalReport(sym, 30),
+  ]);
 
   const filings: BeneficialOwnershipView[] = rows.map((r) => ({
     id: r.id,
@@ -73,6 +80,7 @@ export async function getOwnershipReportForSymbol(
     version: OWNERSHIP_ENGINE_VERSION,
     asOf: new Date().toISOString(),
     filings,
-    empty: filings.length === 0,
+    institutional,
+    empty: filings.length === 0 && institutional.empty,
   };
 }

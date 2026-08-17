@@ -29,7 +29,8 @@ type SecFormKind =
   | "SC 13D"
   | "SC 13D/A"
   | "SC 13G"
-  | "SC 13G/A";
+  | "SC 13G/A"
+  | "13F-HR";
 
 const SEC_ATOM_URLS: { form: SecFormKind; url: string; count: number }[] = [
   {
@@ -132,6 +133,11 @@ const SEC_ATOM_URLS: { form: SecFormKind; url: string; count: number }[] = [
     count: 20,
     url: "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=SC%2013G%2FA&count=20&output=atom",
   },
+  {
+    form: "13F-HR",
+    count: 25,
+    url: "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=13F-HR&count=25&output=atom",
+  },
 ];
 
 let cikToTicker: Map<string, string> | null = null;
@@ -205,6 +211,8 @@ function formHeadline(form: SecFormKind, cleanTitle: string): string {
       return `Schedule 13G: ${cleanTitle}`;
     case "SC 13G/A":
       return `Schedule 13G/A: ${cleanTitle}`;
+    case "13F-HR":
+      return `Form 13F-HR (institutional filings): ${cleanTitle}`;
   }
 }
 
@@ -250,6 +258,8 @@ function formSummary(form: SecFormKind): string {
       return "Beneficial ownership report — Schedule 13G";
     case "SC 13G/A":
       return "Amendment to Schedule 13G";
+    case "13F-HR":
+      return "Institutional holdings report (Form 13F) — delayed period data, not real-time";
   }
 }
 

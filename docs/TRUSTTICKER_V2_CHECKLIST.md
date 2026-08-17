@@ -141,8 +141,8 @@ Check items only when implemented, tested, and committed for that checkpoint.
 ### Ownership
 
 - [x] 13D/13G ownership events
-- [ ] 13F institutional change tracking
-- [ ] 13F not presented as real-time
+- [x] 13F institutional change tracking
+- [x] 13F not presented as real-time
 
 ### Filings
 
@@ -234,7 +234,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [ ] 8. Portfolio Brief
 - [x] 9. Capital Risk / dilution surfacing *(ticker Capital + deep-link desk; Structure removed from primary nav)*
 - [x] 10. Financials metric layer + Quarterly Delta UI
-- [x] 11. Ownership (13D/13G) *(13F still pending)*
+- [x] 11. Ownership (13D/13G + 13F institutional filings)
 - [ ] 12. Filing redlines
 - [ ] 13. Discover rules
 - [ ] 14. Hardening (idempotency, e2e matrix, verify)

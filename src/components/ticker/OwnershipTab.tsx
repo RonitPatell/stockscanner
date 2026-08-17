@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OwnershipReport } from "@/lib/ownership/get-report";
+import type { InstitutionalPositionView } from "@/lib/institutional/get-report";
 
 function fmtPct(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -10,6 +11,13 @@ function fmtPct(v: number | null | undefined): string {
 function fmtShares(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return v.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+function fmtMoney(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  return `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
 function fmtDelta(v: number | null | undefined): string {
@@ -56,117 +64,236 @@ function kindLabel(kind: string): string {
   }
 }
 
+function instTone(kind: string): string {
+  switch (kind) {
+    case "new":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-100";
+    case "increased":
+      return "border-sky-500/30 bg-sky-500/10 text-sky-100";
+    case "reduced":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-100";
+    case "exited":
+      return "border-zinc-500/40 bg-zinc-800/50 text-zinc-300";
+    default:
+      return "border-zinc-700 bg-zinc-900/40 text-zinc-400";
+  }
+}
+
+function InstitutionalRow({ p }: { p: InstitutionalPositionView }) {
+  return (
+    <li
+      className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2.5 space-y-1.5"
+      data-testid="institutional-position-row"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-zinc-100">{p.filerName}</p>
+          <p className="text-[10px] text-zinc-500 font-mono">CIK {p.filerCik}</p>
+        </div>
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border shrink-0",
+            instTone(p.changeKind)
+          )}
+        >
+          {p.changeLabel}
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+        <div>
+          <dt className="text-zinc-600">Shares</dt>
+          <dd className="font-mono text-zinc-300">{fmtShares(p.shares)}</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-600">Value</dt>
+          <dd className="font-mono text-zinc-300">{fmtMoney(p.valueUsd)}</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-600">Period end</dt>
+          <dd className="text-zinc-300">{fmtDate(p.reportDate)}</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-600">Filed</dt>
+          <dd className="text-zinc-300">{fmtDate(p.filedAt)}</dd>
+        </div>
+      </dl>
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
+        {p.accessionNumber ? (
+          <span className="font-mono text-[10px]">{p.accessionNumber}</span>
+        ) : null}
+        {p.sourceUrl ? (
+          <a
+            href={p.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+          >
+            Source <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : null}
+        <a
+          href={`/institution/${encodeURIComponent(p.filerCik)}`}
+          className="text-zinc-400 hover:text-zinc-200 hover:underline"
+        >
+          Institution filing
+        </a>
+      </div>
+    </li>
+  );
+}
+
 export function OwnershipTab({ report }: { report: OwnershipReport }) {
+  const inst = report.institutional;
+
   return (
     <section
-      className="space-y-5"
+      className="space-y-8"
       data-testid="ticker-ownership"
       data-guide="ownership"
     >
       <header className="space-y-2">
         <h2 className="text-lg font-semibold text-zinc-100">Ownership</h2>
         <p className="text-[13px] text-zinc-500 leading-relaxed max-w-prose">
-          Schedule 13D/13G beneficial ownership when percentages are reliably
-          extractable. Informational only — not a trading signal.
+          Beneficial ownership (13D/13G) and institutional filings (13F).
+          Informational only — not a trading signal.
         </p>
       </header>
 
-      {report.empty ? (
-        <p className="text-[13px] text-zinc-500 border border-dashed border-zinc-700 rounded-lg px-3 py-8 text-center">
-          No structured 13D/13G ownership extracts for {report.symbol} yet.
-          Unparseable filings still appear as generic SEC events in Watchtower /
-          What Changed.
-        </p>
-      ) : (
-        <ul className="space-y-3" data-testid="ownership-filing-list">
-          {report.filings.map((f) => (
-            <li
-              key={f.id}
-              className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 space-y-3"
-              data-testid="ownership-filing-row"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-100">
-                    {f.filerName}
+      {/* Institutional filings */}
+      <section className="space-y-3" data-testid="institutional-filings">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-zinc-200">
+            Institutional filings
+          </h3>
+          <p
+            className="text-[12px] text-amber-200/80 border border-amber-500/20 rounded-lg px-3 py-2 bg-amber-500/5 leading-relaxed"
+            data-testid="institutional-delay-disclosure"
+          >
+            {inst.disclosure}
+          </p>
+        </div>
+
+        {inst.empty ? (
+          <p className="text-[13px] text-zinc-500 border border-dashed border-zinc-700 rounded-lg px-3 py-6 text-center">
+            No Form 13F positions resolved for {report.symbol} yet. Ingest runs
+            in the background from SEC public filings.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {inst.positions.map((p) => (
+              <InstitutionalRow
+                key={`${p.filerCik}-${p.reportDate}-${p.changeKind}`}
+                p={p}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* 13D/13G */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-zinc-200">
+          Beneficial ownership (13D/13G)
+        </h3>
+        {report.filings.length === 0 ? (
+          <p className="text-[13px] text-zinc-500 border border-dashed border-zinc-700 rounded-lg px-3 py-6 text-center">
+            No structured 13D/13G ownership extracts for {report.symbol} yet.
+          </p>
+        ) : (
+          <ul className="space-y-3" data-testid="ownership-filing-list">
+            {report.filings.map((f) => (
+              <li
+                key={f.id}
+                className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 space-y-3"
+                data-testid="ownership-filing-row"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-100">
+                      {f.filerName}
+                    </p>
+                    <p className="text-[11px] text-zinc-500">
+                      {[
+                        f.issuerName,
+                        f.formType,
+                        f.isAmendment ? "amendment" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border shrink-0",
+                      kindTone(f.structuredKind)
+                    )}
+                  >
+                    {kindLabel(f.structuredKind)}
+                  </span>
+                </div>
+
+                {f.summaryText ? (
+                  <p className="text-[13px] text-zinc-200 leading-relaxed">
+                    {f.summaryText}
                   </p>
-                  <p className="text-[11px] text-zinc-500">
-                    {[f.issuerName, f.formType, f.isAmendment ? "amendment" : null]
-                      .filter(Boolean)
-                      .join(" · ")}
+                ) : (
+                  <p className="text-[13px] text-zinc-200">
+                    Beneficial owner reported {fmtPct(f.percentOwned)}
                   </p>
-                </div>
-                <span
-                  className={cn(
-                    "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border shrink-0",
-                    kindTone(f.structuredKind)
-                  )}
-                >
-                  {kindLabel(f.structuredKind)}
-                </span>
-              </div>
+                )}
 
-              {f.summaryText ? (
-                <p className="text-[13px] text-zinc-200 leading-relaxed">
-                  {f.summaryText}
-                </p>
-              ) : (
-                <p className="text-[13px] text-zinc-200">
-                  Beneficial owner reported {fmtPct(f.percentOwned)}
-                </p>
-              )}
+                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                  <div>
+                    <dt className="text-zinc-600">Reported %</dt>
+                    <dd className="font-mono text-zinc-300">
+                      {fmtPct(f.percentOwned)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-600">Shares</dt>
+                    <dd className="font-mono text-zinc-300">
+                      {fmtShares(f.sharesOwned)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-600">Prior %</dt>
+                    <dd className="font-mono text-zinc-300">
+                      {fmtPct(f.previousPercent)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-600">Δ %</dt>
+                    <dd className="font-mono text-zinc-300">
+                      {fmtDelta(f.percentChange)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-600">Filed</dt>
+                    <dd className="text-zinc-300">{fmtDate(f.filedAt)}</dd>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <dt className="text-zinc-600">Accession</dt>
+                    <dd className="font-mono text-zinc-400 text-[10px]">
+                      {f.accessionNumber}
+                    </dd>
+                  </div>
+                </dl>
 
-              <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                <div>
-                  <dt className="text-zinc-600">Reported %</dt>
-                  <dd className="font-mono text-zinc-300">
-                    {fmtPct(f.percentOwned)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-600">Shares</dt>
-                  <dd className="font-mono text-zinc-300">
-                    {fmtShares(f.sharesOwned)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-600">Prior %</dt>
-                  <dd className="font-mono text-zinc-300">
-                    {fmtPct(f.previousPercent)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-600">Δ %</dt>
-                  <dd className="font-mono text-zinc-300">
-                    {fmtDelta(f.percentChange)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-600">Filed</dt>
-                  <dd className="text-zinc-300">{fmtDate(f.filedAt)}</dd>
-                </div>
-                <div className="sm:col-span-3">
-                  <dt className="text-zinc-600">Accession</dt>
-                  <dd className="font-mono text-zinc-400 text-[10px]">
-                    {f.accessionNumber}
-                  </dd>
-                </div>
-              </dl>
-
-              {f.sourceUrl ? (
-                <a
-                  href={f.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
-                >
-                  Source <ExternalLink className="w-3 h-3" />
-                </a>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
+                {f.sourceUrl ? (
+                  <a
+                    href={f.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
+                  >
+                    Source <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }

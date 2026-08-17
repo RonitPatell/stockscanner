@@ -1102,28 +1102,61 @@ model BeneficialOwnershipFiling {
   @@index([companyEventId])
 }
 
-/// Institutional 13F (and similar) position snapshot — not real-time ownership.
+/// Institutional 13F position snapshot — delayed filings, never real-time.
 model InstitutionalHoldingSnapshot {
   id                   String    @id @default(cuid())
   symbol               String
   cusip                String?
+  issuerName           String?
   filerCik             String
   filerName            String
   reportDate           DateTime
   filedAt              DateTime?
   shares               Float?
-  /// null = UNKNOWN
+  /// null = UNKNOWN; SEC 13F value is stored in USD (converted from $000s)
   valueUsd             Float?
   putCall              String?
   investmentDiscretion String?
+  /// new | increased | reduced | exited | unchanged | unknown
+  changeKind           String    @default("unknown")
+  priorShares          Float?
+  priorValueUsd        Float?
+  priorReportDate      DateTime?
+  priorAccession       String?
+  sharesChange         Float?
+  valueChange          Float?
   accessionNumber      String?
   sourceUrl            String?
   fingerprint          String    @unique
+  metricsJson          Json      @default("{}")
   createdAt            DateTime  @default(now())
 
   @@index([symbol, reportDate])
   @@index([filerCik, reportDate])
+  @@index([symbol, filerCik, reportDate])
   @@index([accessionNumber])
+  @@index([filerCik, changeKind, reportDate])
+}
+
+/// One processed 13F-HR filing header — idempotent ingest bookkeeping.
+model Institutional13fFiling {
+  id              String    @id @default(cuid())
+  filerCik        String
+  filerName       String
+  reportDate      DateTime
+  filedAt         DateTime?
+  accessionNumber String    @unique
+  sourceUrl       String?
+  holdingCount    Int       @default(0)
+  resolvedCount   Int       @default(0)
+  /// pending | processed | failed
+  status          String    @default("processed")
+  errorNote       String?
+  fingerprint     String    @unique
+  createdAt       DateTime  @default(now())
+
+  @@index([filerCik, reportDate])
+  @@index([status, createdAt])
 }
 
 /// Private per-user read / dismiss state for shared CompanyEvent rows.
