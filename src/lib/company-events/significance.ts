@@ -35,6 +35,9 @@ export const SIGNIFICANCE_REASON_CODES = [
   // MEDIUM
   "NEW_SHELF_REGISTRATION",
   "OWNERSHIP_THRESHOLD_CHANGE",
+  "OWNERSHIP_MATERIAL_NEW",
+  "OWNERSHIP_PCT_CHANGE",
+  "OWNERSHIP_EXIT_REDUCTION",
   "NEW_DEBT_OR_MATERIAL_AGREEMENT",
   "MATERIAL_MARGIN_OR_RESULTS",
   "INSIDER_OPEN_MARKET_SALE",
@@ -344,6 +347,33 @@ export function scoreEventSignificance(
         "MEDIUM",
         "CONVERTIBLE_OR_WARRANT_CAPITAL",
         "Convertible or warrant-related capital structure event",
+        "event_type"
+      );
+      break;
+
+    case "beneficial_ownership_material_new":
+      fire(
+        "MEDIUM",
+        "OWNERSHIP_MATERIAL_NEW",
+        "New material beneficial ownership filing with reported percentage",
+        "event_type"
+      );
+      break;
+
+    case "beneficial_ownership_pct_change":
+      fire(
+        "MEDIUM",
+        "OWNERSHIP_PCT_CHANGE",
+        "Meaningful change in reported beneficial ownership percentage",
+        "event_type"
+      );
+      break;
+
+    case "beneficial_ownership_exit":
+      fire(
+        "MEDIUM",
+        "OWNERSHIP_EXIT_REDUCTION",
+        "Beneficial ownership exit or material reduction established by filing",
         "event_type"
       );
       break;

@@ -82,7 +82,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] Financials tab *(Quarterly Delta)*
 - [x] Capital tab *(Capital Risk: liquidity, shares, financing)*
 - [x] Insiders tab *(structured Form 4)*
-- [ ] Ownership tab *(placeholder on hub)*
+- [x] Ownership tab *(structured 13D/13G)*
 - [ ] Filings tab *(placeholder on hub)*
 - [ ] Timeline tab *(placeholder on hub)*
 - [ ] Public research-preview vs entitled full depth defined and enforced
@@ -140,7 +140,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### Ownership
 
-- [ ] 13D/13G ownership events
+- [x] 13D/13G ownership events
 - [ ] 13F institutional change tracking
 - [ ] 13F not presented as real-time
 
@@ -234,7 +234,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [ ] 8. Portfolio Brief
 - [x] 9. Capital Risk / dilution surfacing *(ticker Capital + deep-link desk; Structure removed from primary nav)*
 - [x] 10. Financials metric layer + Quarterly Delta UI
-- [ ] 11. Ownership (13D/13G/13F)
+- [x] 11. Ownership (13D/13G) *(13F still pending)*
 - [ ] 12. Filing redlines
 - [ ] 13. Discover rules
 - [ ] 14. Hardening (idempotency, e2e matrix, verify)

@@ -1063,6 +1063,45 @@ model InsiderTransaction {
   @@index([companyEventId])
 }
 
+/// Point-in-time Schedule 13D/13G beneficial ownership extract — only when reliably parsed.
+/// Unparseable filings stay as generic CompanyEvent form rows (no invented %).
+model BeneficialOwnershipFiling {
+  id                 String    @id @default(cuid())
+  symbol             String
+  cik                String?
+  accessionNumber    String
+  formType           String
+  isAmendment        Boolean   @default(false)
+  filedAt            DateTime
+  filerName          String
+  filerCik           String?
+  issuerName         String?
+  /// null = not reliably extractable
+  percentOwned       Float?
+  sharesOwned        Float?
+  previousPercent    Float?
+  previousShares     Float?
+  previousAccession  String?
+  /// percentOwned - previousPercent when both finite
+  percentChange      Float?
+  /// material_new | pct_change | exit_reduction | none
+  structuredKind     String    @default("none")
+  summaryText        String?
+  confidence         Float     @default(0)
+  /// ok | partial | unparseable
+  parseStatus        String    @default("ok")
+  sourceUrl          String?
+  fingerprint        String    @unique
+  companyEventId     String?
+  metricsJson        Json      @default("{}")
+  createdAt          DateTime  @default(now())
+
+  @@index([symbol, filedAt])
+  @@index([symbol, filerName, filedAt])
+  @@index([accessionNumber])
+  @@index([companyEventId])
+}
+
 /// Institutional 13F (and similar) position snapshot — not real-time ownership.
 model InstitutionalHoldingSnapshot {
   id                   String    @id @default(cuid())

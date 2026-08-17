@@ -701,6 +701,7 @@ export async function ingestAndAnalyzeNews(
       try {
         const { processCatalystForDilution } = await import("./dilution/from-catalyst");
         const { processCatalystForInsiders } = await import("./insider/from-catalyst");
+        const { processCatalystForOwnership } = await import("./ownership/from-catalyst");
         const { processCatalystForCompanyEvents } = await import(
           "./company-events/from-catalyst"
         );
@@ -718,6 +719,17 @@ export async function ingestAndAnalyzeNews(
         });
 
         await processCatalystForInsiders({
+          catalystId: catalyst.id,
+          symbol,
+          headline: article.headline,
+          summary: article.summary ?? analysis.summary,
+          source: article.source,
+          sourceUrl: article.url,
+          rawNewsId: article.id,
+          publishedAt: article.publishedAt,
+        });
+
+        await processCatalystForOwnership({
           catalystId: catalyst.id,
           symbol,
           headline: article.headline,

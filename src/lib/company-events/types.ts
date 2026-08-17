@@ -117,6 +117,9 @@ export const COMPANY_EVENT_TYPES = [
   // —— Ownership ——
   "beneficial_ownership_13d",
   "beneficial_ownership_13g",
+  "beneficial_ownership_material_new",
+  "beneficial_ownership_pct_change",
+  "beneficial_ownership_exit",
   "institutional_13f_update",
   // —— Guidance ——
   "guidance_raised",
