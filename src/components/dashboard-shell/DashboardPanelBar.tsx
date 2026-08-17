@@ -4,12 +4,13 @@ import { cn } from "@/lib/utils";
 import {
   DESK_PRIMARY_MODE_IDS,
   DESK_MODE_META,
+  isPrimaryDeskMode,
   type DeskModeId,
 } from "@/lib/dashboard-shell/panel-prefs";
 
 /**
- * Primary desk views only — Floor (default) + Watchlist.
- * News/Scanner are not listed; Floor already has the live tape.
+ * Primary desk views: Portfolio | Watchtower | Research | Discover.
+ * Markets / Structure remain reachable via deep links only.
  */
 export function DashboardPanelBar({
   mode,
@@ -20,8 +21,15 @@ export function DashboardPanelBar({
   onSelect: (id: DeskModeId) => void;
   className?: string;
 }) {
-  const active: DeskModeId =
-    mode === "watchlist" ? "watchlist" : mode === "scanner" ? "scanner" : "floor";
+  const activePrimary = isPrimaryDeskMode(mode) ? mode : null;
+  const deepLinkHint =
+    mode === "scanner"
+      ? "scanner"
+      : mode === "floor" || mode === "news"
+        ? "markets"
+        : mode === "structure"
+          ? "structure"
+          : null;
 
   return (
     <nav
@@ -38,20 +46,24 @@ export function DashboardPanelBar({
           View
         </span>
         {DESK_PRIMARY_MODE_IDS.map((id) => {
-          const on = active === id;
+          const on = activePrimary === id;
           const meta = DESK_MODE_META[id];
+          const testId =
+            id === "watchlist"
+              ? "panel-toggle-portfolio"
+              : `panel-toggle-${id}`;
           return (
             <button
               key={id}
               type="button"
               data-panel={id}
               data-active={on ? "true" : "false"}
-              data-testid={`panel-toggle-${id}`}
+              data-testid={testId}
               title={meta.description}
               aria-pressed={on}
               onClick={() => onSelect(id)}
               className={cn(
-                "px-2.5 sm:px-3 py-1 rounded text-[12px] sm:text-[13px] font-medium border transition-colors whitespace-nowrap",
+                "px-2.5 sm:px-3 py-1 rounded text-[12px] sm:text-[13px] font-medium border transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50",
                 on
                   ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-200"
                   : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60"
@@ -61,7 +73,7 @@ export function DashboardPanelBar({
             </button>
           );
         })}
-        {active === "scanner" ? (
+        {deepLinkHint === "scanner" ? (
           <span
             className="ml-2 text-[11px] text-zinc-500"
             data-testid="desk-advanced-scanner-hint"
@@ -69,10 +81,25 @@ export function DashboardPanelBar({
             Advanced Scanner (deep link) ·{" "}
             <button
               type="button"
-              className="text-emerald-400/90 hover:underline"
-              onClick={() => onSelect("floor")}
+              className="text-emerald-400/90 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
+              onClick={() => onSelect("watchlist")}
             >
-              Back to Floor
+              Back to Portfolio
+            </button>
+          </span>
+        ) : null}
+        {deepLinkHint === "markets" || deepLinkHint === "structure" ? (
+          <span
+            className="ml-2 text-[11px] text-zinc-500"
+            data-testid="desk-legacy-mode-hint"
+          >
+            {deepLinkHint === "markets" ? "Markets" : "Structure"} (deep link) ·{" "}
+            <button
+              type="button"
+              className="text-emerald-400/90 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
+              onClick={() => onSelect("watchtower")}
+            >
+              Back to Watchtower
             </button>
           </span>
         ) : null}

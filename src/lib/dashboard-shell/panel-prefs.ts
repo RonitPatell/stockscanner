@@ -1,40 +1,81 @@
 /**
- * Exclusive desk modes. Primary nav is Floor + Watchlist.
- * News/Scanner remain as deep-link / internal modes only.
+ * Exclusive desk modes.
+ * Primary nav: Portfolio | Watchtower | Research | Discover.
+ * Markets (floor), Structure, News, Scanner remain deep-link / internal.
  */
 
-export const DESK_MODE_IDS = ["floor", "news", "watchlist", "scanner"] as const;
+export const DESK_MODE_IDS = [
+  "watchlist",
+  "watchtower",
+  "research",
+  "discover",
+  "floor",
+  "structure",
+  "news",
+  "scanner",
+] as const;
 
-/** Modes shown in the View bar — keep this short on purpose. */
-export const DESK_PRIMARY_MODE_IDS = ["floor", "watchlist"] as const;
+/** Modes shown in the View bar. */
+export const DESK_PRIMARY_MODE_IDS = [
+  "watchlist",
+  "watchtower",
+  "research",
+  "discover",
+] as const;
 
 export type DeskModeId = (typeof DESK_MODE_IDS)[number];
 export type DeskPrimaryModeId = (typeof DESK_PRIMARY_MODE_IDS)[number];
 
-/** @deprecated Use DeskModeId — kept for deep-link / guide compatibility. */
-export type DeskPanelId = DeskModeId | "feed" | "plan" | "risk" | "review";
+/** @deprecated Use DeskModeId */
+export type DeskPanelId =
+  | DeskModeId
+  | "feed"
+  | "plan"
+  | "risk"
+  | "review"
+  | "portfolio";
 
-const STORAGE_KEY = "tt-desk-mode-v3";
+const STORAGE_KEY = "tt-desk-mode-v6";
+const LEGACY_V5_KEY = "tt-desk-mode-v5";
+const LEGACY_V4_KEY = "tt-desk-mode-v4";
+const LEGACY_V3_KEY = "tt-desk-mode-v3";
 const LEGACY_V2_KEY = "tt-desk-mode-v2";
 const LEGACY_PANELS_KEY = "tt-desk-panels-v1";
 
-export const DEFAULT_DESK_MODE: DeskModeId = "floor";
+/** Investor OS default: Portfolio first. */
+export const DEFAULT_DESK_MODE: DeskModeId = "watchlist";
 
 export const DESK_MODE_META: Record<
   DeskModeId,
   { label: string; description: string }
 > = {
+  watchlist: {
+    label: "Portfolio",
+    description: "Companies you monitor",
+  },
+  watchtower: {
+    label: "Watchtower",
+    description: "Material changes across your portfolio",
+  },
+  research: {
+    label: "Research",
+    description: "SEC filings and ticker hub",
+  },
+  discover: {
+    label: "Discover",
+    description: "Opportunity rules across the market",
+  },
   floor: {
-    label: "Floor",
-    description: "Main desk — movers, wire, news, and chart",
+    label: "Markets",
+    description: "Movers, wire, and chart (deep link)",
+  },
+  structure: {
+    label: "Structure",
+    description: "Dilution and capital risk (deep link)",
   },
   news: {
     label: "News",
-    description: "Full catalyst tape (use Floor for day-to-day)",
-  },
-  watchlist: {
-    label: "Watchlist",
-    description: "Your saved symbols and brief",
+    description: "Full catalyst tape",
   },
   scanner: {
     label: "Scanner",
@@ -42,27 +83,41 @@ export const DESK_MODE_META: Record<
   },
 };
 
-/** Legacy aliases so older imports keep compiling during the cutover. */
 export const DESK_PANEL_IDS = DESK_MODE_IDS;
 export const DESK_PANEL_META = DESK_MODE_META;
 export type DeskPanelPrefs = Record<DeskModeId, boolean>;
 
 export const DEFAULT_DESK_PANELS: DeskPanelPrefs = {
-  floor: true,
+  watchlist: true,
+  watchtower: false,
+  research: false,
+  discover: false,
+  floor: false,
+  structure: false,
   news: false,
-  watchlist: false,
   scanner: false,
 };
 
-/** Collapse retired View tabs onto Floor so the product always opens cleanly. */
+export function isPrimaryDeskMode(mode: DeskModeId): mode is DeskPrimaryModeId {
+  return (DESK_PRIMARY_MODE_IDS as readonly string[]).includes(mode);
+}
+
 export function toPrimaryDeskMode(mode: DeskModeId): DeskModeId {
-  if (mode === "watchlist") return "watchlist";
-  if (mode === "scanner") return "scanner"; // deep-link / e2e only
-  return "floor";
+  if (isPrimaryDeskMode(mode)) return mode;
+  if (mode === "scanner") return "scanner";
+  if (mode === "floor" || mode === "news") return "floor";
+  if (mode === "structure") return "structure";
+  return DEFAULT_DESK_MODE;
 }
 
 export function sanitizeDeskMode(raw: unknown): DeskModeId {
-  if (typeof raw === "string" && (DESK_MODE_IDS as readonly string[]).includes(raw)) {
+  if (raw === "portfolio") return "watchlist";
+  if (raw === "markets") return "floor";
+  if (raw === "risk") return "structure";
+  if (
+    typeof raw === "string" &&
+    (DESK_MODE_IDS as readonly string[]).includes(raw)
+  ) {
     return raw as DeskModeId;
   }
   return DEFAULT_DESK_MODE;
@@ -70,9 +125,13 @@ export function sanitizeDeskMode(raw: unknown): DeskModeId {
 
 export function modeToPanelPrefs(mode: DeskModeId): DeskPanelPrefs {
   return {
-    floor: mode === "floor",
-    news: mode === "news",
     watchlist: mode === "watchlist",
+    watchtower: mode === "watchtower",
+    research: mode === "research",
+    discover: mode === "discover",
+    floor: mode === "floor",
+    structure: mode === "structure",
+    news: mode === "news",
     scanner: mode === "scanner",
   };
 }
@@ -87,24 +146,36 @@ export function panelPrefsToMode(prefs: DeskPanelPrefs): DeskModeId {
 export function sanitizeDeskPanels(raw: unknown): DeskPanelPrefs {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_DESK_PANELS };
   const o = raw as Record<string, unknown>;
-  if (typeof o.floor === "boolean" || typeof o.news === "boolean") {
+  if (
+    typeof o.floor === "boolean" ||
+    typeof o.news === "boolean" ||
+    typeof o.structure === "boolean" ||
+    typeof o.research === "boolean" ||
+    typeof o.watchlist === "boolean" ||
+    typeof o.watchtower === "boolean" ||
+    typeof o.discover === "boolean" ||
+    typeof o.risk === "boolean"
+  ) {
     const mode =
-      o.floor === true
-        ? "floor"
-        : o.watchlist === true
-          ? "watchlist"
-          : o.scanner === true
-            ? "scanner"
-            : o.news === true
-              ? "floor" // News tab retired — Floor already has the tape
-              : DEFAULT_DESK_MODE;
+      o.watchlist === true || o.portfolio === true
+        ? "watchlist"
+        : o.watchtower === true
+          ? "watchtower"
+          : o.research === true
+            ? "research"
+            : o.discover === true
+              ? "discover"
+              : o.structure === true || o.risk === true
+                ? "structure"
+                : o.floor === true || o.markets === true
+                  ? "floor"
+                  : o.scanner === true
+                    ? "scanner"
+                    : o.news === true
+                      ? "floor"
+                      : DEFAULT_DESK_MODE;
     return modeToPanelPrefs(mode);
   }
-  if (o.watchlist === true && o.scanner !== true) {
-    return modeToPanelPrefs("watchlist");
-  }
-  if (o.scanner === true && o.feed !== true) return modeToPanelPrefs("scanner");
-  // Old feed-on prefs → Floor (not a separate News view)
   return { ...DEFAULT_DESK_PANELS };
 }
 
@@ -114,16 +185,21 @@ export function loadDeskMode(): DeskModeId {
     const modeRaw = localStorage.getItem(STORAGE_KEY);
     if (modeRaw) {
       const mode = sanitizeDeskMode(JSON.parse(modeRaw));
-      // Persisted "news" from older builds → Floor
       return mode === "news" ? "floor" : mode;
     }
-    // One-time migrate v2 → v3 (prefer Floor over News)
-    const v2 = localStorage.getItem(LEGACY_V2_KEY);
-    if (v2) {
-      const mode = sanitizeDeskMode(JSON.parse(v2));
-      const next = mode === "news" ? "floor" : mode;
-      saveDeskMode(next);
-      return next;
+    for (const key of [
+      LEGACY_V5_KEY,
+      LEGACY_V4_KEY,
+      LEGACY_V3_KEY,
+      LEGACY_V2_KEY,
+    ]) {
+      const legacyMode = localStorage.getItem(key);
+      if (legacyMode) {
+        const mode = sanitizeDeskMode(JSON.parse(legacyMode));
+        const next = mode === "news" ? "floor" : mode;
+        saveDeskMode(next);
+        return next;
+      }
     }
     const legacy = localStorage.getItem(LEGACY_PANELS_KEY);
     if (legacy) {
@@ -161,27 +237,52 @@ export function saveDeskPanels(prefs: DeskPanelPrefs): void {
   saveDeskMode(panelPrefsToMode(prefs));
 }
 
-/** Map legacy ?view= destinations onto exclusive desk modes. */
 export function modeFromLegacyView(
   view: string | null | undefined
 ): DeskModeId | null {
   const v = (view ?? "").trim().toLowerCase();
   if (!v) return null;
-  if (v === "floor") return "floor";
-  // Advanced monitor — only via explicit deep link (not in View bar)
+  if (v === "portfolio" || v === "watchlist") return "watchlist";
+  if (v === "watchtower" || v === "what-changed" || v === "whatchanged") {
+    return "watchtower";
+  }
+  if (v === "research") return "research";
+  if (v === "discover") return "discover";
+  if (v === "markets" || v === "floor") return "floor";
+  if (v === "structure" || v === "risk" || v === "dilution") return "structure";
   if (v === "monitor" || v === "scanner") return "scanner";
-  // Feed/news → Floor (tape already lives there)
   if (v === "feed" || v === "news") return "floor";
-  if (v === "watchlist") return "watchlist";
-  if (v === "plan" || v === "risk" || v === "review") return "floor";
+  if (v === "plan" || v === "review") return "watchlist";
   return null;
 }
 
-/** @deprecated Use modeFromLegacyView */
 export function panelsFromLegacyView(
   view: string | null | undefined
 ): Partial<DeskPanelPrefs> | null {
   const mode = modeFromLegacyView(view);
   if (!mode) return null;
   return modeToPanelPrefs(mode);
+}
+
+/** Map desk mode → ?view= for deep links / URL sync. */
+export function viewParamForDeskMode(mode: DeskModeId): string {
+  switch (mode) {
+    case "watchlist":
+      return "portfolio";
+    case "watchtower":
+      return "watchtower";
+    case "research":
+      return "research";
+    case "discover":
+      return "discover";
+    case "floor":
+    case "news":
+      return "markets";
+    case "structure":
+      return "structure";
+    case "scanner":
+      return "monitor";
+    default:
+      return "portfolio";
+  }
 }

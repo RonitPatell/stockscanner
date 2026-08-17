@@ -23,6 +23,8 @@ export {
   modeFromLegacyView,
   modeToPanelPrefs,
   toPrimaryDeskMode,
+  isPrimaryDeskMode,
+  viewParamForDeskMode,
   DESK_PANEL_IDS,
   DESK_PANEL_META,
   DEFAULT_DESK_PANELS,

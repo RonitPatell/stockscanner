@@ -63,14 +63,14 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ## Primary product surfaces (IA)
 
-- [ ] **Portfolio** primary surface
-- [ ] **Watchtower** primary surface
-- [ ] **Research** primary surface
-- [ ] **Discover** primary surface
-- [ ] Dashboard shell / nav remapped (deprecate Markets/Structure as primary)
-- [ ] Platform Guide updated + `PLATFORM_GUIDE_VERSION` bumped
-- [ ] Loading / empty / error / success states on each primary surface
-- [ ] Keyboard / focus behavior on interactive controls
+- [x] **Portfolio** primary surface
+- [x] **Watchtower** primary surface
+- [x] **Research** primary surface
+- [x] **Discover** primary surface *(shell + honest placeholder; rules engine later)*
+- [x] Dashboard shell / nav remapped (deprecate Markets/Structure as primary)
+- [x] Platform Guide updated + `PLATFORM_GUIDE_VERSION` bumped
+- [x] Loading / empty / error / success states on each primary surface
+- [x] Keyboard / focus behavior on interactive controls
 
 ---
 
@@ -225,9 +225,9 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 1. Entitlement core + access matrix tests
 - [x] 2. Stripe single-SKU migration
 - [x] 3. API gate sweep → `requireEntitled`
-- [ ] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
+- [x] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
 - [ ] 5. Company workspace tab shell
-- [x] 6. CompanyEvent / What Changed engine *(classifier + persist; Watchtower UI later)*
+- [x] 6. CompanyEvent / What Changed engine *(classifier + persist + Watchtower UI)*
 - [ ] 7. Thesis + Thesis Health
 - [ ] 8. Portfolio Brief
 - [ ] 9. Capital Risk / dilution surfacing

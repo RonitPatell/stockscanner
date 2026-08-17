@@ -1,9 +1,17 @@
-# Watchtower backend
+# Watchtower
 
-Portfolio-scoped **What Changed** feed.
+Portfolio-scoped **What Changed** feed — backend + primary desk UI.
 
 > Answers: *What materially changed across the companies I monitor?*  
 > Review priority only — never buy/sell advice.
+
+## UI
+
+- Primary nav: **Portfolio · Watchtower · Research · Discover**
+- Component: `src/components/dashboard-shell/WatchtowerDesk.tsx`
+- Detail drawer: `WatchtowerEventDrawer.tsx`
+- Deep link: `/dashboard?view=watchtower&eventId=…`
+- Markets / Structure remain deep-link only (`?view=markets` / `?view=structure`)
 
 ## Endpoints
 
@@ -25,12 +33,10 @@ All require `requireTrustTickerAccess` (session + entitlement).
 | `since` / `until` | ISO bounds on `occurredAt` |
 | `category` | CSV of CompanyEvent categories |
 | `severity` | CSV of legacy severities (`critical`, `material`, …) |
-| `significance` | CSV of `HIGH`/`MEDIUM`/`LOW`/`INFORMATIONAL` (mapped to legacy severity for filtering) |
+| `significance` | CSV of `HIGH`/`MEDIUM`/`LOW`/`INFORMATIONAL` |
 | `symbol` | CSV; **intersected** with the user's monitored portfolio |
 | `includeDismissed` | `true` to include dismissed |
 | `unreadOnly` | `true` to exclude events this user has read |
-
-Default: dismissed events are hidden; read events remain visible unless `unreadOnly`.
 
 ## Response item
 
@@ -41,26 +47,17 @@ Default: dismissed events are hidden; read events remain visible unless `unreadO
 - `significance` `{ level, reasonCodes, evidence, engineVersion, thesisRelevance: null }`
 - `source` `{ type, id, url }`
 - `evidence` (public blob; significance stripped)
-- `thesisRelevance: null` (overlay placeholder)
+- `thesisRelevance: null`
 - `readState` `{ isRead, readAt, isDismissed, dismissedAt }` — **this user only**
-
-## Query plan (no N+1)
-
-1. `PortfolioItem` symbols for `session.user.id` (`archivedAt: null`)
-2. One `CompanyEvent.findMany` with `symbol IN (…)`, filters, cursor, and `userStates` **filtered by the same userId**
-3. One `SymbolMaster.findMany` for page symbols (names)
-
-Private `UserCompanyEventState` rows of other users are never selected or returned.
 
 ## Security
 
-- Mutations require the event's symbol to be in the caller's active portfolio
-- Cross-user IDOR on event state → `NOT_FOUND` / `NOT_MONITORED` (no other user's timestamps)
-- Expired / unentitled sessions → `403 SUBSCRIPTION_REQUIRED` at the gate
-- Shared `CompanyEvent` facts are global; personalization is only via portfolio membership + private state
+- Mutations require the event's symbol in the caller's active portfolio
+- Cross-user IDOR blocked on private read/dismiss state
+- View source opens only allowlisted `http(s)` URLs
 
 ## Code
 
 - Service: `src/lib/watchtower/service.ts`
-- Schemas: `src/lib/watchtower/schemas.ts`
-- Tests: `tests/watchtower-backend.test.mts`
+- UI helpers: `src/lib/watchtower/ui.ts`
+- Tests: `tests/watchtower-backend.test.mts`, `tests/watchtower-ui.test.mts`, `e2e/watchtower.spec.ts`

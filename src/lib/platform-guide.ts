@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 58;
+export const PLATFORM_GUIDE_VERSION = 59;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -27,14 +27,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
     title: "Welcome to TrustTicker",
-    body: "Investor OS: Portfolio is where you tell TrustTicker which companies to monitor. Research opens ticker hubs. Markets and Structure unlock with full TrustTicker access.",
+    body: "Investor OS: Portfolio is where you choose companies to monitor. Watchtower surfaces material changes on those names. Research opens ticker hubs. Discover is for market-wide opportunity rules (rolling out).",
     tip: "Tap any ? icon if something is unclear · Esc exits the guide",
   },
   {
     id: "secondary-nav",
     target: "dashboard-secondary-nav",
     title: "View switcher",
-    body: "Portfolio · Research · Markets · Structure. Portfolio works during trial or paid access — no free-tier symbol cap.",
+    body: "Portfolio · Watchtower · Research · Discover. Markets and Structure remain available via deep links for power users.",
   },
   {
     id: "portfolio",
@@ -43,22 +43,34 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     body: "Add or remove companies you own or follow. Optional label, note, and entry price. Quotes enrich when available; monitoring works without live prices.",
   },
   {
+    id: "watchtower-desk",
+    target: "watchtower-desk",
+    title: "Watchtower",
+    body: "Material changes across the companies you monitor — filings, capital, ownership, and more. Filter by significance or category. Open a card for detail, source, and mark-as-read. Not buy/sell advice.",
+  },
+  {
     id: "research-desk",
     target: "research-desk",
     title: "Research",
     body: "Look up any ticker. Opens the hub with catalysts, Form 4 context, EDGAR links, and dilution badges.",
   },
   {
+    id: "discover-desk",
+    target: "discover-desk",
+    title: "Discover",
+    body: "Market-wide opportunity rules will land here. Until then, monitor names in Portfolio and review changes in Watchtower.",
+  },
+  {
     id: "trading-floor",
     target: "trading-floor",
     title: "Markets Floor",
-    body: "Pro desk for volume and biggest % leaders, wire, and charts. Search any ticker for float and market cap.",
+    body: "Deep-link desk for volume and biggest % leaders, wire, and charts. Open with ?view=markets. Search any ticker for float and market cap.",
   },
   {
     id: "structure-desk",
     target: "structure-desk",
     title: "Structure Desk",
-    body: "Pro: can new share supply crush this move? Dilution Radar reads SEC capital filings with evidence links.",
+    body: "Deep-link capital risk: can new share supply crush this move? Dilution Radar reads SEC capital filings with evidence links. Open with ?view=structure.",
   },
   {
     id: "dilution-radar",

@@ -1,61 +1,53 @@
 /**
  * Dashboard Shell V3 — destinations, deep links, guide target uniqueness.
+ * Imports avoid dashboard-shell/index (pulls monitor flags with @/ aliases).
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  destinationFromSearchParams,
-  destinationDeepLink,
-  DASHBOARD_DESTINATIONS,
-  DASHBOARD_SHELL_V3_GUIDE_TARGETS,
-  isDashboardShellV3Enabled,
-} from "../src/lib/dashboard-shell/index.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { DASHBOARD_SHELL_V3_GUIDE_TARGETS } from "../src/lib/dashboard-shell/guide-targets.ts";
 import {
   DASHBOARD_GUIDE_STEPS,
   PLATFORM_GUIDE_VERSION,
 } from "../src/lib/platform-guide.ts";
+import {
+  DESK_PRIMARY_MODE_IDS,
+  modeFromLegacyView,
+} from "../src/lib/dashboard-shell/panel-prefs.ts";
 
 test("six destinations defined (Monitor + five legacy)", () => {
-  assert.equal(DASHBOARD_DESTINATIONS.length, 6);
-  assert.deepEqual(
-    DASHBOARD_DESTINATIONS.map((d) => d.id),
-    ["monitor", "feed", "watchlist", "plan", "risk", "review"]
+  const src = readFileSync(
+    join(process.cwd(), "src/lib/dashboard-shell/destinations.ts"),
+    "utf8"
   );
+  for (const id of ["monitor", "feed", "watchlist", "plan", "risk", "review"]) {
+    assert.match(src, new RegExp(`id: \"${id}\"`));
+  }
 });
 
-test("deep links map legacy panels to destinations", () => {
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("view=risk")),
-    "risk"
-  );
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("panel=dilution")),
-    "risk"
-  );
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("panel=session-plan")),
-    "plan"
-  );
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("panel=green-ledger")),
-    "review"
-  );
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("panel=watchlist")),
-    "watchlist"
-  );
-  assert.equal(
-    destinationFromSearchParams(new URLSearchParams("focus=1")),
-    "feed"
-  );
-  assert.equal(
-    destinationDeepLink("plan"),
-    "/dashboard?view=plan"
-  );
+test("deep links map legacy panels / Watchtower view", () => {
+  assert.equal(modeFromLegacyView("risk"), "structure");
+  assert.equal(modeFromLegacyView("dilution"), "structure");
+  assert.equal(modeFromLegacyView("watchlist"), "watchlist");
+  assert.equal(modeFromLegacyView("portfolio"), "watchlist");
+  assert.equal(modeFromLegacyView("watchtower"), "watchtower");
+  assert.equal(modeFromLegacyView("discover"), "discover");
+  assert.equal(modeFromLegacyView("markets"), "floor");
+  assert.equal(modeFromLegacyView("feed"), "floor");
 });
 
-test("platform guide version bumped for shell v3 / monitor", () => {
-  assert.ok(PLATFORM_GUIDE_VERSION >= 41);
+test("primary nav IA is Portfolio Watchtower Research Discover", () => {
+  assert.deepEqual([...DESK_PRIMARY_MODE_IDS], [
+    "watchlist",
+    "watchtower",
+    "research",
+    "discover",
+  ]);
+});
+
+test("platform guide version bumped for shell v3 / monitor / Watchtower IA", () => {
+  assert.ok(PLATFORM_GUIDE_VERSION >= 59);
 });
 
 test("each dashboard guide target is unique in steps", () => {
@@ -72,8 +64,14 @@ test("each dashboard guide target is unique in steps", () => {
 test("shell v3 guide target list has unique entries", () => {
   const set = new Set(DASHBOARD_SHELL_V3_GUIDE_TARGETS);
   assert.equal(set.size, DASHBOARD_SHELL_V3_GUIDE_TARGETS.length);
+  assert.ok(DASHBOARD_SHELL_V3_GUIDE_TARGETS.includes("watchtower-desk"));
+  assert.ok(DASHBOARD_SHELL_V3_GUIDE_TARGETS.includes("discover-desk"));
 });
 
-test("feature flag helper is boolean", () => {
-  assert.equal(typeof isDashboardShellV3Enabled(), "boolean");
+test("feature flag helper is boolean (source)", () => {
+  const src = readFileSync(
+    join(process.cwd(), "src/lib/dashboard-shell/flags.ts"),
+    "utf8"
+  );
+  assert.match(src, /export function isDashboardShellV3Enabled/);
 });

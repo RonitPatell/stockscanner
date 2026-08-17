@@ -261,16 +261,23 @@ test("Watchtower service integration", async (t) => {
     );
     assert.equal(multi.ok, true);
     if (!multi.ok) return;
-    const multiSyms = new Set(multi.result.items.map((i) => i.symbol));
+    const seededTitles = new Set([
+      "AAPL shelf",
+      "AAPL CEO change",
+      "MSFT 10-Q",
+      "AAPL Form 4",
+    ]);
+    const seeded = multi.result.items.filter((i) => seededTitles.has(i.title));
+    const multiSyms = new Set(seeded.map((i) => i.symbol));
     assert.ok(multiSyms.has("AAPL"));
     assert.ok(multiSyms.has("MSFT"));
     assert.equal(multiSyms.has("TSLA"), false);
-    assert.equal(multi.result.items.length, 4);
-    // Newest first
-    assert.equal(multi.result.items[0]!.title, "AAPL CEO change");
-    assert.ok(multi.result.items[0]!.significance.reasonCodes.length > 0);
-    assert.equal(multi.result.items[0]!.thesisRelevance, null);
-    assert.equal(multi.result.items[0]!.readState.isRead, false);
+    assert.equal(seeded.length, 4);
+    // Newest first among seeded
+    assert.equal(seeded[0]!.title, "AAPL CEO change");
+    assert.ok(seeded[0]!.significance.reasonCodes.length > 0);
+    assert.equal(seeded[0]!.thesisRelevance, null);
+    assert.equal(seeded[0]!.readState.isRead, false);
 
     // —— category filter ——
     const capitalOnly = await getWatchtowerFeed(

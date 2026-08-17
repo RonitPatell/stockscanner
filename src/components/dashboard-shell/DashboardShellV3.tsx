@@ -19,7 +19,12 @@ import { DashboardTopBar } from "./DashboardTopBar";
 import { DashboardPanelBar } from "./DashboardPanelBar";
 import { CatalystContextDrawer } from "./CatalystContextDrawer";
 import { TradingFloor } from "./TradingFloor";
+import { ResearchDesk } from "./ResearchDesk";
+import { WatchtowerDesk } from "./WatchtowerDesk";
+import { DiscoverDesk } from "./DiscoverDesk";
+import { ModulePaywall } from "./ModulePaywall";
 import type { DashboardDestination } from "@/lib/dashboard-shell";
+import type { PlanTier } from "@/lib/subscription";
 import { isFocusModeV2Enabled } from "@/lib/focus-mode";
 import { isMonitorV1Enabled } from "@/lib/monitor";
 import { MonitorBetaChrome } from "../monitor/MonitorBetaChrome";
@@ -36,6 +41,7 @@ import {
   loadDeskMode,
   modeFromLegacyView,
   saveDeskMode,
+  viewParamForDeskMode,
   type DeskModeId,
 } from "@/lib/dashboard-shell/panel-prefs";
 
@@ -81,13 +87,21 @@ function ModeSection({
       data-guide={
         id === "watchlist"
           ? "watchlist-destination"
-          : id === "floor"
-            ? "trading-floor"
-            : undefined
+          : id === "watchtower"
+            ? "watchtower-desk"
+            : id === "research"
+              ? "research-desk"
+              : id === "discover"
+                ? "discover-desk"
+                : id === "floor"
+                  ? "trading-floor"
+                  : id === "structure"
+                    ? "structure-desk"
+                    : undefined
       }
       className="desk-panel border-b border-[var(--border)] min-w-0 min-h-0 flex-1 flex flex-col"
     >
-      {id !== "floor" ? (
+      {id !== "floor" && id !== "watchtower" ? (
         <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--background)]/95 backdrop-blur border-b border-[var(--border)]/60 shrink-0">
           <div className="min-w-0 flex items-baseline gap-2">
             <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
@@ -123,6 +137,7 @@ export function DashboardShellV3({
   initialScanner = null,
   initialDestination,
   initialMonitorSnapshot = null,
+  planTier = "free",
 }: {
   initialCatalysts?: CatalystItem[];
   initialWatchlist?: string[];
@@ -130,7 +145,10 @@ export function DashboardShellV3({
   initialScanner?: MarketScannerSnapshot | null;
   initialDestination?: DashboardDestination;
   initialMonitorSnapshot?: MonitorInitialSnapshot | null;
+  planTier?: PlanTier;
 }) {
+  const canUseMarkets = planTier === "pro";
+  const canUseStructure = planTier === "pro";
   const [deskMode, setDeskMode] = useState<DeskModeId>(DEFAULT_DESK_MODE);
   const [tab, setTab] = useState<ScannerTab>("all");
   const [mode, setMode] = useState<"focus" | "full">("full");
@@ -152,7 +170,7 @@ export function DashboardShellV3({
   );
 
   useEffect(() => {
-    // Product default is Floor unless an explicit deep link says otherwise.
+    // Product default is Portfolio unless an explicit deep link says otherwise.
     let next: DeskModeId = DEFAULT_DESK_MODE;
     try {
       const params = new URLSearchParams(window.location.search);
@@ -223,7 +241,27 @@ export function DashboardShellV3({
     setDeskMode(next);
     saveDeskMode(next);
     if (next === "watchlist") setTab("watchlist");
-    if (next === "floor") setTab("all");
+    if (
+      next === "floor" ||
+      next === "structure" ||
+      next === "research" ||
+      next === "watchtower" ||
+      next === "discover"
+    ) {
+      setTab("all");
+    }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", viewParamForDeskMode(next));
+      if (next !== "watchtower") {
+        url.searchParams.delete("eventId");
+        url.searchParams.delete("weid");
+        url.searchParams.delete("companyEventId");
+      }
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const setDashboardMode = useCallback((next: "focus" | "full") => {
@@ -242,9 +280,9 @@ export function DashboardShellV3({
         monitor: "scanner",
         feed: "floor",
         watchlist: "watchlist",
-        plan: "floor",
-        risk: "floor",
-        review: "floor",
+        plan: "watchlist",
+        risk: "structure",
+        review: "watchlist",
       };
       selectMode(map[id]);
     },
@@ -304,6 +342,19 @@ export function DashboardShellV3({
         selectMode("floor");
       } else if (t === "watchlist-destination") {
         navigate("watchlist");
+      } else if (t === "watchtower-desk" || t === "watchtower-event-drawer") {
+        selectMode("watchtower");
+      } else if (t === "research-desk") {
+        selectMode("research");
+      } else if (t === "discover-desk") {
+        selectMode("discover");
+      } else if (
+        t === "dilution-radar" ||
+        t === "risk-destination" ||
+        t === "market-monitor" ||
+        t === "structure-desk"
+      ) {
+        selectMode("structure");
       } else if (t === "news-feed" || t === "live-tape-chart") {
         selectMode("floor");
       } else {
@@ -429,30 +480,92 @@ export function DashboardShellV3({
           <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col">
             {deskMode === "floor" ? (
               <ModeSection id="floor">
-                <TradingFloor
-                  initialScanner={initialScanner}
-                  initialCatalysts={initialCatalysts}
-                  lookupSymbol={floorLookup}
-                  onLookupHandled={() => setFloorLookup(null)}
-                  onSymbolSelect={(symbol, catalyst) => {
-                    if (catalyst) {
-                      onFocusedCatalystChange(catalyst);
-                    } else {
-                      const id = `floor-${symbol}`;
-                      if (selectedIdRef.current !== id) {
-                        selectedIdRef.current = id;
-                        setSelected({
-                          id,
-                          symbol,
-                          headline: symbol,
-                          source: "floor",
-                          publishedAt: new Date().toISOString(),
-                        });
+                {canUseMarkets ? (
+                  <TradingFloor
+                    initialScanner={initialScanner}
+                    initialCatalysts={initialCatalysts}
+                    lookupSymbol={floorLookup}
+                    onLookupHandled={() => setFloorLookup(null)}
+                    onSymbolSelect={(symbol, catalyst) => {
+                      if (catalyst) {
+                        onFocusedCatalystChange(catalyst);
+                      } else {
+                        const id = `floor-${symbol}`;
+                        if (selectedIdRef.current !== id) {
+                          selectedIdRef.current = id;
+                          setSelected({
+                            id,
+                            symbol,
+                            headline: symbol,
+                            source: "floor",
+                            publishedAt: new Date().toISOString(),
+                          });
+                        }
                       }
-                    }
-                    setLastEventAt(new Date());
-                  }}
-                />
+                      setLastEventAt(new Date());
+                    }}
+                  />
+                ) : (
+                  <ModulePaywall
+                    title="Markets requires TrustTicker access"
+                    body="Live movers, wire, and charts unlock with a trial or paid subscription."
+                  />
+                )}
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "research" ? (
+              <ModeSection id="research">
+                <div className="max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-4">
+                  <ResearchDesk seedSymbols={initialWatchlist} />
+                </div>
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "watchtower" ? (
+              <ModeSection id="watchtower">
+                <WatchtowerDesk />
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "discover" ? (
+              <ModeSection id="discover">
+                <div className="max-w-[1680px] w-full mx-auto px-3 sm:px-4 py-4">
+                  <DiscoverDesk />
+                </div>
+              </ModeSection>
+            ) : null}
+
+            {deskMode === "structure" ? (
+              <ModeSection id="structure">
+                {canUseStructure ? (
+                  <div className="max-w-[1680px] w-full mx-auto min-h-[380px] px-3 sm:px-4 py-3">
+                    <header className="mb-4 max-w-3xl" data-guide="structure-desk">
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 mb-1">
+                        Structure Desk
+                      </p>
+                      <h2 className="text-[1.35rem] sm:text-2xl font-semibold tracking-tight text-zinc-100">
+                        Can new supply crush this move?
+                      </h2>
+                      <p className="mt-1.5 text-[13px] text-zinc-400 max-w-xl leading-relaxed">
+                        Dilution Radar reads SEC capital filings first. Use it to
+                        skip offering traps before you chase volume. Informational
+                        only.
+                      </p>
+                    </header>
+                    <Suspense fallback={<SectionFallback label="Structure" />}>
+                      <DashboardNonMonitorBody
+                        {...nonMonitorProps}
+                        destination="risk"
+                      />
+                    </Suspense>
+                  </div>
+                ) : (
+                  <ModulePaywall
+                    title="Structure requires TrustTicker access"
+                    body="Dilution Radar and capital-risk tools unlock with a trial or paid subscription."
+                  />
+                )}
               </ModeSection>
             ) : null}
 
