@@ -1,7 +1,7 @@
 /**
  * Exclusive desk modes.
  * Primary nav: Portfolio | Watchtower | Research | Discover.
- * Markets (floor), Structure, News, Scanner remain deep-link / internal.
+ * Markets (floor), Capital Risk (structure deep link), News, Scanner remain deep-link / internal.
  */
 
 export const DESK_MODE_IDS = [
@@ -70,8 +70,8 @@ export const DESK_MODE_META: Record<
     description: "Movers, wire, and chart (deep link)",
   },
   structure: {
-    label: "Structure",
-    description: "Dilution and capital risk (deep link)",
+    label: "Capital Risk",
+    description: "Financing and dilution exposure (deep link)",
   },
   news: {
     label: "News",
@@ -249,7 +249,9 @@ export function modeFromLegacyView(
   if (v === "research") return "research";
   if (v === "discover") return "discover";
   if (v === "markets" || v === "floor") return "floor";
-  if (v === "structure" || v === "risk" || v === "dilution") return "structure";
+  if (v === "structure" || v === "risk" || v === "dilution" || v === "capital" || v === "capital-risk") {
+    return "structure";
+  }
   if (v === "monitor" || v === "scanner") return "scanner";
   if (v === "feed" || v === "news") return "floor";
   if (v === "plan" || v === "review") return "watchlist";

@@ -93,7 +93,7 @@ export function DashboardPanelBar({
             className="ml-2 text-[11px] text-zinc-500"
             data-testid="desk-legacy-mode-hint"
           >
-            {deepLinkHint === "markets" ? "Markets" : "Structure"} (deep link) ·{" "}
+            {deepLinkHint === "markets" ? "Markets" : "Capital Risk"} (deep link) ·{" "}
             <button
               type="button"
               className="text-emerald-400/90 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"

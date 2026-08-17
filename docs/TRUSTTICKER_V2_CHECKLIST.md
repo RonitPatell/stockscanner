@@ -80,7 +80,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] What Changed tab *(events + compact Quarterly Delta)*
 - [x] Thesis tab *(create/edit conditions + health status)*
 - [x] Financials tab *(Quarterly Delta)*
-- [ ] Capital tab *(placeholder on hub)*
+- [x] Capital tab *(Capital Risk: liquidity, shares, financing)*
 - [ ] Insiders tab *(placeholder on hub)*
 - [ ] Ownership tab *(placeholder on hub)*
 - [ ] Filings tab *(placeholder on hub)*
@@ -128,9 +128,10 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### Capital risk & dilution
 
-- [ ] Capital Risk surface
-- [ ] Dilution monitoring (reuse `src/lib/dilution/*`)
-- [ ] Shelf registration ≠ actual dilution in UX/copy/logic
+- [x] Capital Risk surface *(ticker Capital tab + snapshot engine)*
+- [x] Dilution monitoring (reuse `src/lib/dilution/*`)
+- [x] Shelf registration ≠ actual dilution in UX/copy/logic
+- [x] CapitalRiskSnapshot with reason codes + level-change CompanyEvents
 
 ### Insiders
 
@@ -231,7 +232,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 6. CompanyEvent / What Changed engine *(classifier + persist + Watchtower UI)*
 - [x] 7. Thesis CRUD + Thesis Health evaluation *(async re-eval; no stock score)*
 - [ ] 8. Portfolio Brief
-- [ ] 9. Capital Risk / dilution surfacing
+- [x] 9. Capital Risk / dilution surfacing *(ticker Capital + deep-link desk; Structure removed from primary nav)*
 - [x] 10. Financials metric layer + Quarterly Delta UI
 - [ ] 11. Ownership (13D/13G/13F)
 - [ ] 12. Filing redlines

@@ -542,18 +542,18 @@ export function DashboardShellV3({
                   <div className="max-w-[1680px] w-full mx-auto min-h-[380px] px-3 sm:px-4 py-3">
                     <header className="mb-4 max-w-3xl" data-guide="structure-desk">
                       <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 mb-1">
-                        Structure Desk
+                        Capital Risk
                       </p>
                       <h2 className="text-[1.35rem] sm:text-2xl font-semibold tracking-tight text-zinc-100">
-                        Can new supply crush this move?
+                        How exposed is this name to financing risk?
                       </h2>
                       <p className="mt-1.5 text-[13px] text-zinc-400 max-w-xl leading-relaxed">
-                        Dilution Radar reads SEC capital filings first. Use it to
-                        skip offering traps before you chase volume. Informational
-                        only.
+                        Dilution Radar reads SEC capital filings first. Capacity is
+                        not a confirmed sale. Prefer the ticker Capital tab for
+                        per-name liquidity and share structure. Informational only.
                       </p>
                     </header>
-                    <Suspense fallback={<SectionFallback label="Structure" />}>
+                    <Suspense fallback={<SectionFallback label="Capital Risk" />}>
                       <DashboardNonMonitorBody
                         {...nonMonitorProps}
                         destination="risk"
@@ -562,7 +562,7 @@ export function DashboardShellV3({
                   </div>
                 ) : (
                   <ModulePaywall
-                    title="Structure requires TrustTicker access"
+                    title="Capital Risk requires TrustTicker access"
                     body="Dilution Radar and capital-risk tools unlock with a trial or paid subscription."
                   />
                 )}

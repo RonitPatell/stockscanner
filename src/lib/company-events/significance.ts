@@ -39,6 +39,7 @@ export const SIGNIFICANCE_REASON_CODES = [
   "MATERIAL_MARGIN_OR_RESULTS",
   "INSIDER_OPEN_MARKET_SALE",
   "ATM_PROGRAM_DETECTED",
+  "CAPITAL_RISK_LEVEL_CHANGE",
   "CONVERTIBLE_OR_WARRANT_CAPITAL",
   "DIRECTOR_OR_BOARD_CHANGE",
   // LOW
@@ -297,6 +298,15 @@ export function scoreEventSignificance(
         "MEDIUM",
         "ATM_PROGRAM_DETECTED",
         "ATM program detected — capacity/availability, not automatically a completed sale",
+        "event_type"
+      );
+      break;
+
+    case "capital_risk_level_change":
+      fire(
+        "MEDIUM",
+        "CAPITAL_RISK_LEVEL_CHANGE",
+        "Capital risk classification changed — factual posture, not a prediction of issuance",
         "event_type"
       );
       break;

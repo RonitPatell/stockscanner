@@ -96,6 +96,7 @@ export const COMPANY_EVENT_TYPES = [
   "effective_registration",
   "offering_priced",
   "dilution_capacity_change",
+  "capital_risk_level_change",
   "warrant_exercise_window",
   // —— Insider ——
   "insider_purchase",

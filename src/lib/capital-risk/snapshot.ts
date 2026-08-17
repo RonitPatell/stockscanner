@@ -1,152 +1,152 @@
 /**
- * CapitalRiskSnapshot helpers — point-in-time rollup from DilutionInstrument rows.
- * Shelf capacity ≠ confirmed dilution. Status is factual capacity posture only.
+ * Persist CapitalRiskSnapshot from full evaluation (instruments + metrics).
  */
 
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma.ts";
-import type { CapitalRiskStatusLevel } from "../thesis/types.ts";
 import { scheduleThesisHealthForSymbol } from "../thesis/health/schedule.ts";
+import {
+  buildCapitalRiskFromInstruments,
+  evaluateCapitalRisk,
+} from "./evaluate.ts";
+import { emitCapitalRiskLevelChangeEvent } from "./events.ts";
+import type { CapitalRiskReport } from "./types.ts";
+import { CAPITAL_RISK_ENGINE_VERSION } from "./types.ts";
 
-export type CapitalRiskSnapshotBuild = {
+export { buildCapitalRiskFromInstruments };
+
+function fingerprintFor(opts: {
   symbol: string;
-  status: CapitalRiskStatusLevel;
-  summary: string;
-  metricsJson: Record<string, unknown>;
+  status: string;
+  reasonCodes: string[];
   instrumentIds: string[];
-  asOf: Date;
-  cik: string | null;
-};
-
-const ELEVATED_TYPES = new Set([
-  "ATM_PROGRAM",
-  "REGISTERED_DIRECT",
-  "EQUITY_PURCHASE_AGREEMENT",
-  "CONVERTIBLE_NOTE",
-  "CONVERTIBLE_PREFERRED",
-]);
-
-const MODERATE_TYPES = new Set([
-  "S3_SHELF",
-  "S1_REGISTRATION",
-  "PROSPECTUS_424B5",
-  "WARRANT",
-  "EFFECTIVE_REGISTRATION",
-]);
-
-/**
- * Pure rollup from instrument rows (tests + builders).
- */
-export function buildCapitalRiskFromInstruments(opts: {
-  symbol: string;
-  instruments: Array<{
-    id: string;
-    instrumentType: string;
-    status: string;
-    potentialDilutionPct: number | null;
-    estimateLabel: string;
-    formType: string | null;
-    cik: string | null;
-  }>;
-  asOf?: Date;
-}): CapitalRiskSnapshotBuild {
-  const asOf = opts.asOf ?? new Date();
-  const active = opts.instruments.filter((i) => i.status === "active");
-  const instrumentIds = active.map((i) => i.id);
-
-  let status: CapitalRiskStatusLevel = "unknown";
-  if (opts.instruments.length === 0) {
-    status = "low";
-  } else if (active.length === 0) {
-    status = "low";
-  } else if (active.some((i) => ELEVATED_TYPES.has(i.instrumentType))) {
-    status = "elevated";
-  } else if (active.some((i) => MODERATE_TYPES.has(i.instrumentType))) {
-    status = "moderate";
-  } else {
-    status = "moderate";
-  }
-
-  const types = [...new Set(active.map((i) => i.instrumentType))];
-  const summary =
-    active.length === 0
-      ? "No active capital instruments on file"
-      : `Active capital instruments: ${types.join(", ")} (${active.length}). Shelf/registration capacity is not a confirmed sale.`;
-
-  const cik = opts.instruments.find((i) => i.cik)?.cik ?? null;
-
-  return {
-    symbol: opts.symbol.trim().toUpperCase(),
-    status,
-    summary,
-    metricsJson: {
-      activeCount: active.length,
-      instrumentTypes: types,
-      maxPotentialDilutionPct: active.reduce<number | null>((acc, i) => {
-        if (i.potentialDilutionPct == null) return acc;
-        if (acc == null) return i.potentialDilutionPct;
-        return Math.max(acc, i.potentialDilutionPct);
-      }, null),
-    },
-    instrumentIds,
-    asOf,
-    cik,
-  };
-}
-
-function fingerprintFor(build: CapitalRiskSnapshotBuild): string {
+  asOfHour: string;
+}): string {
   const payload = [
-    build.symbol,
-    build.status,
-    build.asOf.toISOString().slice(0, 13), // hour bucket — avoid spam
-    [...build.instrumentIds].sort().join(","),
-    build.summary,
+    opts.symbol,
+    opts.status,
+    opts.asOfHour,
+    [...opts.reasonCodes].sort().join(","),
+    [...opts.instrumentIds].sort().join(","),
+    CAPITAL_RISK_ENGINE_VERSION,
   ].join("|");
   return createHash("sha256").update(payload).digest("hex").slice(0, 40);
 }
 
+async function loadInputs(symbol: string) {
+  const sym = symbol.trim().toUpperCase();
+  const [instruments, observations, conflicts] = await Promise.all([
+    prisma.dilutionInstrument.findMany({
+      where: { symbol: sym },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 80,
+      select: {
+        id: true,
+        instrumentType: true,
+        status: true,
+        potentialDilutionPct: true,
+        estimateLabel: true,
+        formType: true,
+        cik: true,
+        filingDate: true,
+        createdAt: true,
+        sourceUrl: true,
+        accessionNumber: true,
+        capacityKind: true,
+        confidence: true,
+        conflictNote: true,
+        needsManualReview: true,
+      },
+    }),
+    prisma.metricObservation.findMany({
+      where: {
+        symbol: sym,
+        metricKey: {
+          in: [
+            "cash",
+            "operating_cash_flow",
+            "shares_outstanding",
+            "diluted_shares",
+          ],
+        },
+      },
+      orderBy: [{ periodEnd: "desc" }],
+      take: 120,
+      select: {
+        metricKey: true,
+        value: true,
+        periodStart: true,
+        periodEnd: true,
+        fiscalYear: true,
+        fiscalPeriod: true,
+        sourceUrl: true,
+        filedAt: true,
+        fingerprint: true,
+      },
+    }),
+    prisma.dilutionConflict.count({
+      where: { symbol: sym, resolved: false },
+    }),
+  ]);
+
+  return { instruments, observations, hasConflicts: conflicts > 0 };
+}
+
 /**
- * Upsert latest capital-risk snapshot for a symbol from DilutionInstrument rows.
- * Schedules Thesis Health when the rollup status/fingerprint changes.
+ * Build + persist CapitalRiskSnapshot. Emits CompanyEvent on status change.
  */
 export async function refreshCapitalRiskSnapshotForSymbol(
   symbol: string,
-  opts?: { scheduleHealth?: boolean }
-): Promise<{ snapshotId: string; status: string; changed: boolean } | null> {
+  opts?: { scheduleHealth?: boolean; emitEvent?: boolean }
+): Promise<{
+  snapshotId: string;
+  status: string;
+  changed: boolean;
+  report: CapitalRiskReport;
+} | null> {
   const sym = symbol.trim().toUpperCase();
   if (!sym) return null;
 
-  const instruments = await prisma.dilutionInstrument.findMany({
-    where: { symbol: sym },
-    orderBy: [{ updatedAt: "desc" }],
-    take: 80,
-    select: {
-      id: true,
-      instrumentType: true,
-      status: true,
-      potentialDilutionPct: true,
-      estimateLabel: true,
-      formType: true,
-      cik: true,
-    },
-  });
-
-  const build = buildCapitalRiskFromInstruments({
+  const { instruments, observations, hasConflicts } = await loadInputs(sym);
+  const evaluated = evaluateCapitalRisk({
     symbol: sym,
     instruments,
+    observations,
+    hasInstrumentConflicts: hasConflicts,
   });
-  const fingerprint = fingerprintFor(build);
+
+  const asOf = new Date(evaluated.asOf);
+  const fp = fingerprintFor({
+    symbol: sym,
+    status: evaluated.status,
+    reasonCodes: evaluated.reasonCodes,
+    instrumentIds: evaluated.instrumentIds,
+    asOfHour: asOf.toISOString().slice(0, 13),
+  });
 
   const existing = await prisma.capitalRiskSnapshot.findUnique({
-    where: { fingerprint },
+    where: { fingerprint: fp },
     select: { id: true, status: true },
   });
+
+  const metricsJson = {
+    version: evaluated.version,
+    reasonCodes: evaluated.reasonCodes,
+    reasons: evaluated.reasons,
+    liquidity: evaluated.liquidity,
+    shareStructure: evaluated.shareStructure,
+    statusLabel: evaluated.statusLabel,
+  };
+
+  const { cik: _cik, ...reportBase } = evaluated;
+
   if (existing) {
     return {
       snapshotId: existing.id,
       status: existing.status,
       changed: false,
+      report: { ...reportBase, snapshotId: existing.id },
     };
   }
 
@@ -158,22 +158,64 @@ export async function refreshCapitalRiskSnapshotForSymbol(
 
   const row = await prisma.capitalRiskSnapshot.create({
     data: {
-      symbol: build.symbol,
-      cik: build.cik,
-      asOf: build.asOf,
-      status: build.status,
-      summary: build.summary,
-      metricsJson: build.metricsJson as Prisma.InputJsonValue,
-      instrumentIds: build.instrumentIds,
-      fingerprint,
+      symbol: evaluated.symbol,
+      cik: evaluated.cik,
+      asOf,
+      status: evaluated.status,
+      summary: evaluated.summary,
+      metricsJson: metricsJson as Prisma.InputJsonValue,
+      instrumentIds: evaluated.instrumentIds,
+      fingerprint: fp,
     },
     select: { id: true, status: true },
   });
 
   const changed = !prev || prev.status !== row.status;
+
+  if (changed && opts?.emitEvent !== false) {
+    await emitCapitalRiskLevelChangeEvent({
+      symbol: sym,
+      cik: evaluated.cik,
+      previousStatus: prev?.status ?? null,
+      nextStatus: evaluated.status,
+      summary: evaluated.summary,
+      reasonCodes: evaluated.reasonCodes,
+      snapshotId: row.id,
+      asOf,
+    }).catch(() => {});
+  }
+
   if (changed && opts?.scheduleHealth !== false) {
     scheduleThesisHealthForSymbol(sym, "capital_risk_snapshot_changed");
   }
 
-  return { snapshotId: row.id, status: row.status, changed: true };
+  return {
+    snapshotId: row.id,
+    status: row.status,
+    changed: true,
+    report: { ...reportBase, snapshotId: row.id },
+  };
+}
+
+/** Load Capital Risk report for a symbol (live evaluation + latest snapshot id). */
+export async function getCapitalRiskReportForSymbol(
+  symbol: string
+): Promise<CapitalRiskReport> {
+  const sym = symbol.trim().toUpperCase();
+  const { instruments, observations, hasConflicts } = await loadInputs(sym);
+  const evaluated = evaluateCapitalRisk({
+    symbol: sym,
+    instruments,
+    observations,
+    hasInstrumentConflicts: hasConflicts,
+  });
+
+  const latest = await prisma.capitalRiskSnapshot.findFirst({
+    where: { symbol: sym },
+    orderBy: [{ asOf: "desc" }],
+    select: { id: true },
+  });
+
+  const { cik: _cik, ...reportBase } = evaluated;
+  return { ...reportBase, snapshotId: latest?.id ?? null };
 }

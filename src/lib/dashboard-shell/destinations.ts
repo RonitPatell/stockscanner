@@ -40,9 +40,9 @@ export const DASHBOARD_DESTINATIONS: Array<{
   },
   {
     id: "risk",
-    label: "Risk",
-    href: "/dashboard?view=risk",
-    description: "Dilution, offerings, halts, structural risk",
+    label: "Capital Risk",
+    href: "/dashboard?view=capital-risk",
+    description: "Financing exposure and dilution capacity (deep link)",
   },
   {
     id: "review",
@@ -70,6 +70,13 @@ export function destinationFromSearchParams(
   const view = params.get("view")?.toLowerCase();
   if (view === "monitor") {
     return monitorOn ? "monitor" : "feed";
+  }
+  if (view === "portfolio" || view === "watchlist") return "watchlist";
+  if (view === "research") return "watchlist"; // Research is desk-mode; deep-link seeds Portfolio then client opens Research via modeFromLegacyView
+  if (view === "markets" || view === "floor" || view === "news" || view === "feed")
+    return "feed";
+  if (view === "structure" || view === "risk" || view === "dilution" || view === "capital" || view === "capital-risk") {
+    return "risk";
   }
   if (view && VALID.has(view as DashboardDestination) && view !== "monitor") {
     return view as DashboardDestination;

@@ -52,6 +52,7 @@ const REASON_LABELS: Record<string, string> = {
   MATERIAL_MARGIN_OR_RESULTS: "Results / margin disclosure",
   INSIDER_OPEN_MARKET_SALE: "Insider open-market sale",
   ATM_PROGRAM_DETECTED: "ATM program",
+  CAPITAL_RISK_LEVEL_CHANGE: "Capital risk level change",
   CONVERTIBLE_OR_WARRANT_CAPITAL: "Convertible / warrant capital",
   DIRECTOR_OR_BOARD_CHANGE: "Director / board change",
   ROUTINE_PERIODIC_FILING: "Routine periodic filing",

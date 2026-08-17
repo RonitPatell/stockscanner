@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 61;
+export const PLATFORM_GUIDE_VERSION = 62;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -34,7 +34,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "secondary-nav",
     target: "dashboard-secondary-nav",
     title: "View switcher",
-    body: "Portfolio · Watchtower · Research · Discover. Markets and Structure remain available via deep links for power users.",
+    body: "Portfolio · Watchtower · Research · Discover. Markets and Capital Risk remain available via deep links for power users.",
   },
   {
     id: "portfolio",
@@ -52,7 +52,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "research-desk",
     target: "research-desk",
     title: "Research",
-    body: "Look up any ticker. Opens the hub with Overview, What Changed, Thesis (conditions you monitor), Financials (Quarterly Delta), and more tabs. Form 4 context, EDGAR links, and dilution badges stay on Overview.",
+    body: "Look up any ticker. Opens the hub with Overview, What Changed, Thesis, Financials, and Capital Risk (liquidity, share structure, financing events). Form 4 context and EDGAR links stay on Overview.",
   },
   {
     id: "discover-desk",
@@ -69,14 +69,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "structure-desk",
     target: "structure-desk",
-    title: "Structure Desk",
-    body: "Deep-link capital risk: can new share supply crush this move? Dilution Radar reads SEC capital filings with evidence links. Open with ?view=structure.",
+    title: "Capital Risk desk",
+    body: "Deep-link desk for financing exposure and Dilution Radar. Open with ?view=structure or ?view=capital-risk. Prefer the ticker Capital tab for per-name liquidity, shares, and financing events.",
   },
   {
     id: "dilution-radar",
     target: "dilution-radar",
     title: "Dilution Radar",
-    body: "Live capital-structure alerts from EDGAR. Open the filing. Skip names that look like supply traps.",
+    body: "Live capital-structure alerts from EDGAR inside Capital Risk. Open the filing. Capacity is not a confirmed sale.",
     requiresExtras: true,
   },
   {

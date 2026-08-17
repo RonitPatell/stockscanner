@@ -5,11 +5,14 @@ import { ExternalLink } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { CapitalTab } from "@/components/ticker/CapitalTab";
 import { FinancialsTab } from "@/components/ticker/FinancialsTab";
 import { TickerPlaceholderTab } from "@/components/ticker/TickerPlaceholderTab";
 import { TickerWorkspaceTabs } from "@/components/ticker/TickerWorkspaceTabs";
 import { ThesisPanel } from "@/components/ticker/thesis/ThesisPanel";
 import { WhatChangedTab } from "@/components/ticker/WhatChangedTab";
+import { getCapitalRiskReportForSymbol } from "@/lib/capital-risk/snapshot";
+import { getDilutionTimeline } from "@/lib/dilution/timeline";
 import { parseTickerTab } from "@/lib/ticker-tabs";
 import { getTickerHubBundle } from "@/lib/ticker-hub";
 import { getQuarterlyDeltaForSymbol } from "@/lib/metrics/get-quarterly-delta";
@@ -45,11 +48,14 @@ export default async function TickerPage({ params, searchParams }: Props) {
 
   const tab = parseTickerTab(tabRaw);
 
-  const [hub, report, events] = await Promise.all([
-    getTickerHubBundle(sym),
-    getQuarterlyDeltaForSymbol(sym).catch(() => null),
-    getTickerWhatChangedEvents(sym).catch(() => []),
-  ]);
+  const [hub, report, events, capitalReport, dilutionTimeline] =
+    await Promise.all([
+      getTickerHubBundle(sym),
+      getQuarterlyDeltaForSymbol(sym).catch(() => null),
+      getTickerWhatChangedEvents(sym).catch(() => []),
+      getCapitalRiskReportForSymbol(sym).catch(() => null),
+      getDilutionTimeline(sym, 40).catch(() => []),
+    ]);
 
   const emptyReport = {
     symbol: sym,
@@ -93,19 +99,19 @@ export default async function TickerPage({ params, searchParams }: Props) {
                 className="text-[11px] font-medium uppercase tracking-wide px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200"
                 data-testid="dilution-badge"
               >
-                Structure risk
+                Capital risk
                 {hub.dilution.count > 0 ? ` · ${hub.dilution.count}` : ""}
               </span>
             ) : (
               <span className="text-[11px] text-zinc-500 border border-zinc-800 px-2 py-1 rounded">
-                No recent dilution instruments
+                No recent financing instruments
               </span>
             )}
           </h1>
           <p className="text-zinc-400 text-sm leading-relaxed max-w-xl">
             Catalysts, Form 4 insider filings, financial period deltas, and
-            capital-structure signals. Free to browse. Plus adds alerts. Pro
-            unlocks Structure Desk.
+            Capital Risk (liquidity, shares, financing). Free to browse. Plus
+            adds alerts. Pro unlocks Capital Risk desk and Markets.
           </p>
           {hub.dilution.latestWhy ? (
             <p className="mt-3 text-[12px] text-amber-200/90 border border-amber-500/20 rounded-lg px-3 py-2 bg-amber-500/5">
@@ -137,11 +143,15 @@ export default async function TickerPage({ params, searchParams }: Props) {
         ) : null}
 
         {tab === "capital" ? (
-          <TickerPlaceholderTab
-            testId="ticker-capital"
-            title="Capital"
-            body="Capital structure and dilution capacity will live here. For now, check Structure Desk and dilution badges on Overview."
-          />
+          capitalReport ? (
+            <CapitalTab report={capitalReport} timeline={dilutionTimeline} />
+          ) : (
+            <TickerPlaceholderTab
+              testId="ticker-capital"
+              title="Capital Risk"
+              body="Capital risk data could not be loaded for this symbol right now."
+            />
+          )
         ) : null}
 
         {tab === "insiders" ? (
