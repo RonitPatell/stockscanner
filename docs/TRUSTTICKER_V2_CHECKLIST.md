@@ -78,13 +78,13 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 - [x] Overview tab *(ticker hub default)*
 - [x] What Changed tab *(events + compact Quarterly Delta)*
-- [ ] Thesis tab
+- [x] Thesis tab *(create/edit conditions + health status)*
 - [x] Financials tab *(Quarterly Delta)*
-- [ ] Capital tab
-- [ ] Insiders tab
-- [ ] Ownership tab
-- [ ] Filings tab
-- [ ] Timeline tab
+- [ ] Capital tab *(placeholder on hub)*
+- [ ] Insiders tab *(placeholder on hub)*
+- [ ] Ownership tab *(placeholder on hub)*
+- [ ] Filings tab *(placeholder on hub)*
+- [ ] Timeline tab *(placeholder on hub)*
 - [ ] Public research-preview vs entitled full depth defined and enforced
 - [ ] Source/evidence links retained where practical
 - [ ] Unknown/Unavailable — never fabricate zeros

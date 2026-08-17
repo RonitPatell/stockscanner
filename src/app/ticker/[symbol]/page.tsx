@@ -6,11 +6,11 @@ import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { FinancialsTab } from "@/components/ticker/FinancialsTab";
-import {
-  parseTickerTab,
-  TickerWorkspaceTabs,
-} from "@/components/ticker/TickerWorkspaceTabs";
+import { TickerPlaceholderTab } from "@/components/ticker/TickerPlaceholderTab";
+import { TickerWorkspaceTabs } from "@/components/ticker/TickerWorkspaceTabs";
+import { ThesisPanel } from "@/components/ticker/thesis/ThesisPanel";
 import { WhatChangedTab } from "@/components/ticker/WhatChangedTab";
+import { parseTickerTab } from "@/lib/ticker-tabs";
 import { getTickerHubBundle } from "@/lib/ticker-hub";
 import { getQuarterlyDeltaForSymbol } from "@/lib/metrics/get-quarterly-delta";
 import { getTickerWhatChangedEvents } from "@/lib/ticker-what-changed";
@@ -126,12 +126,54 @@ export default async function TickerPage({ params, searchParams }: Props) {
 
         <TickerWorkspaceTabs symbol={sym} active={tab} />
 
+        {tab === "thesis" ? <ThesisPanel symbol={sym} /> : null}
+
         {tab === "financials" ? (
           <FinancialsTab report={deltaReport} />
         ) : null}
 
         {tab === "what-changed" ? (
           <WhatChangedTab hub={hub} report={deltaReport} events={events} />
+        ) : null}
+
+        {tab === "capital" ? (
+          <TickerPlaceholderTab
+            testId="ticker-capital"
+            title="Capital"
+            body="Capital structure and dilution capacity will live here. For now, check Structure Desk and dilution badges on Overview."
+          />
+        ) : null}
+
+        {tab === "insiders" ? (
+          <TickerPlaceholderTab
+            testId="ticker-insiders"
+            title="Insiders"
+            body="Structured Form 4 context is rolling out. Recent Form 4 headlines are on Overview."
+          />
+        ) : null}
+
+        {tab === "ownership" ? (
+          <TickerPlaceholderTab
+            testId="ticker-ownership"
+            title="Ownership"
+            body="13D/13G and 13F ownership tracking will appear here."
+          />
+        ) : null}
+
+        {tab === "filings" ? (
+          <TickerPlaceholderTab
+            testId="ticker-filings-tab"
+            title="Filings"
+            body="A dedicated filings timeline is next. Recent filings and catalysts remain on Overview and What Changed."
+          />
+        ) : null}
+
+        {tab === "timeline" ? (
+          <TickerPlaceholderTab
+            testId="ticker-timeline"
+            title="Timeline"
+            body="A unified company timeline across filings, financials, and capital events is coming soon."
+          />
         ) : null}
 
         {tab === "overview" ? (

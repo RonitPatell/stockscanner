@@ -81,9 +81,10 @@ All require `requireTrustTickerAccess`. **Never** accept client `userId`.
 | `GET`/`POST` | `/api/thesis/[id]/health` |
 | cron | `/api/cron/thesis-health` |
 
-## Code
+## UI
 
-- `src/lib/thesis/` — CRUD + types
-- `src/lib/thesis/health/` — evaluate / persist / schedule
-- `src/lib/capital-risk/snapshot.ts` — CapitalRiskSnapshot rollup
-- Tests: `tests/thesis-monitoring.test.mts`, `tests/thesis-health.test.mts`
+Ticker hub `?tab=thesis` — `ThesisPanel` with plain-language condition builder (no raw enums).
+Status copy: Intact / Needs review / Unknown / Manual.
+Summary: `N intact · N needs review · N unknown`.
+
+E2E: `e2e/thesis.spec.ts` + `/e2e/thesis-harness`.
