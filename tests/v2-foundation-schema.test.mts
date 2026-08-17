@@ -61,8 +61,10 @@ test("fingerprint is stable for identical inputs", () => {
 });
 
 test("thesis condition types reject advice-shaped ids", () => {
-  assert.ok(THESIS_CONDITION_TYPES.includes("no_new_shelf"));
+  assert.ok(THESIS_CONDITION_TYPES.includes("NO_EVENT_TYPE"));
+  assert.ok(THESIS_CONDITION_TYPES.includes("CUSTOM_MANUAL"));
   assert.equal(isThesisConditionType("recommend_buy"), false);
+  assert.equal(isThesisConditionType("no_new_shelf"), false);
 });
 
 test("normalizePortfolioSymbol accepts A–Z 1–5 only", () => {
@@ -213,9 +215,10 @@ test("v2 foundation db: idempotent events + portfolio join", async (t) => {
         conditions: {
           create: [
             {
-              conditionType: "no_new_shelf",
+              conditionType: "NO_EVENT_TYPE",
               label: "No new shelf registration",
               polarity: "invalidate_if",
+              paramsJson: { eventType: "shelf_registration" },
             },
           ],
         },
