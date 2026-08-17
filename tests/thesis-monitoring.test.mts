@@ -145,6 +145,7 @@ test("thesis API routes gate entitlement and avoid client userId", () => {
   const files = [
     "route.ts",
     "[id]/route.ts",
+    "[id]/health/route.ts",
     "[id]/conditions/route.ts",
     "[id]/conditions/[conditionId]/route.ts",
     "[id]/conditions/reorder/route.ts",

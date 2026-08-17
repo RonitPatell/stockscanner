@@ -109,7 +109,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 ### Thesis
 
 - [x] User-defined investment thesis conditions
-- [ ] Thesis Health evaluation
+- [x] Thesis Health evaluation
 - [x] Thesis CRUD scoped to session user
 - [ ] Alerts on thesis breaches (as designed)
 
@@ -229,7 +229,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] 4. Nav IA: Portfolio / Watchtower / Research / Discover + guide bump
 - [x] 5. Company workspace tab shell *(Overview / What Changed / Financials on ticker hub)*
 - [x] 6. CompanyEvent / What Changed engine *(classifier + persist + Watchtower UI)*
-- [x] 7. Thesis CRUD backend *(Thesis Health evaluation later)*
+- [x] 7. Thesis CRUD + Thesis Health evaluation *(async re-eval; no stock score)*
 - [ ] 8. Portfolio Brief
 - [ ] 9. Capital Risk / dilution surfacing
 - [x] 10. Financials metric layer + Quarterly Delta UI

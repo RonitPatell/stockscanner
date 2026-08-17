@@ -83,5 +83,28 @@ export async function persistCompanyEvents(
     upserted += 1;
   }
 
+  if (upserted > 0) {
+    notifyThesisHealthAfterCompanyEvents(events.map((e) => e.symbol));
+  }
+
   return { upserted, ids };
+}
+
+/** Schedule Thesis Health after company events land (async — not on UI path). */
+export function notifyThesisHealthAfterCompanyEvents(
+  symbols: string[]
+): void {
+  const unique = [
+    ...new Set(
+      symbols.map((s) => s.trim().toUpperCase()).filter(Boolean)
+    ),
+  ];
+  if (unique.length === 0) return;
+  void import("../thesis/health/schedule.ts")
+    .then(({ scheduleThesisHealthForSymbol }) => {
+      for (const sym of unique) {
+        scheduleThesisHealthForSymbol(sym, "company_event");
+      }
+    })
+    .catch(() => {});
 }

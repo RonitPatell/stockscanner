@@ -103,6 +103,18 @@ export function isAutomatedConditionType(
   return t !== "CUSTOM_MANUAL";
 }
 
+/** Evidence attached to an automated Thesis Health result. */
+export type ThesisConditionEvidenceDto = {
+  sourceType: string;
+  sourceUrl?: string | null;
+  sourceId?: string | null;
+  accession?: string | null;
+  metricFingerprint?: string | null;
+  companyEventId?: string | null;
+  capitalRiskSnapshotId?: string | null;
+  label: string;
+};
+
 /**
  * Display / API evaluation wrapper.
  * Manual conditions never claim an automated PASS/WARN/FAIL/UNKNOWN.
@@ -110,11 +122,28 @@ export function isAutomatedConditionType(
 export type ThesisConditionEvaluationDto =
   | {
       mode: "automated";
-      /** Until Thesis Health engine runs, defaults to UNKNOWN. */
+      /** Defaults to UNKNOWN until Thesis Health persists a result. */
       state: ThesisConditionEvalState;
+      explanation?: string;
+      observationDate?: string | null;
+      actualValue?: number | null;
+      threshold?: number | null;
+      evidence?: ThesisConditionEvidenceDto;
+      evaluatedAt?: string;
     }
   | {
       mode: "manual";
       /** Qualitative — platform cannot verify. */
       state: null;
+      explanation?: string;
+      evidence?: ThesisConditionEvidenceDto;
+      evaluatedAt?: string;
     };
+
+export type ThesisHealthSummaryDto = {
+  passing: number;
+  warning: number;
+  failed: number;
+  unknown: number;
+  manual: number;
+};

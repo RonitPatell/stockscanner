@@ -12,11 +12,15 @@ import type {
   UpdateConditionBody,
   UpdateThesisBody,
 } from "./schemas.ts";
+import { getLatestThesisEvaluation } from "./health/persist.ts";
+import { parseHealthResultsJson } from "./health/parse-results.ts";
+import { scheduleThesisHealthForThesis } from "./health/schedule.ts";
 import {
   isAutomatedConditionType,
   type ThesisConditionEvaluationDto,
   type ThesisConditionType,
   type ThesisHealthStatus,
+  type ThesisHealthSummaryDto,
   type ThesisStatus,
 } from "./types.ts";
 
@@ -41,6 +45,8 @@ export type ThesisDto = {
   status: ThesisStatus;
   healthStatus: ThesisHealthStatus;
   lastEvaluatedAt: string | null;
+  /** Counts from latest persisted evaluation — not a stock score. */
+  healthSummary: ThesisHealthSummaryDto | null;
   createdAt: string;
   updatedAt: string;
   conditions: ThesisConditionDto[];
@@ -78,16 +84,29 @@ function asRecord(v: unknown): Record<string, unknown> {
 }
 
 function evaluationForType(
-  conditionType: string
+  conditionType: string,
+  overlay?: ThesisConditionEvaluationDto
 ): ThesisConditionEvaluationDto {
+  if (overlay) return overlay;
   if (conditionType === "CUSTOM_MANUAL") {
-    return { mode: "manual", state: null };
+    return {
+      mode: "manual",
+      state: null,
+      explanation: "Manual condition — not auto-evaluated",
+    };
   }
-  // Health engine not wired in this checkpoint — honest UNKNOWN.
-  return { mode: "automated", state: "UNKNOWN" };
+  return {
+    mode: "automated",
+    state: "UNKNOWN",
+    explanation: "Not yet evaluated",
+    evidence: { sourceType: "none", label: "Awaiting Thesis Health evaluation" },
+  };
 }
 
-function conditionToDto(row: ConditionRow): ThesisConditionDto {
+function conditionToDto(
+  row: ConditionRow,
+  overlay?: ThesisConditionEvaluationDto
+): ThesisConditionDto {
   const conditionType = row.conditionType as ThesisConditionType;
   return {
     id: row.id,
@@ -96,16 +115,26 @@ function conditionToDto(row: ConditionRow): ThesisConditionDto {
     polarity: row.polarity,
     params: asRecord(row.paramsJson),
     sortOrder: row.sortOrder,
-    evaluation: evaluationForType(row.conditionType),
+    evaluation: evaluationForType(row.conditionType, overlay),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function thesisToDto(row: ThesisRow): ThesisDto {
+function thesisToDto(
+  row: ThesisRow,
+  health?: {
+    byConditionId: Map<string, ThesisConditionEvaluationDto>;
+    summary: ThesisHealthSummaryDto | null;
+  }
+): ThesisDto {
   const conditions = [...row.conditions]
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
-    .map(conditionToDto);
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder ||
+        a.createdAt.getTime() - b.createdAt.getTime()
+    )
+    .map((c) => conditionToDto(c, health?.byConditionId.get(c.id)));
   return {
     id: row.id,
     symbol: row.symbol,
@@ -114,10 +143,21 @@ function thesisToDto(row: ThesisRow): ThesisDto {
     status: row.status as ThesisStatus,
     healthStatus: row.healthStatus as ThesisHealthStatus,
     lastEvaluatedAt: row.lastEvaluatedAt?.toISOString() ?? null,
+    healthSummary: health?.summary ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     conditions,
   };
+}
+
+async function thesisToDtoWithHealth(row: ThesisRow): Promise<ThesisDto> {
+  const latest = await getLatestThesisEvaluation(row.id);
+  if (!latest) return thesisToDto(row);
+  const parsed = parseHealthResultsJson(latest.resultsJson);
+  return thesisToDto(row, {
+    byConditionId: parsed.byConditionId,
+    summary: parsed.summary,
+  });
 }
 
 const THESIS_INCLUDE = {
@@ -168,7 +208,7 @@ export async function listThesesForUser(
     orderBy: [{ updatedAt: "desc" }],
     include: THESIS_INCLUDE,
   });
-  return rows.map(thesisToDto);
+  return Promise.all(rows.map((row) => thesisToDtoWithHealth(row)));
 }
 
 export async function getThesisForUser(
@@ -179,7 +219,7 @@ export async function getThesisForUser(
   if (!row) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
-  return { ok: true, thesis: thesisToDto(row) };
+  return { ok: true, thesis: await thesisToDtoWithHealth(row) };
 }
 
 export async function getThesisBySymbolForUser(
@@ -192,7 +232,7 @@ export async function getThesisBySymbolForUser(
     where: { userId_symbol: { userId, symbol } },
     include: THESIS_INCLUDE,
   });
-  return row ? thesisToDto(row) : null;
+  return row ? thesisToDtoWithHealth(row) : null;
 }
 
 function resolveNote(
@@ -264,7 +304,8 @@ export async function createThesisForUser(
           include: THESIS_INCLUDE,
         });
       });
-      return { ok: true, thesis: thesisToDto(row) };
+      scheduleThesisHealthForThesis(row.id, "thesis_created");
+      return { ok: true, thesis: await thesisToDtoWithHealth(row) };
     }
 
     const row = await prisma.investmentThesis.create({
@@ -289,7 +330,8 @@ export async function createThesisForUser(
       },
       include: THESIS_INCLUDE,
     });
-    return { ok: true, thesis: thesisToDto(row) };
+    scheduleThesisHealthForThesis(row.id, "thesis_created");
+    return { ok: true, thesis: await thesisToDtoWithHealth(row) };
   } catch (e) {
     const code =
       e && typeof e === "object" && "code" in e
@@ -329,7 +371,7 @@ export async function updateThesisForUser(
     },
     include: THESIS_INCLUDE,
   });
-  return { ok: true, thesis: thesisToDto(row) };
+  return { ok: true, thesis: await thesisToDtoWithHealth(row) };
 }
 
 export async function deleteThesisForUser(
@@ -390,9 +432,10 @@ export async function addConditionForUser(
   if (!row) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
+  scheduleThesisHealthForThesis(thesis.id, "condition_added");
   return {
     ok: true,
-    thesis: thesisToDto(row),
+    thesis: await thesisToDtoWithHealth(row),
     conditionId: created.id,
   };
 }
@@ -453,7 +496,12 @@ export async function updateConditionForUser(
   if (!row) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
-  return { ok: true, thesis: thesisToDto(row), conditionId: existing.id };
+  scheduleThesisHealthForThesis(thesis.id, "condition_edited");
+  return {
+    ok: true,
+    thesis: await thesisToDtoWithHealth(row),
+    conditionId: existing.id,
+  };
 }
 
 export async function deleteConditionForUser(
@@ -498,7 +546,12 @@ export async function deleteConditionForUser(
   if (!row) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
-  return { ok: true, thesis: thesisToDto(row), conditionId: existing.id };
+  scheduleThesisHealthForThesis(thesis.id, "condition_deleted");
+  return {
+    ok: true,
+    thesis: await thesisToDtoWithHealth(row),
+    conditionId: existing.id,
+  };
 }
 
 export async function reorderConditionsForUser(
@@ -556,5 +609,5 @@ export async function reorderConditionsForUser(
   if (!row) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
-  return { ok: true, thesis: thesisToDto(row) };
+  return { ok: true, thesis: await thesisToDtoWithHealth(row) };
 }

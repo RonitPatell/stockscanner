@@ -65,5 +65,18 @@ export async function persistMetricObservations(
     upserted += 1;
   }
 
+  if (upserted > 0) {
+    const symbols = [
+      ...new Set(rows.map((r) => r.symbol.trim().toUpperCase()).filter(Boolean)),
+    ];
+    void import("../thesis/health/schedule.ts")
+      .then(({ scheduleThesisHealthForSymbol }) => {
+        for (const sym of symbols) {
+          scheduleThesisHealthForSymbol(sym, "metric_observation");
+        }
+      })
+      .catch(() => {});
+  }
+
   return { upserted, ids };
 }

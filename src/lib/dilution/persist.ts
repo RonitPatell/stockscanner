@@ -89,6 +89,11 @@ export async function persistDilutionExtractions(
   }
 
   await flagConflicts(input.symbol.toUpperCase()).catch(() => {});
+  void import("../capital-risk/snapshot.ts")
+    .then(({ refreshCapitalRiskSnapshotForSymbol }) =>
+      refreshCapitalRiskSnapshotForSymbol(input.symbol.toUpperCase())
+    )
+    .catch(() => {});
   return ids;
 }
 
