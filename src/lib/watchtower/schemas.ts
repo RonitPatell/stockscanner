@@ -105,11 +105,18 @@ export const watchtowerEventStateBodySchema = z
   .object({
     read: z.boolean().optional(),
     dismissed: z.boolean().optional(),
+    opened: z.boolean().optional(),
   })
   .strict()
-  .refine((b) => b.read !== undefined || b.dismissed !== undefined, {
-    message: "Provide read and/or dismissed",
-  });
+  .refine(
+    (b) =>
+      b.read !== undefined ||
+      b.dismissed !== undefined ||
+      b.opened === true,
+    {
+      message: "Provide read, dismissed, and/or opened",
+    }
+  );
 
 export type WatchtowerEventStateBody = z.infer<
   typeof watchtowerEventStateBodySchema

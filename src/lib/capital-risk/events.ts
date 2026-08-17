@@ -87,8 +87,26 @@ export async function emitCapitalRiskLevelChangeEvent(opts: {
       evidenceJson: evidenceJson as Prisma.InputJsonValue,
       occurredAt: opts.asOf,
     },
-    select: { id: true },
+    select: { id: true, fingerprint: true },
   });
+
+  void import("../monitoring-alerts/dispatch.ts")
+    .then(({ scheduleCompanyEventAlertDispatch }) => {
+      scheduleCompanyEventAlertDispatch({
+        id: row.id,
+        symbol: sym,
+        category: "capital",
+        eventType: "capital_risk_level_change",
+        title,
+        summary,
+        sourceType: "derived",
+        sourceUrl: null,
+        fingerprint: fp,
+        evidenceJson,
+        occurredAt: opts.asOf,
+      });
+    })
+    .catch(() => {});
 
   return { emitted: true, eventId: row.id };
 }

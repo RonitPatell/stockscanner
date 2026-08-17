@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import { cn } from "@/lib/utils";
 import type { ThesisConditionDto } from "@/lib/thesis/service";
 import {
@@ -94,15 +95,16 @@ export function ThesisConditionCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-[13px] sm:text-sm text-zinc-100 font-medium leading-snug">
+          <p className="text-[13px] sm:text-sm text-zinc-100 font-medium leading-snug break-words">
             {description}
           </p>
-          <span
+            <span
             className={cn(
               "inline-flex text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border",
               statusClass(status)
             )}
             data-testid="thesis-condition-status"
+            aria-label={`Status: ${userStatusLabel(status)}`}
           >
             {userStatusLabel(status)}
           </span>
@@ -110,7 +112,7 @@ export function ThesisConditionCard({
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            className="text-[11px] text-zinc-500 hover:text-zinc-200 px-1.5 py-1 disabled:opacity-40"
+            className="text-[11px] text-zinc-500 hover:text-zinc-200 h-[44px] w-[44px] inline-flex items-center justify-center disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
             disabled={busy || index === 0}
             onClick={onMoveUp}
             aria-label="Move condition up"
@@ -120,7 +122,7 @@ export function ThesisConditionCard({
           </button>
           <button
             type="button"
-            className="text-[11px] text-zinc-500 hover:text-zinc-200 px-1.5 py-1 disabled:opacity-40"
+            className="text-[11px] text-zinc-500 hover:text-zinc-200 h-[44px] w-[44px] inline-flex items-center justify-center disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded"
             disabled={busy || index >= total - 1}
             onClick={onMoveDown}
             aria-label="Move condition down"
@@ -148,16 +150,15 @@ export function ThesisConditionCard({
           <dt className="text-[10px] text-zinc-500">Source</dt>
           <dd className="text-zinc-400">
             {sourceUrl ? (
-              <a
+              <SafeExternalLink
                 href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
                 data-testid="thesis-condition-source"
+                fallback="null"
               >
                 {sourceLabel}
                 <ExternalLink className="w-3 h-3" />
-              </a>
+              </SafeExternalLink>
             ) : (
               <span data-testid="thesis-condition-source">{sourceLabel}</span>
             )}
@@ -181,7 +182,7 @@ export function ThesisConditionCard({
       <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="button"
-          className="text-[12px] px-2.5 py-1.5 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          className="text-[12px] px-2.5 py-1.5 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           disabled={busy}
           onClick={onEdit}
           data-testid="thesis-condition-edit"
@@ -190,7 +191,7 @@ export function ThesisConditionCard({
         </button>
         <button
           type="button"
-          className="text-[12px] px-2.5 py-1.5 rounded-md border border-rose-500/30 text-rose-300/90 hover:bg-rose-500/10 disabled:opacity-50"
+          className="text-[12px] px-2.5 py-1.5 rounded-md border border-rose-500/30 text-rose-300/90 hover:bg-rose-500/10 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           disabled={busy}
           onClick={onRemove}
           data-testid="thesis-condition-remove"

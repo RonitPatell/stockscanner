@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/api-guard";
+import { requireAdmin } from "@/lib/api-guard";
 import {
   FUNNEL_EVENTS,
   getCancellationReasonCounts,
@@ -8,6 +7,7 @@ import {
   getFunnelEventCounts,
   type FunnelEvent,
 } from "@/lib/analytics/track";
+import { collectRetentionMetrics } from "@/lib/analytics/retention";
 import { prisma } from "@/lib/prisma";
 
 function pct(num: number, den: number): number {
@@ -16,10 +16,8 @@ function pct(num: number, den: number): number {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.email || !isAdminEmail(session.user.email)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (gate.error) return gate.error;
 
   const day = req.nextUrl.searchParams.get("day")?.slice(0, 10) || null;
   const events = day ? await getFunnelDayCounts(day) : await getFunnelEventCounts();
@@ -57,6 +55,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const cancelReasons = await getCancellationReasonCounts();
+  const retention = await collectRetentionMetrics();
 
   return NextResponse.json({
     day: day || "all",
@@ -70,5 +69,6 @@ export async function GET(req: NextRequest) {
       activationRate: pct(usersActivated, usersTotal),
     },
     cancelReasons,
+    retention,
   });
 }

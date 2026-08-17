@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatMarketCap(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
@@ -14,7 +14,7 @@ export function formatMarketCap(value: number | null | undefined): string {
 }
 
 export function formatFloat(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
   if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
@@ -22,19 +22,20 @@ export function formatFloat(value: number | null | undefined): string {
 }
 
 export function formatPercent(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
 }
 
 export function formatPrice(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   return `$${value.toFixed(2)}`;
 }
 
 /** Stable clock format for SSR + client (avoids Node vs browser locale drift). */
 export function formatClockTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -45,9 +46,12 @@ export function formatClockTime(date: Date | string): string {
 
 export function timeAgo(date: Date | string, now: Date | number = Date.now()): string {
   const d = typeof date === "string" ? new Date(date) : date;
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "—";
   const nowMs = typeof now === "number" ? now : now.getTime();
+  if (!Number.isFinite(nowMs)) return "—";
   const seconds = Math.floor((nowMs - d.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (!Number.isFinite(seconds)) return "—";
+  if (seconds < 60) return `${Math.max(0, seconds)}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
@@ -80,10 +84,11 @@ export function getChangeColor(change: number | null | undefined): string {
 
 /** Only allow http(s) links from external feed sources (blocks javascript:/data: etc.). */
 export function safeHttpUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
+  if (!url || typeof url !== "string") return null;
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url.trim());
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (parsed.username || parsed.password) return null;
     return parsed.toString();
   } catch {
     return null;

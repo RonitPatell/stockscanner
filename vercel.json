@@ -45,6 +45,14 @@
       "schedule": "15 */3 * * *"
     },
     {
+      "path": "/api/cron/metrics",
+      "schedule": "25 */4 * * *"
+    },
+    {
+      "path": "/api/cron/hydrate",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/cron/calibration",
       "schedule": "*/5 * * * *"
     },

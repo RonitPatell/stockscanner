@@ -5,7 +5,9 @@ import { ExternalLink } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import { CapitalTab } from "@/components/ticker/CapitalTab";
+import { FilingsTab } from "@/components/ticker/FilingsTab";
 import { FinancialsTab } from "@/components/ticker/FinancialsTab";
 import { InsidersTab } from "@/components/ticker/InsidersTab";
 import { OwnershipTab } from "@/components/ticker/OwnershipTab";
@@ -15,14 +17,19 @@ import { ThesisPanel } from "@/components/ticker/thesis/ThesisPanel";
 import { WhatChangedTab } from "@/components/ticker/WhatChangedTab";
 import { getCapitalRiskReportForSymbol } from "@/lib/capital-risk/snapshot";
 import { getDilutionTimeline } from "@/lib/dilution/timeline";
+import { getFilingsReportForSymbol } from "@/lib/filings/get-report";
 import { getInsiderReportForSymbol } from "@/lib/insider/get-report";
 import { getOwnershipReportForSymbol } from "@/lib/ownership/get-report";
 import { parseTickerTab } from "@/lib/ticker-tabs";
 import { getTickerHubBundle } from "@/lib/ticker-hub";
 import { getQuarterlyDeltaForSymbol } from "@/lib/metrics/get-quarterly-delta";
-import { getTickerWhatChangedEvents } from "@/lib/ticker-what-changed";
+import {
+  getCompanyWhatChangedFeed,
+  resolveWhatChangedAccess,
+} from "@/lib/ticker-what-changed";
+import { auth } from "@/lib/auth";
 import { cn, formatPercent } from "@/lib/utils";
-import { PLUS_PRICE_MO, PRO_PRICE_MO } from "@/lib/stripe";
+import { TRUSTTICKER_MONTHLY_MO, TRUSTTICKER_TRIAL_CTA } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -52,23 +59,43 @@ export default async function TickerPage({ params, searchParams }: Props) {
 
   const tab = parseTickerTab(tabRaw);
 
+  const session = await auth();
+  const access = await resolveWhatChangedAccess({
+    userId: session?.user?.id ?? null,
+  });
+
   const [
     hub,
     report,
-    events,
+    whatChangedFeed,
     capitalReport,
     dilutionTimeline,
     insiderReport,
     ownershipReport,
+    filingsReport,
   ] = await Promise.all([
       getTickerHubBundle(sym),
       getQuarterlyDeltaForSymbol(sym).catch(() => null),
-      getTickerWhatChangedEvents(sym).catch(() => []),
+      getCompanyWhatChangedFeed({
+        symbol: sym,
+        window: "30d",
+        showAllActivity: false,
+        accessMode: access.accessMode,
+        userId: access.userId,
+      }).catch(() => null),
       getCapitalRiskReportForSymbol(sym).catch(() => null),
       getDilutionTimeline(sym, 40).catch(() => []),
       getInsiderReportForSymbol(sym).catch(() => null),
       getOwnershipReportForSymbol(sym).catch(() => null),
+      getFilingsReportForSymbol(sym).catch(() => null),
     ]);
+
+  // Public SSR must never carry thesis relevance (SEO / crawlers).
+  if (whatChangedFeed && access.accessMode === "public") {
+    for (const c of whatChangedFeed.cards) c.thesisRelevance = null;
+    whatChangedFeed.meta.hasThesis = false;
+    whatChangedFeed.meta.accessMode = "public";
+  }
 
   const emptyReport = {
     symbol: sym,
@@ -95,7 +122,7 @@ export default async function TickerPage({ params, searchParams }: Props) {
             </Button>
           </Link>
           <Link href="/pricing">
-            <Button size="sm">Plans from {PLUS_PRICE_MO}</Button>
+            <Button size="sm">{TRUSTTICKER_TRIAL_CTA}</Button>
           </Link>
         </div>
       </header>
@@ -123,8 +150,8 @@ export default async function TickerPage({ params, searchParams }: Props) {
           </h1>
           <p className="text-zinc-400 text-sm leading-relaxed max-w-xl">
             Catalysts, Form 4 insider filings, financial period deltas, and
-            Capital Risk (liquidity, shares, financing). Free to browse. Plus
-            adds alerts. Pro unlocks Capital Risk desk and Markets.
+            Capital Risk (liquidity, shares, financing). Public overview available;
+            full monitoring, alerts, and Research unlock with TrustTicker.
           </p>
           {hub.dilution.latestWhy ? (
             <p className="mt-3 text-[12px] text-amber-200/90 border border-amber-500/20 rounded-lg px-3 py-2 bg-amber-500/5">
@@ -152,7 +179,19 @@ export default async function TickerPage({ params, searchParams }: Props) {
         ) : null}
 
         {tab === "what-changed" ? (
-          <WhatChangedTab hub={hub} report={deltaReport} events={events} />
+          whatChangedFeed ? (
+            <WhatChangedTab
+              symbol={sym}
+              feed={whatChangedFeed}
+              entitled={access.accessMode === "entitled"}
+            />
+          ) : (
+            <TickerPlaceholderTab
+              testId="ticker-what-changed"
+              title="What Changed"
+              body="What Changed could not be loaded for this symbol right now."
+            />
+          )
         ) : null}
 
         {tab === "capital" ? (
@@ -192,19 +231,15 @@ export default async function TickerPage({ params, searchParams }: Props) {
         ) : null}
 
         {tab === "filings" ? (
-          <TickerPlaceholderTab
-            testId="ticker-filings-tab"
-            title="Filings"
-            body="A dedicated filings timeline is next. Recent filings and catalysts remain on Overview and What Changed."
-          />
-        ) : null}
-
-        {tab === "timeline" ? (
-          <TickerPlaceholderTab
-            testId="ticker-timeline"
-            title="Timeline"
-            body="A unified company timeline across filings, financials, and capital events is coming soon."
-          />
+          filingsReport ? (
+            <FilingsTab report={filingsReport} />
+          ) : (
+            <TickerPlaceholderTab
+              testId="ticker-filings-tab"
+              title="Filings"
+              body="Filing comparisons could not be loaded for this symbol right now."
+            />
+          )
         ) : null}
 
         {tab === "overview" ? (
@@ -230,14 +265,13 @@ export default async function TickerPage({ params, searchParams }: Props) {
                       </div>
                       <p className="text-sm text-zinc-200">{f.headline}</p>
                       {f.sourceUrl ? (
-                        <a
+                        <SafeExternalLink
                           href={f.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="text-[11px] text-emerald-400 hover:underline mt-1 inline-flex items-center gap-1"
+                          fallback="null"
                         >
                           Source <ExternalLink className="w-3 h-3" />
-                        </a>
+                        </SafeExternalLink>
                       ) : null}
                     </li>
                   ))}
@@ -256,7 +290,7 @@ export default async function TickerPage({ params, searchParams }: Props) {
                     href="/pricing"
                     className="block mt-4 text-emerald-400 hover:underline"
                   >
-                    See Plus / Pro plans
+                    See pricing · {TRUSTTICKER_TRIAL_CTA}
                   </Link>
                 </div>
               ) : (
@@ -339,8 +373,7 @@ export default async function TickerPage({ params, searchParams }: Props) {
         ) : null}
 
         <p className="text-[11px] text-zinc-600 text-center">
-          Free hub · Plus {PLUS_PRICE_MO} · Pro {PRO_PRICE_MO} · Not investment
-          advice
+          TrustTicker {TRUSTTICKER_MONTHLY_MO} · Not investment advice
         </p>
         <DisclaimerBanner />
       </main>

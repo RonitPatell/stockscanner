@@ -73,6 +73,19 @@ export function evaluateCapitalRisk(
   const symbol = input.symbol.trim().toUpperCase();
   const instruments = input.instruments;
   const active = instruments.filter((i) => i.status === "active");
+  /** Capacity filings with unconfirmed status still matter — do not ignore as silence. */
+  const capacityPresent = instruments.filter(
+    (i) =>
+      i.status === "unknown" &&
+      (i.instrumentType === "ATM_PROGRAM" ||
+        i.instrumentType === "S3_SHELF" ||
+        i.instrumentType === "S1_REGISTRATION" ||
+        i.instrumentType === "PROSPECTUS_424B5" ||
+        i.instrumentType === "REGISTERED_DIRECT" ||
+        i.instrumentType === "EQUITY_PURCHASE_AGREEMENT" ||
+        i.instrumentType === "CONVERTIBLE_NOTE" ||
+        i.instrumentType === "CONVERTIBLE_PREFERRED")
+  );
   const reasons: CapitalRiskReason[] = [];
 
   const liquidity = buildLiquidityBlock(input.observations);
@@ -84,18 +97,35 @@ export function evaluateCapitalRisk(
     reasons.push(
       reason(
         "NO_INSTRUMENT_COVERAGE",
-        "No financing instruments on file",
-        "No DilutionInstrument rows for this symbol yet.",
+        "No qualifying financing event detected in available sources",
+        "No DilutionInstrument rows for this symbol yet — not proof of no dilution.",
         "unknown"
       )
     );
-  } else if (active.length === 0) {
+  } else if (active.length === 0 && capacityPresent.length === 0) {
     reasons.push(
       reason(
         "NO_ACTIVE_FINANCING_INSTRUMENTS",
-        "No active financing instruments",
-        "Prior instruments exist but none are marked active.",
+        "No active financing instruments detected",
+        "Prior instruments exist but none are marked active in available sources.",
         "low"
+      )
+    );
+  }
+
+  for (const i of capacityPresent) {
+    const elevated =
+      i.instrumentType === "ATM_PROGRAM" ||
+      i.instrumentType === "REGISTERED_DIRECT" ||
+      i.instrumentType === "EQUITY_PURCHASE_AGREEMENT" ||
+      i.instrumentType === "CONVERTIBLE_NOTE" ||
+      i.instrumentType === "CONVERTIBLE_PREFERRED";
+    reasons.push(
+      reason(
+        "FINANCING_CAPACITY_STATUS_UNKNOWN",
+        "Financing capacity on file (status unconfirmed)",
+        `${i.instrumentType.replace(/_/g, " ")} extracted but activity status is unknown — capacity present in available sources, not confirmed active.`,
+        elevated ? "elevated" : "moderate"
       )
     );
   }

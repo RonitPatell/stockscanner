@@ -8,7 +8,7 @@
  * (and DESK_GUIDE_STEPS if Prop Desk changed). Keep copy trader-plain.
  */
 
-export const PLATFORM_GUIDE_VERSION = 65;
+export const PLATFORM_GUIDE_VERSION = 74;
 
 export type GuideSurface = "dashboard" | "desk";
 
@@ -27,20 +27,26 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     id: "welcome",
     title: "Welcome to TrustTicker",
-    body: "Investor OS: Portfolio is where you choose companies to monitor. Watchtower surfaces material changes on those names. Research opens ticker hubs. Discover is for market-wide opportunity rules (rolling out).",
+    body: "Investor OS: Portfolio is where you choose companies to monitor. Watchtower surfaces material changes on those names. Research is the in-desk company workspace. Discover is for market-wide opportunity rules.",
     tip: "Tap any ? icon if something is unclear · Esc exits the guide",
   },
   {
     id: "secondary-nav",
     target: "dashboard-secondary-nav",
     title: "View switcher",
-    body: "Portfolio · Watchtower · Research · Discover. Markets and Capital Risk remain available via deep links for power users.",
+    body: "Primary nav: Portfolio · Watchtower · Research · Discover. Markets Floor and the old Capital Risk desk are legacy deep links only — use Research Capital and Watchtower capital filters instead.",
   },
   {
     id: "portfolio",
     target: "watchlist-destination",
     title: "Portfolio",
-    body: "Add or remove companies you own or follow. Optional label, note, and entry price. Quotes enrich when available; monitoring works without live prices.",
+    body: "Add or remove companies you own or follow. Optional label, note, and entry price. Portfolio Brief summarizes what needs attention across those names (SEC/company data — quotes not required).",
+  },
+  {
+    id: "portfolio-brief",
+    target: "portfolio-brief",
+    title: "Portfolio Brief",
+    body: "Personalized daily digest: Needs Review, thesis changes, capital, and insider activity for your monitored companies. Distinct from the public /today sample plan.",
   },
   {
     id: "watchtower-desk",
@@ -52,25 +58,25 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "research-desk",
     target: "research-desk",
     title: "Research",
-    body: "Look up any ticker. Opens the hub with Overview, What Changed, Thesis, Financials, Capital Risk, Insiders, and Ownership (13D/13G + delayed Institutional filings / 13F). 13F is never real-time.",
+    body: "In-desk company workspace: search, recently viewed, and monitored names. Open Overview for a monitoring snapshot, then What Changed, Thesis, Financials, Capital, Insiders, Ownership, Filings, or Timeline. Add to Portfolio works from Overview. Public /ticker pages stay limited for discovery — thesis notes stay private.",
   },
   {
     id: "discover-desk",
     target: "discover-desk",
     title: "Discover",
-    body: "Market-wide opportunity rules will land here. Until then, monitor names in Portfolio and review changes in Watchtower.",
+    body: "Build rules over TrustTicker data (financials, Capital Risk, insiders, ownership, high-significance changes). Search shows why each name matched — no opaque scores. Save a rule and optionally alert when a company newly satisfies it. Price filters appear only if a price provider is configured.",
   },
   {
     id: "trading-floor",
     target: "trading-floor",
-    title: "Markets Floor",
-    body: "Deep-link desk for volume and biggest % leaders, wire, and charts. Open with ?view=markets. Search any ticker for float and market cap.",
+    title: "Markets Floor (legacy)",
+    body: "Optional legacy movers/wire surface. Open only via ?view=markets. Day-to-day work stays in Portfolio, Watchtower, Research, and Discover.",
   },
   {
     id: "structure-desk",
     target: "structure-desk",
-    title: "Capital Risk desk",
-    body: "Deep-link desk for financing exposure and Dilution Radar. Open with ?view=structure or ?view=capital-risk. Prefer the ticker Capital tab for per-name liquidity, shares, and financing events.",
+    title: "Capital Risk desk (legacy)",
+    body: "Optional legacy Dilution Radar surface via ?view=structure. Prefer Research → Capital for a company, or Watchtower capital filters across your portfolio.",
   },
   {
     id: "dilution-radar",
@@ -139,7 +145,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "monitor-squawk",
     target: "monitor-squawk",
     title: "Squawk",
-    body: "Status-bar control opens mute, replay, and transcript. Speaks only high-value transitions (verified catalyst, attention leader, momentum breaking, official halt/resumption, high-severity dilution/offering, critical data degradation). Never raw articles, returns, or trade instructions.",
+    body: "Status-bar control opens mute, replay, and transcript. Speaks only high-value transitions (verified catalyst, attention leader, momentum breaking, official halt/resumption, high-severity dilution/offering, critical data degradation). Respects quiet hours. Never raw articles, returns, or trade instructions.",
     requiresExtras: true,
   },
   {
@@ -167,14 +173,14 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "monitor-intel",
     target: "monitor-intelligence",
     title: "Selected-ticker detail",
-    body: "Right column for the name you clicked: essentials stay usable from the snapshot while filings, analogues, feedback, and autopsy load in isolated panels. A slow secondary never blanks the list. Failures show Retry on that panel only.",
+    body: "Right column for the name you clicked: What happened, market move, tradeability, and risks stay usable from the snapshot while filings, analogues, feedback, and autopsy load in isolated panels. Unavailable fields stay labelled Unavailable. A slow secondary never blanks the list. Failures show Retry on that panel only. Not a directional trade cue.",
     requiresExtras: true,
   },
   {
     id: "monitor-tape",
     target: "monitor-event-tape",
     title: "Event tape",
-    body: "Bottom strip of inspection events — quiet unless severity is high/critical. Filters: All, Selected, Watchlist, Risk, Market. Click to focus the ticker and jump to the matching detail section. Labels are not trade instructions.",
+    body: "Bottom virtualized strip of inspection events — quiet unless severity is high/critical. Filters: All, Selected, Watchlist, Risk, Market. Click to focus the ticker and jump to the matching detail section. Labels are not trade instructions.",
     requiresExtras: true,
   },
   {
@@ -237,7 +243,7 @@ export const DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     id: "context-drawer",
     target: "catalyst-context-drawer",
     title: "Decision Drawer",
-    body: "Right-side Decision Drawer (overlay on tablet, sheet on mobile) shows Event → Reaction → Tradeability → Primary risks → Evidence, then Optional analysis (analogues, feedback) collapsed. Escape closes; j/k keeps it open on the next catalyst. Deep-link with ?cid=.",
+    body: "Right-side Decision Drawer (overlay on tablet, sheet on mobile) shows Event → Reaction → Tradeability → Primary risks → Evidence, then Optional analysis (analogues, feedback) collapsed. Escape closes; j/k keeps the sticky drawer open on the next catalyst. Deep-link with ?cid=.",
     tip: "Source and TradingView stay in the header",
   },
   {

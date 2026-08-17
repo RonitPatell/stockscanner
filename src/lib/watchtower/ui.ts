@@ -10,6 +10,8 @@ export const WATCHTOWER_LAST_VISIT_KEY = "tt-watchtower-last-visit";
 
 export type WatchtowerFeedFilterId =
   | "all"
+  | "needs_review"
+  | "thesis_relevant"
   | "high"
   | "capital"
   | "financial"
@@ -27,6 +29,8 @@ export type WatchtowerFeedFilter = {
 
 export const WATCHTOWER_FEED_FILTERS: WatchtowerFeedFilter[] = [
   { id: "all", label: "All", params: {} },
+  { id: "needs_review", label: "Needs Review", params: {} },
+  { id: "thesis_relevant", label: "Thesis Relevant", params: {} },
   { id: "high", label: "High significance", params: { significance: "HIGH" } },
   { id: "capital", label: "Capital", params: { category: "capital" } },
   { id: "financial", label: "Financial", params: { category: "financial" } },
@@ -60,6 +64,7 @@ const REASON_LABELS: Record<string, string> = {
   DIRECTOR_OR_BOARD_CHANGE: "Director / board change",
   INSIDER_CLUSTER: "Insider transaction cluster",
   ROUTINE_PERIODIC_FILING: "Routine periodic filing",
+  FILING_SECTION_CHANGE: "Filing section change",
   ROUTINE_OWNERSHIP_AMENDMENT: "Ownership amendment",
   ROUTINE_INSIDER_FORM: "Insider form",
   EFFECTIVE_REGISTRATION_NOTICE: "Effective registration",
@@ -147,9 +152,12 @@ export function buildWatchtowerQuery(
 export function countRequiringReview(items: WatchtowerEventDto[]): number {
   return items.filter(
     (i) =>
-      i.significance.level === "HIGH" &&
       !i.readState.isRead &&
-      !i.readState.isDismissed
+      !i.readState.isDismissed &&
+      (i.significance.level === "HIGH" ||
+        (i.thesisRelevance?.status === "matches_condition" &&
+          (i.thesisRelevance.polarity === "risk_if" ||
+            i.thesisRelevance.polarity === "invalidate_if")))
   ).length;
 }
 

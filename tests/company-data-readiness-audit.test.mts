@@ -34,12 +34,11 @@ test("RKLB is curated-core eligible and a valid ticker format", () => {
   assert.equal(isValidTickerFormat("rklb"), false);
 });
 
-test("coverage has no Research-intent reason", () => {
-  assert.equal(isCoverageReason("RESEARCH"), false);
-  assert.equal(isCoverageReason("RESEARCH_INTEREST"), false);
+test("coverage includes Research-interest reason after readiness work", () => {
+  assert.equal(isCoverageReason("RESEARCH_INTEREST"), true);
   assert.ok(COVERAGE_REASONS.includes("CURATED_CORE"));
   assert.ok(COVERAGE_REASONS.includes("USER_WATCHLIST"));
-  assert.equal(COVERAGE_REASONS.includes("RESEARCH_INTEREST" as never), false);
+  assert.ok(COVERAGE_REASONS.includes("RESEARCH_INTEREST"));
 });
 
 test("metrics cron skips missing CIK and only walks portfolio + SymbolCoverage", () => {
@@ -74,14 +73,18 @@ test("Financials / Insiders empty copy does not distinguish processing vs unavai
   assert.doesNotMatch(insiders, /PROCESSING/);
 });
 
-test("company_tickers.json is fetched from two sites (duplicate to collapse later)", () => {
+test("company_tickers.json is loaded through one shared identity helper", () => {
+  const loader = read("src/lib/company-identity/sec-tickers.ts");
   const master = read("src/lib/coverage/symbol-master.ts");
   const edgar = read("src/lib/news-sources/sec-edgar.ts");
-  assert.match(master, /www\.sec\.gov\/files\/company_tickers\.json/);
-  assert.match(edgar, /www\.sec\.gov\/files\/company_tickers\.json/);
+  assert.match(loader, /www\.sec\.gov\/files\/company_tickers\.json/);
+  assert.match(master, /loadSecCompanyTickerMap/);
+  assert.match(edgar, /loadSecCompanyTickerMap/);
+  assert.doesNotMatch(master, /www\.sec\.gov\/files\/company_tickers\.json/);
+  assert.doesNotMatch(edgar, /www\.sec\.gov\/files\/company_tickers\.json/);
 });
 
-test("vercel.json schedules coverage + metrics; package.json has no hydrate script yet", () => {
+test("vercel.json schedules coverage + metrics + hydrate; package.json has hydrate scripts", () => {
   const vercel = JSON.parse(read("vercel.json")) as {
     crons: { path: string }[];
   };
@@ -89,11 +92,11 @@ test("vercel.json schedules coverage + metrics; package.json has no hydrate scri
   assert.ok(paths.some((p) => p.startsWith("/api/cron/coverage")));
   assert.ok(paths.some((p) => p.startsWith("/api/cron/metrics")));
   assert.ok(paths.some((p) => p.startsWith("/api/cron/filings")));
-  assert.equal(paths.some((p) => p.includes("hydrate")), false);
+  assert.ok(paths.some((p) => p.startsWith("/api/cron/hydrate")));
 
   const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
-  assert.equal(pkg.scripts.hydrate, undefined);
-  assert.equal(pkg.scripts["hydrate:portfolio"], undefined);
+  assert.ok(pkg.scripts.hydrate);
+  assert.ok(pkg.scripts["hydrate:portfolio"]);
 });
 
 test("local next dev starts ingest loop but metrics cron is not imported there", () => {

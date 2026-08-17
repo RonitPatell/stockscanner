@@ -26,6 +26,11 @@ import type {
   WatchtowerFeedResult,
   WatchtowerSignificanceDto,
 } from "./types.ts";
+import type {
+  ThesisConditionOverlayInput,
+  ThesisRelevanceDto,
+} from "../ticker-what-changed/types.ts";
+import { overlayWatchtowerThesisRelevance } from "./thesis-overlay.ts";
 
 const EVENT_SELECT = {
   id: true,
@@ -226,7 +231,8 @@ function buildEventWhere(opts: {
 
 function toDto(
   row: EventRow,
-  companyName: string | null
+  companyName: string | null,
+  thesisRelevance: ThesisRelevanceDto | null
 ): WatchtowerEventDto {
   const state = row.userStates[0] ?? null;
   const significance = parseSignificance(row.evidenceJson);
@@ -248,7 +254,7 @@ function toDto(
       url: row.sourceUrl,
     },
     evidence: publicEvidence(row.evidenceJson),
-    thesisRelevance: null,
+    thesisRelevance,
     readState: {
       isRead: Boolean(state?.readAt),
       readAt: state?.readAt?.toISOString() ?? null,
@@ -256,6 +262,52 @@ function toDto(
       dismissedAt: state?.dismissedAt?.toISOString() ?? null,
     },
   };
+}
+
+async function loadThesisConditionsBySymbol(
+  userId: string,
+  symbols: string[]
+): Promise<Map<string, ThesisConditionOverlayInput[]>> {
+  const out = new Map<string, ThesisConditionOverlayInput[]>();
+  if (!symbols.length) return out;
+  const theses = await prisma.investmentThesis.findMany({
+    where: {
+      userId,
+      symbol: { in: symbols },
+      status: { not: "archived" },
+    },
+    select: {
+      symbol: true,
+      conditions: {
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          conditionType: true,
+          label: true,
+          polarity: true,
+          paramsJson: true,
+        },
+      },
+    },
+  });
+  for (const t of theses) {
+    out.set(
+      t.symbol,
+      t.conditions.map((c) => ({
+        id: c.id,
+        conditionType: c.conditionType,
+        label: c.label,
+        polarity: c.polarity,
+        params:
+          c.paramsJson &&
+          typeof c.paramsJson === "object" &&
+          !Array.isArray(c.paramsJson)
+            ? (c.paramsJson as Record<string, unknown>)
+            : {},
+      }))
+    );
+  }
+  return out;
 }
 
 export async function getWatchtowerFeed(
@@ -348,10 +400,25 @@ export async function getWatchtowerFeed(
         })
       : [];
   const nameBySym = new Map(masters.map((m) => [m.symbol, m.name]));
-
-  const items = page.map((row) =>
-    toDto(row, nameBySym.get(row.symbol) ?? null)
+  const conditionsBySymbol = await loadThesisConditionsBySymbol(
+    userId,
+    pageSymbols
   );
+
+  const items = page.map((row) => {
+    const conds = conditionsBySymbol.get(row.symbol) ?? [];
+    const thesisRelevance = conds.length
+      ? overlayWatchtowerThesisRelevance({
+          event: {
+            eventType: row.eventType,
+            category: row.category,
+            title: row.title,
+          },
+          conditions: conds,
+        })
+      : null;
+    return toDto(row, nameBySym.get(row.symbol) ?? null, thesisRelevance);
+  });
 
   return {
     ok: true,
@@ -445,7 +512,7 @@ function resolveStateTimestamps(
 export async function updateWatchtowerEventState(
   userId: string,
   eventId: string,
-  body: { read?: boolean; dismissed?: boolean },
+  body: { read?: boolean; dismissed?: boolean; opened?: boolean },
   monitoredSet?: Set<string>
 ): Promise<WatchtowerStateMutationResult> {
   const gate = await assertEventInMonitoredPortfolio(
@@ -461,6 +528,19 @@ export async function updateWatchtowerEventState(
     },
     select: { readAt: true, dismissedAt: true },
   });
+
+  if (body.read === undefined && body.dismissed === undefined) {
+    return {
+      ok: true,
+      eventId,
+      readState: {
+        isRead: Boolean(existing?.readAt),
+        readAt: existing?.readAt?.toISOString() ?? null,
+        isDismissed: Boolean(existing?.dismissedAt),
+        dismissedAt: existing?.dismissedAt?.toISOString() ?? null,
+      },
+    };
+  }
 
   const { readAt, dismissedAt } = resolveStateTimestamps(existing, body);
 

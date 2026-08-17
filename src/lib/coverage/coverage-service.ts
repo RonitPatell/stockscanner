@@ -119,6 +119,7 @@ export async function primaryCoverageReason(
     "FRESH_NEWS",
     "CURATED_CORE",
     "MANUAL",
+    "RESEARCH_INTEREST",
   ];
   for (const p of priority) {
     const hit = badges.find((b) => b.reason === p);
@@ -147,6 +148,15 @@ export async function syncWatchlistCoverage(symbols: string[]): Promise<void> {
       permanent: true,
     }).catch(() => {});
   }
+}
+
+/** Entitled Research open — temporary coverage so metrics/hydrate universe includes the symbol. */
+export async function ensureResearchInterestCoverage(symbol: string): Promise<void> {
+  await upsertCoverage({
+    symbol,
+    reason: "RESEARCH_INTEREST",
+    note: "research workspace",
+  });
 }
 
 /**

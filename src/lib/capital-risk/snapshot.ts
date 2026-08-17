@@ -105,6 +105,30 @@ export async function refreshCapitalRiskSnapshotForSymbol(
   changed: boolean;
   report: CapitalRiskReport;
 } | null> {
+  try {
+    return await refreshCapitalRiskSnapshotForSymbolInner(symbol, opts);
+  } catch (err) {
+    void import("../ops/index.ts")
+      .then(({ opsFail, incrOpsCounter }) => {
+        opsFail("capital_risk", "snapshot_refresh_failed", err, {
+          symbol: symbol.trim().toUpperCase(),
+        });
+        return incrOpsCounter("capital_risk_fail");
+      })
+      .catch(() => {});
+    throw err;
+  }
+}
+
+async function refreshCapitalRiskSnapshotForSymbolInner(
+  symbol: string,
+  opts?: { scheduleHealth?: boolean; emitEvent?: boolean }
+): Promise<{
+  snapshotId: string;
+  status: string;
+  changed: boolean;
+  report: CapitalRiskReport;
+} | null> {
   const sym = symbol.trim().toUpperCase();
   if (!sym) return null;
 
@@ -142,6 +166,15 @@ export async function refreshCapitalRiskSnapshotForSymbol(
   const { cik: _cik, ...reportBase } = evaluated;
 
   if (existing) {
+    void import("../ops/index.ts")
+      .then(({ recordOpsStamp }) =>
+        recordOpsStamp("capital_risk_ok", {
+          symbol: sym,
+          status: existing.status,
+          changed: false,
+        })
+      )
+      .catch(() => {});
     return {
       snapshotId: existing.id,
       status: existing.status,
@@ -189,6 +222,16 @@ export async function refreshCapitalRiskSnapshotForSymbol(
     scheduleThesisHealthForSymbol(sym, "capital_risk_snapshot_changed");
   }
 
+  void import("../ops/index.ts")
+    .then(({ recordOpsStamp }) =>
+      recordOpsStamp("capital_risk_ok", {
+        symbol: sym,
+        status: row.status,
+        changed,
+      })
+    )
+    .catch(() => {});
+
   return {
     snapshotId: row.id,
     status: row.status,
@@ -201,21 +244,38 @@ export async function refreshCapitalRiskSnapshotForSymbol(
 export async function getCapitalRiskReportForSymbol(
   symbol: string
 ): Promise<CapitalRiskReport> {
-  const sym = symbol.trim().toUpperCase();
-  const { instruments, observations, hasConflicts } = await loadInputs(sym);
-  const evaluated = evaluateCapitalRisk({
-    symbol: sym,
-    instruments,
-    observations,
-    hasInstrumentConflicts: hasConflicts,
-  });
+  try {
+    const sym = symbol.trim().toUpperCase();
+    const { instruments, observations, hasConflicts } = await loadInputs(sym);
+    const evaluated = evaluateCapitalRisk({
+      symbol: sym,
+      instruments,
+      observations,
+      hasInstrumentConflicts: hasConflicts,
+    });
 
-  const latest = await prisma.capitalRiskSnapshot.findFirst({
-    where: { symbol: sym },
-    orderBy: [{ asOf: "desc" }],
-    select: { id: true },
-  });
+    const latest = await prisma.capitalRiskSnapshot.findFirst({
+      where: { symbol: sym },
+      orderBy: [{ asOf: "desc" }],
+      select: { id: true },
+    });
 
-  const { cik: _cik, ...reportBase } = evaluated;
-  return { ...reportBase, snapshotId: latest?.id ?? null };
+    const { cik: _cik, ...reportBase } = evaluated;
+    void import("../ops/index.ts")
+      .then(({ recordOpsStamp }) =>
+        recordOpsStamp("capital_risk_ok", { symbol: sym, status: evaluated.status })
+      )
+      .catch(() => {});
+    return { ...reportBase, snapshotId: latest?.id ?? null };
+  } catch (err) {
+    void import("../ops/index.ts")
+      .then(({ opsFail, incrOpsCounter }) => {
+        opsFail("capital_risk", "report_failed", err, {
+          symbol: symbol.trim().toUpperCase(),
+        });
+        return incrOpsCounter("capital_risk_fail");
+      })
+      .catch(() => {});
+    throw err;
+  }
 }

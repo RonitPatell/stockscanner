@@ -35,12 +35,18 @@ import {
   writeWatchtowerDeepLink,
   type WatchtowerFeedFilterId,
 } from "@/lib/watchtower/ui";
+import { applyWatchtowerClientFilter } from "@/lib/watchtower/thesis-overlay";
 import { openSafeHttpUrl, safeHttpUrl } from "@/lib/monitor/safe-open";
 import { cn } from "@/lib/utils";
 import { WatchtowerEventDrawer } from "./WatchtowerEventDrawer";
 
 function useDrawerMode(): "side" | "overlay" | "sheet" {
-  const [mode, setMode] = useState<"side" | "overlay" | "sheet">("side");
+  const [mode, setMode] = useState<"side" | "overlay" | "sheet">(() => {
+    if (typeof window === "undefined") return "side";
+    if (window.matchMedia("(max-width: 639px)").matches) return "sheet";
+    if (window.matchMedia("(max-width: 1023px)").matches) return "overlay";
+    return "side";
+  });
   useEffect(() => {
     const mqSheet = window.matchMedia("(max-width: 639px)");
     const mqOverlay = window.matchMedia("(max-width: 1023px)");
@@ -135,7 +141,10 @@ export function WatchtowerDesk() {
           setError(data.error || "Could not load Watchtower feed.");
           return;
         }
-        const nextItems = Array.isArray(data.items) ? data.items : [];
+        const nextItems = applyWatchtowerClientFilter(
+          Array.isArray(data.items) ? data.items : [],
+          filter
+        );
         setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
         setNextCursor(data.nextCursor ?? null);
         setMeta(data.meta ?? null);
@@ -189,6 +198,11 @@ export function WatchtowerDesk() {
     setSelectedId(ev.id);
     setDrawerOpen(true);
     writeWatchtowerDeepLink(ev.id);
+    void fetch(`/api/watchtower/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opened: true }),
+    }).catch(() => {});
   }, []);
 
   const closeDrawer = useCallback(() => {
@@ -401,7 +415,7 @@ export function WatchtowerDesk() {
                     href="/pricing"
                     className={cn(buttonVariants({ size: "sm" }))}
                   >
-                    View pricing
+                    Start 7-Day Trial
                   </Link>
                 ) : null}
               </div>
@@ -474,7 +488,7 @@ export function WatchtowerDesk() {
                     data-event-id={ev.id}
                     data-testid={`watchtower-card-${ev.id}`}
                     tabIndex={0}
-                    aria-label={`${ev.symbol}: ${ev.title}`}
+                    aria-label={`${unread ? "Unread. " : ""}${ev.symbol}: ${ev.title}. Significance ${significanceDisplay(level)}.`}
                     onClick={() => openEvent(ev)}
                     onKeyDown={(e) => onCardKeyDown(e, ev, index)}
                     className={cn(
@@ -487,11 +501,17 @@ export function WatchtowerDesk() {
                       <span className="font-mono text-sm font-semibold text-emerald-300">
                         {ev.symbol}
                       </span>
+                      {unread ? (
+                        <span className="text-[10px] uppercase tracking-wide text-emerald-400/90">
+                          Unread
+                        </span>
+                      ) : null}
                       <span
                         className={cn(
                           "inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium uppercase tracking-wide",
                           significanceBadgeClass(level)
                         )}
+                        aria-label={`Significance: ${significanceDisplay(level)}`}
                       >
                         {significanceDisplay(level)}
                       </span>
@@ -499,9 +519,23 @@ export function WatchtowerDesk() {
                         {formatEventWhen(ev.occurredAt)}
                       </span>
                     </div>
-                    <p className="mt-1.5 text-[13px] sm:text-sm text-zinc-100 font-medium leading-snug">
+                    <p className="mt-1.5 text-[13px] sm:text-sm text-zinc-100 font-medium leading-snug break-words">
                       {ev.title}
                     </p>
+                    {ev.thesisRelevance &&
+                    ev.thesisRelevance.status !== "none" ? (
+                      <p
+                        className="mt-1 text-[11px] text-emerald-400/90"
+                        data-testid={`watchtower-thesis-relevance-${ev.id}`}
+                      >
+                        {ev.thesisRelevance.status === "matches_condition"
+                          ? "Relevant to 1 thesis condition"
+                          : "Related to a thesis condition"}
+                        {ev.thesisRelevance.conditionLabel
+                          ? ` · ${ev.thesisRelevance.conditionLabel}`
+                          : ""}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-[12px] text-zinc-400 leading-relaxed line-clamp-2">
                       <span className="text-zinc-500 uppercase tracking-wide text-[10px] mr-1.5">
                         What changed

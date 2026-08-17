@@ -1,8 +1,10 @@
 /**
  * Liquidity block: cash, OCF/burn, runway — UNKNOWN when not defensible.
  * Never invent burn or runway from incomplete accounting.
+ * Never treat FY / YTD OCF as a quarterly burn.
  */
 
+import { classifyDurationBucket, durationDays } from "../metrics/periods.ts";
 import type { CapitalLiquidityBlock } from "./types.ts";
 
 export type LiquidityObservation = {
@@ -19,17 +21,35 @@ function isQuarter(fp: string | null): boolean {
   return fp === "Q1" || fp === "Q2" || fp === "Q3" || fp === "Q4";
 }
 
+function knownNumber(v: number | null | undefined): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** True when the observation looks like a ~quarter window (not FY / YTD). */
+export function isQuarterLengthObservation(
+  row: LiquidityObservation
+): boolean {
+  const days = durationDays(row.periodStart, row.periodEnd);
+  if (days != null) {
+    return classifyDurationBucket(days) === "quarter";
+  }
+  // Instant / missing duration: only trust explicit Q1–Q4 labels (still weaker).
+  return isQuarter(row.fiscalPeriod);
+}
+
 function pickLatest(
   rows: LiquidityObservation[],
   key: string,
   preferQuarter: boolean
 ): LiquidityObservation | null {
-  const filtered = rows.filter((r) => r.metricKey === key && r.value != null);
+  const filtered = rows.filter(
+    (r) => r.metricKey === key && knownNumber(r.value)
+  );
   if (!filtered.length) return null;
   return [...filtered].sort((a, b) => {
     if (preferQuarter) {
-      const aq = isQuarter(a.fiscalPeriod) ? 1 : 0;
-      const bq = isQuarter(b.fiscalPeriod) ? 1 : 0;
+      const aq = isQuarterLengthObservation(a) ? 1 : 0;
+      const bq = isQuarterLengthObservation(b) ? 1 : 0;
       if (bq !== aq) return bq - aq;
     }
     return (b.periodEnd?.getTime() ?? 0) - (a.periodEnd?.getTime() ?? 0);
@@ -73,7 +93,7 @@ export function estimateOperatingBurn(
 
 /**
  * Runway = cash / quarterly burn, only when both are finite and burn > 0.
- * Caps display sanity at 40 quarters; below 0.25 → treat as short.
+ * Caps display sanity at 40 quarters; below 4 → short.
  */
 export function estimateRunwayQuarters(
   cash: number | null,
@@ -127,8 +147,25 @@ export function buildLiquidityBlock(
   const cashRow = pickLatest(observations, "cash", false);
   const ocfRow = pickLatest(observations, "operating_cash_flow", true);
   const cash = cashRow?.value ?? null;
-  const ocf = ocfRow?.value ?? null;
-  const burnEst = estimateOperatingBurn(ocf);
+
+  // Refuse FY / YTD OCF as quarterly burn — never invent a short runway.
+  let ocf: number | null = null;
+  let burnEst = estimateOperatingBurn(null);
+  if (ocfRow && knownNumber(ocfRow.value)) {
+    if (!isQuarterLengthObservation(ocfRow)) {
+      burnEst = {
+        burn: null,
+        status: "unknown",
+        explanation:
+          "Operating cash flow period is not a defensible quarter (FY/YTD/unknown duration) — burn and runway left unknown.",
+      };
+      ocf = ocfRow.value;
+    } else {
+      ocf = ocfRow.value;
+      burnEst = estimateOperatingBurn(ocf);
+    }
+  }
+
   const runway =
     burnEst.status === "burn"
       ? estimateRunwayQuarters(cash, burnEst.burn)

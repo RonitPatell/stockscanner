@@ -15,12 +15,14 @@ import {
 import { buildShareStructureBlock } from "../src/lib/capital-risk/share-structure.ts";
 import { capitalRiskStatusLabel } from "../src/lib/capital-risk/types.ts";
 
-test("status labels never say will dilute", () => {
+test("status labels never say will dilute or no dilution", () => {
   for (const s of ["low", "moderate", "elevated", "unknown"] as const) {
     const label = capitalRiskStatusLabel(s);
-    assert.match(label, /capital risk/i);
-    assert.doesNotMatch(label, /will dilute|guaranteed|crush/i);
+    assert.doesNotMatch(label, /will dilute|guaranteed|crush|^no dilution$/i);
   }
+  assert.match(capitalRiskStatusLabel("low"), /low capital risk/i);
+  assert.match(capitalRiskStatusLabel("elevated"), /capital risk/i);
+  assert.match(capitalRiskStatusLabel("unknown"), /unknown capital risk/i);
 });
 
 test("active ATM → elevated with ACTIVE_ATM reason", () => {

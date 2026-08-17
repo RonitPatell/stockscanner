@@ -24,6 +24,18 @@ export const FUNNEL_EVENTS = [
   "paid_conversion",
   "cancellation",
   "cancellation_reason",
+  "company_searched",
+  "company_hydration_requested",
+  "company_hydration_ready",
+  "portfolio_company_added",
+  "thesis_created",
+  "thesis_condition_created",
+  "thesis_relevant_event_detected",
+  "watchtower_event_opened",
+  "event_marked_reviewed",
+  "portfolio_brief_opened",
+  "alert_created",
+  "research_return_visit",
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

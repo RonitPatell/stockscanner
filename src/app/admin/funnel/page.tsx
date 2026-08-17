@@ -28,6 +28,9 @@ export default async function AdminFunnelPage() {
           <Link href="/admin/ingest" className="text-zinc-400 hover:text-zinc-200">
             Ingest
           </Link>
+          <Link href="/admin/company-readiness" className="text-zinc-400 hover:text-zinc-200">
+            Data readiness
+          </Link>
           <Link href="/admin/latency" className="text-zinc-400 hover:text-zinc-200">
             Latency
           </Link>

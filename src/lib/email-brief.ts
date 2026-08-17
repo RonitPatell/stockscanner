@@ -77,17 +77,16 @@ export async function sendDailyBriefEmail(
 export async function sendWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
   const greeting = name ? `Hey ${name.split(" ")[0]},` : "Hey,";
   const body = `
-    <h2 style="color:#fafafa;margin:0 0 12px;font-size:20px">Welcome to TrustTicker Pro</h2>
-    <p style="color:#a1a1aa;margin:0 0 16px">${greeting} your live catalyst scanner is ready. Here's what you get:</p>
+    <h2 style="color:#fafafa;margin:0 0 12px;font-size:20px">Welcome to TrustTicker</h2>
+    <p style="color:#a1a1aa;margin:0 0 16px">${greeting} your Investor OS is ready. Here's what you get:</p>
     <ul style="color:#d4d4d8;margin:0 0 20px;padding-left:20px;line-height:1.8">
-      <li>SSE push when the feed updates, with visible measured ingest latency</li>
-      <li>Action playbooks, anti-FOMO scores, dilution radar</li>
-      <li>Illustrative speed scenarios + candle-based comparisons</li>
-      <li>Morning/EOD email briefs with daily edge recap</li>
-      <li>Pro alert rules — Discord, email, SMS, and browser push</li>
+      <li>Portfolio Watchtower, What Changed, Thesis Monitor, and Thesis Health</li>
+      <li>Financial deltas, Quarterly Delta, Capital Risk, and dilution monitoring</li>
+      <li>Insider activity, ownership changes, filing comparisons</li>
+      <li>Portfolio Brief, alerts, Research, and Discover</li>
     </ul>
-    <p style="color:#a1a1aa;margin:0 0 16px">Set your watchlist and alert channels in Settings — takes about 60 seconds.</p>
-    <a href="${APP_URL}/dashboard" style="display:inline-block;background:#059669;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">Launch scanner</a>
+    <p style="color:#a1a1aa;margin:0 0 16px">Set your portfolio and alert channels in Settings — takes about 60 seconds.</p>
+    <a href="${APP_URL}/dashboard" style="display:inline-block;background:#059669;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">Open Portfolio</a>
   `;
-  return sendEmail(to, "Welcome to TrustTicker Pro — you're in", emailShell("Welcome", body));
+  return sendEmail(to, "Welcome to TrustTicker — you're in", emailShell("Welcome", body));
 }

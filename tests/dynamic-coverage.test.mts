@@ -50,7 +50,9 @@ test("coverage reasons include required enum values", () => {
   ]) {
     assert.equal(isCoverageReason(r), true);
   }
-  assert.equal(COVERAGE_REASONS.length, 8);
+  assert.equal(COVERAGE_REASONS.length, 9);
+  assert.equal(isCoverageReason("RESEARCH_INTEREST"), true);
+  assert.equal(isTemporaryReason("RESEARCH_INTEREST"), true);
   assert.equal(isTemporaryReason("FRESH_NEWS"), true);
   assert.equal(isTemporaryReason("CURATED_CORE"), false);
   assert.ok(coverageTtlHours("ACTIVE_GAINER") > 0);

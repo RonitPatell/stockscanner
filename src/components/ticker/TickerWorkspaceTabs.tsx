@@ -11,7 +11,7 @@ import {
 export type { TickerTabId };
 export { parseTickerTab };
 
-const TAB_LABELS: Record<TickerTabId, string> = {
+const TAB_LABELS = {
   overview: "Overview",
   "what-changed": "What Changed",
   thesis: "Thesis",
@@ -20,8 +20,7 @@ const TAB_LABELS: Record<TickerTabId, string> = {
   insiders: "Insiders",
   ownership: "Ownership",
   filings: "Filings",
-  timeline: "Timeline",
-};
+} as const;
 
 export function TickerWorkspaceTabs({
   symbol,
@@ -48,7 +47,7 @@ export function TickerWorkspaceTabs({
             href={href}
             scroll={false}
             className={cn(
-              "px-2.5 sm:px-3 py-2 text-[12px] sm:text-[13px] rounded-t-md border border-transparent transition-colors whitespace-nowrap",
+              "px-2.5 sm:px-3 min-h-[44px] sm:min-h-10 inline-flex items-center text-[12px] sm:text-[13px] rounded-t-md border border-transparent transition-colors whitespace-nowrap",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50",
               isActive
                 ? "border-zinc-700 border-b-zinc-950 bg-zinc-900/60 text-zinc-100 font-medium"

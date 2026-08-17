@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check, ExternalLink, X } from "lucide-react";
 import type { WatchtowerEventDto } from "@/lib/watchtower/types";
@@ -13,6 +13,7 @@ import {
 import { openSafeHttpUrl, safeHttpUrl } from "@/lib/monitor/safe-open";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 type DrawerMode = "side" | "overlay" | "sheet";
 
@@ -35,8 +36,17 @@ export function WatchtowerEventDrawer({
   markingRead?: boolean;
   mode: DrawerMode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const modal = Boolean(open && event && mode !== "side");
+
+  useFocusTrap(modal, panelRef, {
+    onEscape: onClose,
+    initialFocusRef: closeRef,
+  });
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || mode !== "side") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -45,7 +55,7 @@ export function WatchtowerEventDrawer({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, mode]);
 
   useEffect(() => {
     if (!open || mode === "side") return;
@@ -74,10 +84,12 @@ export function WatchtowerEventDrawer({
 
   const panel = (
     <div
+      ref={panelRef}
+      tabIndex={-1}
       className={cn(
-        "flex flex-col bg-[var(--bg-graphite)] border-[var(--border)] min-h-0",
+        "flex flex-col bg-[var(--bg-graphite)] border-[var(--border)] min-h-0 outline-none",
         mode === "sheet"
-          ? "rounded-t-xl border-t max-h-[85vh]"
+          ? "rounded-t-xl border-t max-h-[min(85vh,100dvh)] pb-[calc(3.5rem+env(safe-area-inset-bottom))] sm:pb-0"
           : "h-full border-l"
       )}
       role="dialog"
@@ -90,23 +102,24 @@ export function WatchtowerEventDrawer({
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">
             Event detail
           </p>
-          <p className="text-sm font-semibold text-zinc-100 truncate font-mono">
+          <p className="text-sm font-semibold text-zinc-100 font-mono truncate">
             {event.symbol}
-            {event.companyName ? (
-              <span className="ml-2 font-sans font-normal text-zinc-400">
-                {event.companyName}
-              </span>
-            ) : null}
           </p>
+          {event.companyName ? (
+            <p className="text-[12px] font-sans font-normal text-zinc-400 truncate">
+              {event.companyName}
+            </p>
+          ) : null}
         </div>
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
-          className="rounded p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          className="rounded-md h-[44px] w-[44px] inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           aria-label="Close event detail"
           data-testid="watchtower-drawer-close"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden />
         </button>
       </div>
 
@@ -115,7 +128,29 @@ export function WatchtowerEventDrawer({
           <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
             Event
           </p>
-          <p className="text-zinc-100 font-medium leading-snug">{event.title}</p>
+          <p className="text-zinc-100 font-medium leading-snug break-words">
+            {event.title}
+          </p>
+          {event.thesisRelevance && event.thesisRelevance.status !== "none" ? (
+            <p
+              className="mt-2 text-[12px] text-emerald-400/90 leading-relaxed"
+              data-testid="watchtower-drawer-thesis-relevance"
+            >
+              {event.thesisRelevance.status === "matches_condition"
+                ? "Relevant to 1 thesis condition"
+                : "Related to a thesis condition"}
+              {event.thesisRelevance.conditionLabel
+                ? ` — ${event.thesisRelevance.conditionLabel}`
+                : ""}
+              {event.thesisRelevance.summary
+                ? `. ${event.thesisRelevance.summary}`
+                : ""}
+            </p>
+          ) : (
+            <p className="mt-2 text-[12px] text-zinc-500">
+              Not tied to your thesis conditions.
+            </p>
+          )}
           <p className="mt-1 text-[12px] text-zinc-500">
             {event.eventType.replace(/_/g, " ")} · {event.category}
           </p>
@@ -250,7 +285,7 @@ export function WatchtowerEventDrawer({
         data-drawer-mode="overlay"
         data-drawer-state="open"
         data-event-id={event.id}
-        className="fixed inset-0 z-40 flex justify-end"
+        className="fixed inset-0 z-50 flex justify-end"
       >
         <button
           type="button"
@@ -271,7 +306,7 @@ export function WatchtowerEventDrawer({
       data-drawer-mode="sheet"
       data-drawer-state="open"
       data-event-id={event.id}
-      className="fixed inset-0 z-40 flex flex-col justify-end"
+      className="fixed inset-0 z-50 flex flex-col justify-end"
     >
       <button
         type="button"

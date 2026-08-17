@@ -8,14 +8,14 @@ import type {
   SignificanceLevel,
   SignificanceReasonCode,
 } from "../company-events/significance.ts";
+import type { ThesisRelevanceDto } from "../ticker-what-changed/types.ts";
 
 export type WatchtowerSignificanceDto = {
   level: SignificanceLevel | null;
   reasonCodes: SignificanceReasonCode[];
   evidence: SignificanceEvidenceItem[];
   engineVersion: string | null;
-  /** Reserved for user thesis overlay — always null until thesis engine wires it. */
-  thesisRelevance: null;
+  thesisRelevance: ThesisRelevanceDto | null;
 };
 
 export type WatchtowerSourceDto = {
@@ -47,8 +47,7 @@ export type WatchtowerEventDto = {
   source: WatchtowerSourceDto;
   /** Bounded evidence blob from CompanyEvent.evidenceJson (no secrets). */
   evidence: Record<string, unknown>;
-  /** Explicit placeholder for later thesis overlay (mirrors significance.thesisRelevance). */
-  thesisRelevance: null;
+  thesisRelevance: ThesisRelevanceDto | null;
   readState: WatchtowerReadStateDto;
 };
 

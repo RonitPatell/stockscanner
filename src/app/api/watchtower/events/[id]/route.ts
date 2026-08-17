@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { trackRetention } from "@/lib/analytics/retention";
 import {
   updateWatchtowerEventState,
   watchtowerEventStateBodySchema,
@@ -47,6 +48,13 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
       { error: zodErrorMessage(parsed.error), code: "INVALID" },
       { status: 400 }
     );
+  }
+
+  if (parsed.data.opened) {
+    void trackRetention("watchtower_event_opened", { userId: gate.user.id });
+  }
+  if (parsed.data.read === true) {
+    void trackRetention("event_marked_reviewed", { userId: gate.user.id });
   }
 
   const result = await updateWatchtowerEventState(

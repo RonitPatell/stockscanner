@@ -107,7 +107,7 @@ export async function getTickerHubBundle(symbol: string): Promise<TickerHubBundl
   };
 }
 
-/** Lightweight public dilution chip without requirePro (read-only display). */
+/** Lightweight public dilution chip (read-only; no TrustTicker entitlement gate). */
 export async function hasRecentDilutionSignal(symbol: string): Promise<boolean> {
   const sym = symbol.toUpperCase();
   const n = await prisma.dilutionInstrument.count({

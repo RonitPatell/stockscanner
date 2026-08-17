@@ -1,5 +1,5 @@
 import { prisma } from "../prisma.ts";
-import { SEC_USER_AGENT } from "../ingest/sec-politeness.ts";
+import { loadSecCompanyTickerMap } from "../company-identity/sec-tickers.ts";
 import { ACTIVE_US_TICKERS } from "../news-sources/active-tickers.ts";
 import { isValidTickerFormat } from "../ticker-utils.ts";
 import { classifyAssetType, KNOWN_ETF_SYMBOLS } from "./asset-type.ts";
@@ -15,18 +15,10 @@ export async function refreshSymbolMaster(): Promise<{
   etfs: number;
   equities: number;
 }> {
-  const res = await fetch("https://www.sec.gov/files/company_tickers.json", {
-    headers: { "User-Agent": SEC_USER_AGENT },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`SEC company_tickers HTTP ${res.status}`);
+  const mapping = await loadSecCompanyTickerMap({ force: true });
+  if (!mapping.ok) {
+    throw new Error(`SEC company_tickers ${mapping.errorCode}`);
   }
-
-  const data = (await res.json()) as Record<
-    string,
-    { cik_str: number; ticker: string; title?: string }
-  >;
 
   const now = new Date();
   let upserted = 0;
@@ -41,21 +33,18 @@ export async function refreshSymbolMaster(): Promise<{
     assetType: "equity" | "etf";
   }[] = [];
 
-  for (const entry of Object.values(data)) {
-    const symbol = String(entry.ticker ?? "")
-      .trim()
-      .toUpperCase()
-      .replace(/\./g, "");
+  for (const entry of mapping.byTicker.values()) {
+    const symbol = entry.ticker;
     if (!isValidTickerFormat(symbol) || seen.has(symbol)) continue;
     seen.add(symbol);
-    const name = entry.title?.trim() || null;
+    const name = entry.title;
     const assetType = classifyAssetType(symbol, name);
     if (assetType === "etf") etfs++;
     else equities++;
     rows.push({
       symbol,
       name,
-      cik: String(entry.cik_str).padStart(10, "0"),
+      cik: entry.cik,
       assetType,
     });
   }

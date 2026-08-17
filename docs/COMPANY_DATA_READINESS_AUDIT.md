@@ -28,12 +28,15 @@ Local `next dev` runs a **catalyst wire loop** only. It does **not** run `vercel
 
 ## 1. How ticker → CIK resolution happens
 
-There is **no** `resolveCompanyIdentity(symbol)` service.
+**Implemented (Prompt 2):** `resolveCompanyIdentity(symbol)` in `src/lib/company-identity/`. Canonical store remains `SymbolMaster` (no second identity table). Statuses: `READY | NOT_FOUND | NO_CIK | ERROR`. Shared loader: `loadSecCompanyTickerMap()` (`src/lib/company-identity/sec-tickers.ts`).
+
+Research UI still does **not** call this resolver on search (that is Prompt 4). The following describes both the new service and the older call sites.
 
 | Path | What it does | Ticker → CIK? |
 |------|----------------|---------------|
-| `refreshSymbolMaster()` (`src/lib/coverage/symbol-master.ts`) | Fetches `https://www.sec.gov/files/company_tickers.json`, upserts `SymbolMaster.symbol` with `cik` padded to 10 digits | Yes (batch, daily cron) |
-| `loadCikMap()` (`src/lib/news-sources/sec-edgar.ts`) | Same JSON, process-local **CIK → ticker** map for Atom titles | Reverse only (CIK → ticker) |
+| `resolveCompanyIdentity()` | Normalize → SymbolMaster → SEC map if CIK missing → persist | Yes (on-demand, tests inject mapping) |
+| `refreshSymbolMaster()` (`src/lib/coverage/symbol-master.ts`) | Batch upsert via `loadSecCompanyTickerMap()` | Yes (daily cron) |
+| `loadCikMap()` (`src/lib/news-sources/sec-edgar.ts`) | Same shared map, **CIK → ticker** for Atom titles | Reverse only (CIK → ticker) |
 | `lookupCompanyMeta()` (`src/lib/portfolio/service.ts`) | `symbolMaster.findUnique` when adding to Portfolio | Read-only |
 | Metrics cron | Portfolio `cik` **or** `SymbolMaster.cik` | Read-only; **skips** if both null |
 | Catalyst hooks | Pass `cik` when present on the article; often null | Optional |
@@ -47,10 +50,10 @@ There is **no** `resolveCompanyIdentity(symbol)` service.
 
 **RKLB path (happy):** SEC map row `{ ticker: "RKLB", cik_str: 1819994 }` → `SymbolMaster { symbol: "RKLB", cik: "0001819994" }` after `/api/cron/coverage`. Atom Form 4 titled `...(1819994)` maps to `RKLB` via `loadCikMap`.
 
-**Gaps:**
+**Gaps (remaining after identity service):**
 
-- Two independent fetches of `company_tickers.json` (master refresh vs Atom mapper). No shared cache/service.
-- No ticker→CIK lookup on Research open. If `SymbolMaster` is empty (fresh local DB, coverage cron never ran), **nothing** resolves CIK for RKLB even though the SEC file would.
+- Shared `company_tickers.json` loader is in place (`loadSecCompanyTickerMap`). Master refresh and Atom mapping reuse it.
+- Research search still does **not** call `resolveCompanyIdentity`. If `SymbolMaster` is empty, opening RKLB still will not resolve CIK until coverage cron or an explicit resolve/hydrate path runs.
 - Curated-core fallback in `refreshSymbolMaster` inserts `ACTIVE_US_TICKERS` **with `cik: ""` → stored null** when the symbol is missing from the SEC file. Update uses `cik: row.cik \|\| undefined` so an empty refresh does not wipe a good CIK.
 - **No alias table.** Ticker changes: new ticker gets the CIK on next master refresh; old ticker is soft-deactivated after 36h stale `refreshedAt`. Portfolio rows on the old symbol are not remapped.
 - `isListedSymbol` can return true from `ACTIVE_US_TICKERS` **before** the first master refresh — listed ≠ CIK present.
@@ -307,8 +310,8 @@ Insiders / Ownership / Filings / Capital instruments:
 
 | Duplicate | Canonical to keep |
 |-----------|-------------------|
-| `company_tickers.json` in `symbol-master.ts` **and** `sec-edgar.ts` | One `loadSecCompanyTickers()` used by master refresh, Atom mapper, and future `resolveCompanyIdentity` |
-| CIK pad (`padStart(10,"0")`) in master, Atom, `companyfacts.ts` | One `normalizeCik` |
+| `company_tickers.json` | **Done:** `loadSecCompanyTickerMap()` used by master refresh, Atom mapper, and `resolveCompanyIdentity` |
+| CIK pad (`padStart(10,"0")`) | `normalizeCik` in `company-identity/normalize.ts` (CompanyFacts URL uses it) |
 | Symbol normalize (`toUpperCase` + strip non-letters) in Research, ticker-hub, coverage, APIs | One `normalizeSymbol` (respect `isValidTickerFormat`) |
 | Metrics: cron vs any future Research fetch | **Must** call `ingestCompanyfactsMetrics` / `fetchCompanyfacts` — never a second normalizer |
 | Form 4 / 13D / dilution / filings | Keep `processForm4Filing`, `processOwnershipFiling`, `processFilingForDilution`, `processCatalystForFilingSections` |

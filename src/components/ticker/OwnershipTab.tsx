@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import type { OwnershipReport } from "@/lib/ownership/get-report";
 import type { InstitutionalPositionView } from "@/lib/institutional/get-report";
 
@@ -87,7 +88,9 @@ function InstitutionalRow({ p }: { p: InstitutionalPositionView }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-zinc-100">{p.filerName}</p>
+          <p className="text-[13px] font-medium text-zinc-100 break-words">
+            {p.filerName}
+          </p>
           <p className="text-[10px] text-zinc-500 font-mono">CIK {p.filerCik}</p>
         </div>
         <span
@@ -122,14 +125,13 @@ function InstitutionalRow({ p }: { p: InstitutionalPositionView }) {
           <span className="font-mono text-[10px]">{p.accessionNumber}</span>
         ) : null}
         {p.sourceUrl ? (
-          <a
+          <SafeExternalLink
             href={p.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+            fallback="null"
           >
             Source <ExternalLink className="w-3 h-3" />
-          </a>
+          </SafeExternalLink>
         ) : null}
         <a
           href={`/institution/${encodeURIComponent(p.filerCik)}`}
@@ -209,10 +211,10 @@ export function OwnershipTab({ report }: { report: OwnershipReport }) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-zinc-100">
+                    <p className="text-sm font-semibold text-zinc-100 break-words">
                       {f.filerName}
                     </p>
-                    <p className="text-[11px] text-zinc-500">
+                    <p className="text-[11px] text-zinc-500 break-words">
                       {[
                         f.issuerName,
                         f.formType,
@@ -280,14 +282,13 @@ export function OwnershipTab({ report }: { report: OwnershipReport }) {
                 </dl>
 
                 {f.sourceUrl ? (
-                  <a
+                  <SafeExternalLink
                     href={f.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
+                    fallback="null"
                   >
                     Source <ExternalLink className="w-3 h-3" />
-                  </a>
+                  </SafeExternalLink>
                 ) : null}
               </li>
             ))}

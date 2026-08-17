@@ -7,10 +7,11 @@ import {
   SEC_USER_AGENT,
   waitForSecPermit,
 } from "../ingest/sec-politeness.ts";
+import { normalizeCik } from "../company-identity/normalize.ts";
 import type { SecCompanyfactsDocument } from "./types.ts";
 
 function padCik(cik: string): string {
-  return cik.replace(/\D/g, "").padStart(10, "0");
+  return normalizeCik(cik) ?? cik.replace(/\D/g, "").padStart(10, "0");
 }
 
 export function companyfactsUrlForCik(cik: string): string {

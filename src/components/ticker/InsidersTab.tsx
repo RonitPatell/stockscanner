@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import type { InsiderReport } from "@/lib/insider/get-report";
 
 function fmtShares(v: number | null | undefined): string {
@@ -72,10 +73,10 @@ export function InsidersTab({ report }: { report: InsiderReport }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-100">
+                  <p className="text-sm font-semibold text-zinc-100 break-words">
                     {tx.ownerName}
                   </p>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-zinc-500 break-words">
                     {[tx.role, tx.issuerName].filter(Boolean).join(" · ") ||
                       "Reporting person"}
                   </p>
@@ -156,15 +157,16 @@ export function InsidersTab({ report }: { report: InsiderReport }) {
                 ) : null}
                 <span className="font-mono">{tx.accessionNumber}</span>
                 {tx.sourceUrl ? (
-                  <a
+                  <SafeExternalLink
                     href={tx.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                    fallback="null"
                   >
                     Source <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : null}
+                  </SafeExternalLink>
+                ) : (
+                  <span className="text-zinc-600">No source URL available.</span>
+                )}
               </div>
             </li>
           ))}

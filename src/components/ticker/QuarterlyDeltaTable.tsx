@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import { cn } from "@/lib/utils";
 import type {
   DeltaEmphasis,
@@ -41,15 +42,16 @@ function RowSource({ row }: { row: QuarterlyDeltaRow }) {
         Filed {formatFiledDate(cur.filedAt)}
       </div>
       {cur.sourceUrl ? (
-        <a
+        <SafeExternalLink
           href={cur.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[10px] text-emerald-400 hover:underline"
+          fallback="null"
         >
           Source <ExternalLink className="w-2.5 h-2.5" />
-        </a>
-      ) : null}
+        </SafeExternalLink>
+      ) : (
+        <span className="text-[10px] text-zinc-600">No source URL available.</span>
+      )}
     </div>
   );
 }
@@ -145,17 +147,39 @@ export function QuarterlyDeltaTable({
 
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto rounded-xl border border-zinc-800">
-        <table className="w-full text-left text-[12px]">
+        <table
+          className="w-full text-left text-[12px]"
+          aria-label="Quarterly financial deltas"
+        >
+          <caption className="sr-only">
+            Quarter-over-quarter metric changes for {report.symbol}
+          </caption>
           <thead>
             <tr className="border-b border-zinc-800 bg-zinc-900/50 text-[10px] uppercase tracking-wide text-zinc-500">
-              <th className="px-3 py-2.5 font-medium">Metric</th>
-              <th className="px-3 py-2.5 font-medium">Basis</th>
-              <th className="px-3 py-2.5 font-medium text-right">Previous</th>
-              <th className="px-3 py-2.5 font-medium text-right">Current</th>
-              <th className="px-3 py-2.5 font-medium text-right">Abs.</th>
-              <th className="px-3 py-2.5 font-medium text-right">% / bps</th>
-              <th className="px-3 py-2.5 font-medium">Change</th>
-              <th className="px-3 py-2.5 font-medium">Period / source</th>
+              <th scope="col" className="px-3 py-2.5 font-medium">
+                Metric
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium">
+                Basis
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium text-right">
+                Previous
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium text-right">
+                Current
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium text-right">
+                Abs.
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium text-right">
+                % / bps
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium">
+                Change
+              </th>
+              <th scope="col" className="px-3 py-2.5 font-medium">
+                Period / source
+              </th>
             </tr>
           </thead>
           <tbody>

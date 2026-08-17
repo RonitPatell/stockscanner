@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import { cn } from "@/lib/utils";
 import type { QuarterlyDeltaReport } from "@/lib/metrics/quarterly-delta";
 import {
@@ -96,14 +97,13 @@ export function QuarterlyDeltaCard({
       )}
 
       {highlight[0]?.current?.sourceUrl ? (
-        <a
+        <SafeExternalLink
           href={highlight[0].current.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
           className="inline-flex items-center gap-1 mt-3 text-[10px] text-emerald-400 hover:underline"
+          fallback="null"
         >
           Latest source <ExternalLink className="w-2.5 h-2.5" />
-        </a>
+        </SafeExternalLink>
       ) : null}
     </section>
   );

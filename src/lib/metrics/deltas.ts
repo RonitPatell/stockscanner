@@ -27,6 +27,7 @@ function absChange(
   prior: number | null
 ): number | null {
   if (curr == null || prior == null) return null;
+  if (!Number.isFinite(curr) || !Number.isFinite(prior)) return null;
   const d = curr - prior;
   return Number.isFinite(d) ? d : null;
 }
@@ -36,7 +37,8 @@ function pctChange(
   prior: number | null
 ): number | null {
   if (curr == null || prior == null) return null;
-  if (prior === 0) return null;
+  if (!Number.isFinite(curr) || !Number.isFinite(prior)) return null;
+  if (prior === 0) return null; // UNKNOWN — never Infinity / 0%
   const d = ((curr - prior) / Math.abs(prior)) * 100;
   return Number.isFinite(d) ? d : null;
 }
@@ -47,6 +49,7 @@ function bpsChange(
 ): number | null {
   // Margins stored as percent points → 1 percent point = 100 bps
   if (curr == null || prior == null) return null;
+  if (!Number.isFinite(curr) || !Number.isFinite(prior)) return null;
   const d = (curr - prior) * 100;
   return Number.isFinite(d) ? d : null;
 }
@@ -184,18 +187,22 @@ export function computeYoyDelta(
       "No comparable prior-year period"
     );
   }
+  const percentChange = pctChange(current.value, prior.value);
   return {
     kind: "yoy",
     metricKey: current.metricKey,
     current,
     prior,
     absoluteChange: absChange(current.value, prior.value),
-    percentChange: pctChange(current.value, prior.value),
+    percentChange,
     bpsChange: isMarginKey(current.metricKey)
       ? bpsChange(current.value, prior.value)
       : null,
     comparable: true,
-    reason: null,
+    reason:
+      prior.value === 0
+        ? "Percent change unavailable (prior value is zero)"
+        : null,
   };
 }
 
@@ -234,7 +241,10 @@ export function computeQoqDelta(
       ? bpsChange(current.value, prior.value)
       : null,
     comparable: true,
-    reason: null,
+    reason:
+      prior.value === 0
+        ? "Percent change unavailable (prior value is zero)"
+        : null,
   };
 }
 

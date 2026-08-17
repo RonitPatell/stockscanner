@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SafeExternalLink } from "@/components/SafeExternalLink";
 import type { CapitalRiskReport } from "@/lib/capital-risk/types";
 import type { DilutionTimelineEvent } from "@/lib/dilution/timeline";
 
@@ -172,15 +173,16 @@ export function CapitalTab({
           {report.shareStructure.explanation}
         </p>
         {report.shareStructure.sharesSourceUrl ? (
-          <a
+          <SafeExternalLink
             href={report.shareStructure.sharesSourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
+            fallback="null"
           >
             Source <ExternalLink className="w-3 h-3" />
-          </a>
-        ) : null}
+          </SafeExternalLink>
+        ) : (
+          <p className="text-[11px] text-zinc-600">No source URL available.</p>
+        )}
       </section>
 
       {/* Financing events */}
@@ -190,7 +192,8 @@ export function CapitalTab({
         </h3>
         {report.financingEvents.length === 0 ? (
           <p className="text-[13px] text-zinc-500 border border-dashed border-zinc-700 rounded-lg px-3 py-6 text-center">
-            No financing instruments extracted for this symbol yet.
+            No qualifying financing event detected in available TrustTicker
+            sources. That is not the same as “no dilution risk.”
           </p>
         ) : (
           <ul className="space-y-2" data-testid="capital-financing-events">
@@ -209,15 +212,18 @@ export function CapitalTab({
                 <p className="text-[13px] text-zinc-200">{ev.label}</p>
                 <p className="text-[11px] text-zinc-500 mt-1">{ev.capacityNote}</p>
                 {ev.sourceUrl ? (
-                  <a
+                  <SafeExternalLink
                     href={ev.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-emerald-400 hover:underline"
+                    fallback="null"
                   >
                     Source <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : null}
+                  </SafeExternalLink>
+                ) : (
+                  <p className="mt-1.5 text-[11px] text-zinc-600">
+                    No source URL available.
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -242,11 +248,13 @@ export function CapitalTab({
                 key={t.id}
                 className="flex flex-wrap items-baseline justify-between gap-2 text-[12px] border-b border-zinc-900 py-2"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 break-words">
                   <span className="text-zinc-200">{t.label}</span>
-                  <span className="text-zinc-600 ml-2 text-[10px]">
-                    {t.capacityNote}
-                  </span>
+                  {t.capacityNote ? (
+                    <span className="text-zinc-600 ml-2 text-[10px] break-words">
+                      {t.capacityNote}
+                    </span>
+                  ) : null}
                 </div>
                 <time className="text-[10px] text-zinc-500 shrink-0">
                   {fmtDate(t.at)}

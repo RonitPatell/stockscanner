@@ -12,6 +12,7 @@ export const COVERAGE_REASONS = [
   "FRESH_SEC_FILING",
   "FRESH_NEWS",
   "MANUAL",
+  "RESEARCH_INTEREST",
 ] as const;
 
 export type CoverageReason = (typeof COVERAGE_REASONS)[number];
@@ -31,6 +32,8 @@ export function coverageTtlHours(reason: CoverageReason): number {
     case "CURATED_CORE":
     case "MANUAL":
       return 0; // permanent until removed
+    case "RESEARCH_INTEREST":
+      return Number(process.env.COVERAGE_TTL_H_RESEARCH_INTEREST) || 168;
     case "ACTIVE_GAINER":
       return Number(process.env.COVERAGE_TTL_H_ACTIVE_GAINER) || 6;
     case "UNUSUAL_VOLUME":
@@ -59,6 +62,7 @@ export const COVERAGE_REASON_LABELS: Record<CoverageReason, string> = {
   FRESH_SEC_FILING: "Fresh SEC filing",
   FRESH_NEWS: "Fresh news",
   MANUAL: "Manual",
+  RESEARCH_INTEREST: "Research",
 };
 
 export const COVERAGE_REASON_HINTS: Record<CoverageReason, string> = {
@@ -71,6 +75,8 @@ export const COVERAGE_REASON_HINTS: Record<CoverageReason, string> = {
   FRESH_SEC_FILING: "Temporary: recent EDGAR filing mapped to this ticker.",
   FRESH_NEWS: "Temporary: high-confidence news match outside the curated core.",
   MANUAL: "Added by an operator.",
+  RESEARCH_INTEREST:
+    "An entitled user opened this company in Research — queued for data hydration.",
 };
 
 /** Match confidence floors — below publish floor → quarantine (no live alert). */

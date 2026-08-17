@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireTrustTickerAccess } from "@/lib/api-guard";
 import { buildWatchlistBrief, markBriefSeen } from "@/lib/briefs";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireTrustTickerAccess();
+  if (gate.error) return gate.error;
 
-  const kind = (req.nextUrl.searchParams.get("kind") ?? "delta") as
-    | "morning"
-    | "eod"
-    | "delta";
+  const kindRaw = req.nextUrl.searchParams.get("kind") ?? "delta";
+  const kind =
+    kindRaw === "morning" || kindRaw === "eod" || kindRaw === "delta"
+      ? kindRaw
+      : "delta";
 
-  const brief = await buildWatchlistBrief(session.user.id, kind);
+  const brief = await buildWatchlistBrief(gate.user.id, kind);
   if (!brief) {
     return NextResponse.json({ error: "Empty watchlist" }, { status: 400 });
   }
@@ -24,11 +23,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireTrustTickerAccess();
+  if (gate.error) return gate.error;
 
-  await markBriefSeen(session.user.id);
+  await markBriefSeen(gate.user.id);
   return NextResponse.json({ ok: true });
 }

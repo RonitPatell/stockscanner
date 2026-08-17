@@ -14,6 +14,7 @@ type FunnelPayload = {
     activationRate: number;
   };
   cancelReasons: Record<string, number>;
+  retention?: Record<string, number | null>;
 };
 
 export function AdminFunnelClient() {
@@ -81,6 +82,26 @@ export function AdminFunnelClient() {
           ))}
         </div>
       </section>
+
+      {data.retention ? (
+        <section>
+          <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+            Retention loop
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.entries(data.retention).map(([k, v]) => (
+              <div key={k} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+                  {k.replace(/_/g, " ")}
+                </div>
+                <div className="text-xl font-semibold text-emerald-400 mt-1">
+                  {v == null ? "—" : v}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="text-sm font-semibold text-zinc-300 mb-3">User cohort (DB)</h2>

@@ -17,6 +17,8 @@ model User {
   subscriptionId   String?
   subscriptionStatus String @default("inactive") // inactive, active, past_due, canceled, trialing
   subscriptionEndsAt DateTime?
+  /// monthly | annual — set from Stripe checkout/webhook metadata or known price IDs
+  billingPeriod      String?
   /// Legacy freemium label: free | plus | pro — not used for V2 feature gating
   planTier           String    @default("free")
   hasUsedTrial     Boolean   @default(false)
@@ -33,6 +35,8 @@ model User {
   watchlist        String[]  @default([])
   scannerFilters   Json?
   alertRules       Json?
+  /// Discover opportunity rules (versioned JSON array). Session-scoped only.
+  discoverRules    Json?
   /// Alert Strategy Builder rules (versioned JSON array). Never silently mutated.
   alertStrategies  Json?
   strategyVersions AlertStrategyVersion[]
@@ -73,6 +77,7 @@ model User {
   investmentTheses InvestmentThesis[]
   companyEventStates UserCompanyEventState[]
   notificationDeliveries NotificationDelivery[]
+  productAnalyticsEvents ProductAnalyticsEvent[]
 
   @@index([trialEndsAt])
   @@index([subscriptionStatus, trialEndsAt])
@@ -144,6 +149,7 @@ model Catalyst {
 
   @@index([symbol])
   @@index([publishedAt])
+  @@index([createdAt])
   @@index([urgencyScore])
   @@index([sentimentScore])
   @@index([storyClusterId])
@@ -928,6 +934,7 @@ model InvestmentThesis {
   updatedAt       DateTime @updatedAt
   conditions      ThesisCondition[]
   evaluations     ThesisEvaluation[]
+  revisions       ThesisRevision[]
 
   @@unique([userId, symbol])
   @@index([userId, status])
@@ -972,6 +979,22 @@ model ThesisEvaluation {
   @@index([evaluatedAt])
 }
 
+/// Immutable thesis/condition change log — never rewrite prior evaluations.
+model ThesisRevision {
+  id          String   @id @default(cuid())
+  thesisId    String
+  thesis      InvestmentThesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  /// created | text | status | condition_created | condition_updated | condition_deleted
+  kind        String
+  /// Short factual summary — never dumps full private notes beyond a bounded snippet.
+  summary     String
+  payloadJson Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([thesisId, createdAt])
+  @@index([kind, createdAt])
+}
+
 /// Point-in-time capital-risk rollup per symbol — does NOT replace DilutionInstrument rows.
 model CapitalRiskSnapshot {
   id            String   @id @default(cuid())
@@ -991,7 +1014,7 @@ model CapitalRiskSnapshot {
   @@index([status, asOf])
 }
 
-/// Filing section text/hash (+ optional diff) for amendment redlines — shared facts.
+/// Filing section text/hash (+ optional diff) for period-over-period redlines — shared facts.
 model FilingSectionSnapshot {
   id              String   @id @default(cuid())
   symbol          String
@@ -999,21 +1022,30 @@ model FilingSectionSnapshot {
   accessionNumber String
   formType        String
   sectionKey      String
+  /// Human label e.g. "Risk Factors"
+  sectionTitle    String?
   filingDate      DateTime?
   textHash        String
   /// Bounded excerpt for evidence UI — not full filing dump when large.
   textExcerpt     String?
   priorAccession  String?
   priorTextHash   String?
+  priorSourceUrl  String?
+  /// { status, added[], removed[], changed[], stats, material }
   diffJson        Json?
+  /// True when change crosses material size threshold (for CompanyEvent)
+  materialChange  Boolean  @default(false)
   sourceUrl       String?
+  companyEventId  String?
   fingerprint     String   @unique
   createdAt       DateTime @default(now())
 
   @@unique([accessionNumber, sectionKey])
   @@index([symbol, filingDate])
   @@index([symbol, formType])
+  @@index([symbol, sectionKey, filingDate])
   @@index([priorAccession])
+  @@index([materialChange, filingDate])
 }
 
 /// Structured Form 4 (and similar) insider transaction — Catalyst headlines alone are insufficient.
@@ -1203,4 +1235,66 @@ model NotificationDelivery {
   @@index([subjectType, subjectId])
   @@index([companyEventId])
   @@index([status, createdAt])
+}
+
+/// Per-symbol dataset freshness for Research hydration (not a second identity table).
+model CompanyDatasetState {
+  id                String    @id @default(cuid())
+  symbol            String
+  /// IDENTITY | FINANCIALS | CAPITAL | FILINGS | INSIDERS | OWNERSHIP | INSTITUTIONAL_13F
+  dataset           String
+  /// READY | STALE | MISSING | PROCESSING | UNSUPPORTED | ERROR
+  status            String    @default("MISSING")
+  lastAttemptAt     DateTime?
+  lastSuccessAt     DateTime?
+  dataAsOf          DateTime?
+  nextEligibleAt    DateTime?
+  rowCount          Int?
+  attemptCount      Int       @default(0)
+  lastErrorCode     String?
+  /// Generic summary — never secrets, env, or stack traces.
+  lastErrorSummary  String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([symbol, dataset])
+  @@index([symbol, status])
+  @@index([status, nextEligibleAt])
+}
+
+/// Bounded on-demand hydration queue (Vercel cron drain). One row per symbol.
+model CompanyHydrationJob {
+  id                String    @id @default(cuid())
+  symbol            String    @unique
+  /// PENDING | RUNNING | SUCCEEDED | PARTIAL | FAILED
+  status            String    @default("PENDING")
+  lockToken         String?
+  lockedAt          DateTime?
+  attemptCount      Int       @default(0)
+  nextEligibleAt    DateTime  @default(now())
+  requestedAt       DateTime  @default(now())
+  lastAttemptAt     DateTime?
+  lastSuccessAt     DateTime?
+  /// Generic — never secrets.
+  lastErrorSummary  String?
+  /// Entitled user who last requested (rate-limit / audit). Not used as an ownership key for facts.
+  requestedByUserId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, nextEligibleAt])
+  @@index([requestedByUserId, requestedAt])
+}
+
+/// Privacy-conscious retention events. Never store thesis text, emails, phones, or secrets.
+model ProductAnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event     String
+  propsJson Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, event, createdAt])
 }

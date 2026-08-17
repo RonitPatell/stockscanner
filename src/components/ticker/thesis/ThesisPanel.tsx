@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { AccessGate } from "@/components/access/AccessGate";
 import { Button } from "@/components/ui/button";
 import type { ThesisDto } from "@/lib/thesis/service";
 import { formatHealthSummaryLine } from "@/lib/thesis/labels";
@@ -10,10 +10,11 @@ import {
   type ConditionBuilderResult,
 } from "./ThesisConditionBuilder";
 import { ThesisConditionCard } from "./ThesisConditionCard";
+import { ThesisHistoryTimeline } from "./ThesisHistoryTimeline";
 
 type LoadState =
   | { status: "loading" }
-  | { status: "unauthorized" }
+  | { status: "unauthorized"; reason: "login" | "subscribe" }
   | { status: "error"; message: string }
   | { status: "ready"; thesis: ThesisDto | null };
 
@@ -45,19 +46,31 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
 
   const refresh = useCallback(async () => {
     setBanner(null);
-    const res = await fetch(`/api/thesis?symbol=${encodeURIComponent(sym)}`, {
-      credentials: "include",
-    });
-    if (res.status === 401 || res.status === 403) {
-      setLoad({ status: "unauthorized" });
-      return;
+    setLoad({ status: "loading" });
+    try {
+      const res = await fetch(`/api/thesis?symbol=${encodeURIComponent(sym)}`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        setLoad({ status: "unauthorized", reason: "login" });
+        return;
+      }
+      if (res.status === 403) {
+        setLoad({ status: "unauthorized", reason: "subscribe" });
+        return;
+      }
+      if (!res.ok) {
+        setLoad({ status: "error", message: await parseError(res) });
+        return;
+      }
+      const data = (await res.json()) as { theses?: ThesisDto[] };
+      applyThesis(Array.isArray(data.theses) ? data.theses[0] ?? null : null);
+    } catch {
+      setLoad({
+        status: "error",
+        message: "Network error loading thesis. Check your connection and retry.",
+      });
     }
-    if (!res.ok) {
-      setLoad({ status: "error", message: await parseError(res) });
-      return;
-    }
-    const data = (await res.json()) as { theses: ThesisDto[] };
-    applyThesis(data.theses?.[0] ?? null);
   }, [sym, applyThesis]);
 
   useEffect(() => {
@@ -78,8 +91,12 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
           status: "active",
         }),
       });
-      if (res.status === 401 || res.status === 403) {
-        setLoad({ status: "unauthorized" });
+      if (res.status === 401) {
+        setLoad({ status: "unauthorized", reason: "login" });
+        return;
+      }
+      if (res.status === 403) {
+        setLoad({ status: "unauthorized", reason: "subscribe" });
         return;
       }
       if (!res.ok) {
@@ -234,6 +251,8 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
       <div
         className="rounded-xl border border-zinc-800 px-4 py-8 text-center text-[13px] text-zinc-500"
         data-testid="thesis-loading"
+        aria-busy="true"
+        aria-live="polite"
       >
         Loading thesis…
       </div>
@@ -242,28 +261,13 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
 
   if (load.status === "unauthorized") {
     return (
-      <section
-        className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6 space-y-3 text-center"
-        data-testid="thesis-unauthorized"
-      >
-        <h2 className="text-sm font-semibold text-zinc-200">
-          Investment Thesis
-        </h2>
-        <p className="text-[13px] text-zinc-500 max-w-md mx-auto leading-relaxed">
-          Sign in with an active TrustTicker plan to write and monitor your
-          thesis for {sym}.
-        </p>
-        <div className="flex justify-center gap-2">
-          <Link href="/login">
-            <Button size="sm">Sign in</Button>
-          </Link>
-          <Link href="/pricing">
-            <Button size="sm" variant="outline">
-              View plans
-            </Button>
-          </Link>
-        </div>
-      </section>
+      <div data-testid="thesis-unauthorized" data-gate={load.reason}>
+        <AccessGate
+          state={load.reason === "login" ? "anonymous" : "expired"}
+          feature="Investment Thesis"
+          compact
+        />
+      </div>
     );
   }
 
@@ -272,6 +276,7 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
       <div
         className="rounded-xl border border-rose-500/30 px-4 py-6 text-center space-y-3"
         data-testid="thesis-error"
+        role="alert"
       >
         <p className="text-[13px] text-rose-200">{load.message}</p>
         <Button size="sm" variant="outline" onClick={() => void refresh()}>
@@ -295,15 +300,25 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
             measurable parts.
           </p>
         </header>
-        <textarea
-          className="w-full min-h-[100px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-          placeholder="e.g. Durable revenue growth, manageable dilution, and a product customers keep buying…"
-          value={noteDraft}
-          onChange={(e) => setNoteDraft(e.target.value)}
-          data-testid="thesis-note-input"
-        />
+        <label className="block space-y-1.5">
+          <span className="text-[11px] uppercase tracking-wide text-zinc-500">
+            Investment thesis note
+          </span>
+          <textarea
+            className="w-full min-h-[100px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            placeholder="e.g. Durable revenue growth, manageable dilution, and a product customers keep buying…"
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            data-testid="thesis-note-input"
+            aria-label="Investment thesis note"
+          />
+        </label>
         {banner ? (
-          <p className="text-[12px] text-rose-300" data-testid="thesis-banner">
+          <p
+            className="text-[12px] text-rose-300"
+            data-testid="thesis-banner"
+            role="alert"
+          >
             {banner}
           </p>
         ) : null}
@@ -364,12 +379,16 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
         </div>
         {editingNote ? (
           <>
-            <textarea
-              className="w-full min-h-[88px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              data-testid="thesis-note-input"
-            />
+            <label className="block space-y-1.5">
+              <span className="sr-only">Edit investment thesis note</span>
+              <textarea
+                className="w-full min-h-[88px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                data-testid="thesis-note-input"
+                aria-label="Edit investment thesis note"
+              />
+            </label>
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -404,7 +423,11 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
       </div>
 
       {banner ? (
-        <p className="text-[12px] text-rose-300" data-testid="thesis-banner">
+        <p
+          className="text-[12px] text-rose-300"
+          data-testid="thesis-banner"
+          role="alert"
+        >
           {banner}
         </p>
       ) : null}
@@ -478,6 +501,15 @@ export function ThesisPanel({ symbol }: { symbol: string }) {
             )
           )}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-zinc-200">Thesis history</h3>
+        <p className="text-[12px] text-zinc-500">
+          Created {new Date(thesis.createdAt).toLocaleDateString()} ·
+          evaluations keep the rule that produced them.
+        </p>
+        <ThesisHistoryTimeline thesisId={thesis.id} />
       </div>
     </section>
   );

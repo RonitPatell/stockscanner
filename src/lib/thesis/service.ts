@@ -15,6 +15,8 @@ import type {
 import { getLatestThesisEvaluation } from "./health/persist.ts";
 import { parseHealthResultsJson } from "./health/parse-results.ts";
 import { scheduleThesisHealthForThesis } from "./health/schedule.ts";
+import { appendThesisRevision, isMaterialTextChange } from "./history.ts";
+import { trackRetention } from "../analytics/retention.ts";
 import {
   isAutomatedConditionType,
   type ThesisConditionEvaluationDto,
@@ -274,9 +276,6 @@ export async function createThesisForUser(
         await tx.thesisCondition.deleteMany({
           where: { thesisId: existing.id },
         });
-        await tx.thesisEvaluation.deleteMany({
-          where: { thesisId: existing.id },
-        });
         await tx.investmentThesis.update({
           where: { id: existing.id },
           data: {
@@ -305,6 +304,13 @@ export async function createThesisForUser(
         });
       });
       scheduleThesisHealthForThesis(row.id, "thesis_created");
+      void appendThesisRevision({
+        thesisId: row.id,
+        kind: "created",
+        summary: `Thesis created for ${symbol}`,
+        payload: { symbol },
+      });
+      void trackRetention("thesis_created", { userId, props: { symbol } });
       return { ok: true, thesis: await thesisToDtoWithHealth(row) };
     }
 
@@ -331,6 +337,13 @@ export async function createThesisForUser(
       include: THESIS_INCLUDE,
     });
     scheduleThesisHealthForThesis(row.id, "thesis_created");
+    void appendThesisRevision({
+      thesisId: row.id,
+      kind: "created",
+      summary: `Thesis created for ${symbol}`,
+      payload: { symbol, conditionCount: conditions.length },
+    });
+    void trackRetention("thesis_created", { userId, props: { symbol } });
     return { ok: true, thesis: await thesisToDtoWithHealth(row) };
   } catch (e) {
     const code =
@@ -355,7 +368,7 @@ export async function updateThesisForUser(
 ): Promise<ThesisMutationResult> {
   const existing = await prisma.investmentThesis.findFirst({
     where: { id: thesisId, userId },
-    select: { id: true },
+    select: { id: true, premise: true, title: true, status: true },
   });
   if (!existing) {
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
@@ -371,6 +384,33 @@ export async function updateThesisForUser(
     },
     include: THESIS_INCLUDE,
   });
+  if (note !== undefined && isMaterialTextChange(existing.premise, note)) {
+    void appendThesisRevision({
+      thesisId: existing.id,
+      kind: "text",
+      summary: "Thesis notes updated",
+      payload: { field: "note" },
+    });
+  }
+  if (
+    body.title !== undefined &&
+    isMaterialTextChange(existing.title, body.title)
+  ) {
+    void appendThesisRevision({
+      thesisId: existing.id,
+      kind: "text",
+      summary: "Thesis title updated",
+      payload: { field: "title" },
+    });
+  }
+  if (body.status !== undefined && body.status !== existing.status) {
+    void appendThesisRevision({
+      thesisId: existing.id,
+      kind: "status",
+      summary: `Status ${existing.status} → ${body.status}`,
+      payload: { from: existing.status, to: body.status },
+    });
+  }
   return { ok: true, thesis: await thesisToDtoWithHealth(row) };
 }
 
@@ -433,6 +473,20 @@ export async function addConditionForUser(
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
   scheduleThesisHealthForThesis(thesis.id, "condition_added");
+  void appendThesisRevision({
+    thesisId: thesis.id,
+    kind: "condition_created",
+    summary: `Condition added: ${input.label}`,
+    payload: {
+      conditionId: created.id,
+      conditionType: input.conditionType,
+      params: input.params,
+    },
+  });
+  void trackRetention("thesis_condition_created", {
+    userId,
+    props: { conditionType: input.conditionType },
+  });
   return {
     ok: true,
     thesis: await thesisToDtoWithHealth(row),
@@ -497,6 +551,18 @@ export async function updateConditionForUser(
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
   scheduleThesisHealthForThesis(thesis.id, "condition_edited");
+  void appendThesisRevision({
+    thesisId: thesis.id,
+    kind: "condition_updated",
+    summary: `Condition updated: ${body.label ?? existing.label}`,
+    payload: {
+      conditionId: existing.id,
+      previousParams: asRecord(existing.paramsJson),
+      nextParams: nextParams ?? asRecord(existing.paramsJson),
+      previousType: existing.conditionType,
+      nextType: nextType,
+    },
+  });
   return {
     ok: true,
     thesis: await thesisToDtoWithHealth(row),
@@ -519,7 +585,13 @@ export async function deleteConditionForUser(
 
   const existing = await prisma.thesisCondition.findFirst({
     where: { id: conditionId, thesisId: thesis.id },
-    select: { id: true },
+    select: {
+      id: true,
+      conditionType: true,
+      label: true,
+      polarity: true,
+      paramsJson: true,
+    },
   });
   if (!existing) {
     return { ok: false, code: "NOT_FOUND", error: "Condition not found" };
@@ -547,6 +619,17 @@ export async function deleteConditionForUser(
     return { ok: false, code: "NOT_FOUND", error: "Thesis not found" };
   }
   scheduleThesisHealthForThesis(thesis.id, "condition_deleted");
+  void appendThesisRevision({
+    thesisId: thesis.id,
+    kind: "condition_deleted",
+    summary: `Condition removed: ${existing.label}`,
+    payload: {
+      conditionId: existing.id,
+      conditionType: existing.conditionType,
+      polarity: existing.polarity,
+      params: asRecord(existing.paramsJson),
+    },
+  });
   return {
     ok: true,
     thesis: await thesisToDtoWithHealth(row),

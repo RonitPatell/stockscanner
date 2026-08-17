@@ -14,7 +14,7 @@ import {
   findQoqPrior,
   findYoyPrior,
 } from "./deltas.ts";
-import { durationDays, durationsComparableForYoy } from "./periods.ts";
+import { durationDays, durationsComparableForYoy, classifyDurationBucket } from "./periods.ts";
 
 export const QUARTERLY_DELTA_VERSION = "1.0.0";
 
@@ -222,7 +222,12 @@ export function selectCurrentObservation(
   key: FinancialMetricKey,
   preferQuarter: boolean
 ): NormalizedMetricObservation | null {
-  const candidates = pool.filter((p) => p.metricKey === key && p.value != null);
+  const candidates = pool.filter(
+    (p) =>
+      p.metricKey === key &&
+      typeof p.value === "number" &&
+      Number.isFinite(p.value)
+  );
   if (candidates.length === 0) return null;
 
   const ranked = [...candidates].sort((a, b) => {
@@ -230,6 +235,16 @@ export function selectCurrentObservation(
       const aq = isQuarter(a) ? 1 : 0;
       const bq = isQuarter(b) ? 1 : 0;
       if (bq !== aq) return bq - aq;
+      // Prefer true ~90d windows over YTD/other with the same Q label.
+      const ad = classifyDurationBucket(
+        durationDays(a.periodStart, a.periodEnd)
+      );
+      const bd = classifyDurationBucket(
+        durationDays(b.periodStart, b.periodEnd)
+      );
+      const aqLen = ad === "quarter" ? 1 : 0;
+      const bqLen = bd === "quarter" ? 1 : 0;
+      if (bqLen !== aqLen) return bqLen - aqLen;
     }
     const ae = a.periodEnd?.getTime() ?? 0;
     const be = b.periodEnd?.getTime() ?? 0;
