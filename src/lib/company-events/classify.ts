@@ -38,7 +38,7 @@ export type ClassifiedCompanyEvent = {
   title: string;
   summary: string | null;
   occurredAt: Date;
-  sourceType: "sec";
+  sourceType: "sec" | "derived" | "news" | "wire" | "manual";
   sourceId: string | null;
   sourceUrl: string | null;
   evidenceJson: Record<string, unknown>;

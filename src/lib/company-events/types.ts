@@ -104,6 +104,8 @@ export const COMPANY_EVENT_TYPES = [
   "insider_grant",
   "insider_disposition_other",
   "insider_form4",
+  "insider_cluster_purchases",
+  "insider_cluster_sales",
   // —— Management / governance ——
   "ceo_change",
   "cfo_change",

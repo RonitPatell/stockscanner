@@ -42,6 +42,7 @@ export const SIGNIFICANCE_REASON_CODES = [
   "CAPITAL_RISK_LEVEL_CHANGE",
   "CONVERTIBLE_OR_WARRANT_CAPITAL",
   "DIRECTOR_OR_BOARD_CHANGE",
+  "INSIDER_CLUSTER",
   // LOW
   "ROUTINE_PERIODIC_FILING",
   "ROUTINE_OWNERSHIP_AMENDMENT",
@@ -455,7 +456,7 @@ export function scoreEventSignificance(
       fire(
         "MEDIUM",
         "INSIDER_OPEN_MARKET_SALE",
-        "Insider sale event type",
+        "Structured open-market sale (Form 4 code S) — not every disposition",
         "event_type"
       );
       break;
@@ -473,7 +474,26 @@ export function scoreEventSignificance(
       fire(
         "LOW",
         "ROUTINE_INSIDER_FORM",
-        "Insider purchase event — informational unless other evidence elevates",
+        "Insider open-market purchase — informational, not a buy signal",
+        "event_type"
+      );
+      break;
+
+    case "insider_disposition_other":
+      fire(
+        "LOW",
+        "ROUTINE_INSIDER_FORM",
+        "Insider transaction that is not classified as open-market sale/purchase (e.g. tax withholding, gift, exercise, other)",
+        "event_type"
+      );
+      break;
+
+    case "insider_cluster_purchases":
+    case "insider_cluster_sales":
+      fire(
+        "INFORMATIONAL",
+        "INSIDER_CLUSTER",
+        "Multiple open-market insider transactions in a short window — informational cluster, not predictive alpha",
         "event_type"
       );
       break;

@@ -1030,14 +1030,27 @@ model InsiderTransaction {
   isOfficer         Boolean?
   isTenPercent      Boolean?
   officerTitle      String?
+  issuerName        String?
   transactionCode   String?
+  /// A = acquisition, D = disposition (SEC acquiredDisposedCode) — not the same as "sale"
+  acquiredDisposed  String?
   shares            Float?
   /// null = UNKNOWN
   pricePerShare     Float?
+  /// shares * price when both reported and finite
+  transactionValue  Float?
   sharesOwnedAfter  Float?
   isDirect          Boolean?
+  /// Signed change in reported holdings when basis is compatible; else null
+  holdingChange     Float?
   securityTitle     String?
+  /// open_market_purchase | open_market_sale | grant_award | option_exercise | gift | tax_withholding | other
+  classification    String    @default("other")
+  /// Only true when Form 4 discloses 10b5-1 / affirmative trading arrangement
+  is10b51           Boolean?
+  summaryText       String?
   footnotesJson     Json?
+  metricsJson       Json      @default("{}")
   sourceUrl         String?
   fingerprint       String    @unique
   companyEventId    String?
@@ -1045,6 +1058,7 @@ model InsiderTransaction {
 
   @@index([symbol, filedAt])
   @@index([symbol, transactionDate])
+  @@index([symbol, classification, transactionDate])
   @@index([accessionNumber])
   @@index([companyEventId])
 }

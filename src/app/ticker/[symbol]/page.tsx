@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { CapitalTab } from "@/components/ticker/CapitalTab";
 import { FinancialsTab } from "@/components/ticker/FinancialsTab";
+import { InsidersTab } from "@/components/ticker/InsidersTab";
 import { TickerPlaceholderTab } from "@/components/ticker/TickerPlaceholderTab";
 import { TickerWorkspaceTabs } from "@/components/ticker/TickerWorkspaceTabs";
 import { ThesisPanel } from "@/components/ticker/thesis/ThesisPanel";
 import { WhatChangedTab } from "@/components/ticker/WhatChangedTab";
 import { getCapitalRiskReportForSymbol } from "@/lib/capital-risk/snapshot";
 import { getDilutionTimeline } from "@/lib/dilution/timeline";
+import { getInsiderReportForSymbol } from "@/lib/insider/get-report";
 import { parseTickerTab } from "@/lib/ticker-tabs";
 import { getTickerHubBundle } from "@/lib/ticker-hub";
 import { getQuarterlyDeltaForSymbol } from "@/lib/metrics/get-quarterly-delta";
@@ -48,13 +50,14 @@ export default async function TickerPage({ params, searchParams }: Props) {
 
   const tab = parseTickerTab(tabRaw);
 
-  const [hub, report, events, capitalReport, dilutionTimeline] =
+  const [hub, report, events, capitalReport, dilutionTimeline, insiderReport] =
     await Promise.all([
       getTickerHubBundle(sym),
       getQuarterlyDeltaForSymbol(sym).catch(() => null),
       getTickerWhatChangedEvents(sym).catch(() => []),
       getCapitalRiskReportForSymbol(sym).catch(() => null),
       getDilutionTimeline(sym, 40).catch(() => []),
+      getInsiderReportForSymbol(sym).catch(() => null),
     ]);
 
   const emptyReport = {
@@ -155,11 +158,15 @@ export default async function TickerPage({ params, searchParams }: Props) {
         ) : null}
 
         {tab === "insiders" ? (
-          <TickerPlaceholderTab
-            testId="ticker-insiders"
-            title="Insiders"
-            body="Structured Form 4 context is rolling out. Recent Form 4 headlines are on Overview."
-          />
+          insiderReport ? (
+            <InsidersTab report={insiderReport} />
+          ) : (
+            <TickerPlaceholderTab
+              testId="ticker-insiders"
+              title="Insiders"
+              body="Structured Form 4 data could not be loaded for this symbol right now."
+            />
+          )
         ) : null}
 
         {tab === "ownership" ? (

@@ -81,7 +81,7 @@ Check items only when implemented, tested, and committed for that checkpoint.
 - [x] Thesis tab *(create/edit conditions + health status)*
 - [x] Financials tab *(Quarterly Delta)*
 - [x] Capital tab *(Capital Risk: liquidity, shares, financing)*
-- [ ] Insiders tab *(placeholder on hub)*
+- [x] Insiders tab *(structured Form 4)*
 - [ ] Ownership tab *(placeholder on hub)*
 - [ ] Filings tab *(placeholder on hub)*
 - [ ] Timeline tab *(placeholder on hub)*
@@ -135,8 +135,8 @@ Check items only when implemented, tested, and committed for that checkpoint.
 
 ### Insiders
 
-- [ ] Form 4 parsing beyond headline heuristics
-- [ ] Insider context (disposition ≠ automatic open-market sale)
+- [x] Form 4 parsing beyond headline heuristics
+- [x] Insider context (disposition ≠ automatic open-market sale)
 
 ### Ownership
 

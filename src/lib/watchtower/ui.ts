@@ -55,6 +55,7 @@ const REASON_LABELS: Record<string, string> = {
   CAPITAL_RISK_LEVEL_CHANGE: "Capital risk level change",
   CONVERTIBLE_OR_WARRANT_CAPITAL: "Convertible / warrant capital",
   DIRECTOR_OR_BOARD_CHANGE: "Director / board change",
+  INSIDER_CLUSTER: "Insider transaction cluster",
   ROUTINE_PERIODIC_FILING: "Routine periodic filing",
   ROUTINE_OWNERSHIP_AMENDMENT: "Ownership amendment",
   ROUTINE_INSIDER_FORM: "Insider form",

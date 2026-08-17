@@ -1,4 +1,4 @@
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "./redis.ts";
 
 type Bucket = { count: number; resetAt: number };
 

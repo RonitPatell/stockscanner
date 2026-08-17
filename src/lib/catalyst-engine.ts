@@ -696,10 +696,11 @@ export async function ingestAndAnalyzeNews(
       }
     })();
 
-    // Dilution Radar V2 + Company Event Engine (non-blocking / enrichment path)
+    // Dilution Radar V2 + Form 4 insiders + Company Event Engine
     void (async () => {
       try {
         const { processCatalystForDilution } = await import("./dilution/from-catalyst");
+        const { processCatalystForInsiders } = await import("./insider/from-catalyst");
         const { processCatalystForCompanyEvents } = await import(
           "./company-events/from-catalyst"
         );
@@ -714,6 +715,17 @@ export async function ingestAndAnalyzeNews(
           rawNewsId: article.id,
           publishedAt: article.publishedAt,
           floatShares: quote?.floatShares ?? null,
+        });
+
+        await processCatalystForInsiders({
+          catalystId: catalyst.id,
+          symbol,
+          headline: article.headline,
+          summary: article.summary ?? analysis.summary,
+          source: article.source,
+          sourceUrl: article.url,
+          rawNewsId: article.id,
+          publishedAt: article.publishedAt,
         });
 
         await processCatalystForCompanyEvents(
