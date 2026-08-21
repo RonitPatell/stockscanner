@@ -1234,58 +1234,95 @@ body {
   will-change: transform;
 }
 
-/* Scroll snap — flush viewport slides (no empty bands between sections) */
-html.landing-scroll-snap {
-  scroll-snap-type: y mandatory;
-  -webkit-scroll-snap-type: y mandatory;
-  scroll-padding-top: 0;
-  /* Instant snap feels cleaner than smooth easing between tall slides */
-  scroll-behavior: auto;
+/* Landing scroll progress + short sticky tours (no mandatory snap spam) */
+.landing-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  background: transparent;
+  pointer-events: none;
 }
-
-body.landing-scroll-snap-body {
-  overscroll-behavior-y: none;
-  margin: 0;
-}
-
-.landing-snap-slide {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  height: 100dvh;
-  min-height: 100dvh;
-  max-height: 100dvh;
-  box-sizing: border-box;
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-start;
-  overflow: hidden;
-  position: relative;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.landing-snap-slide-inner {
+.landing-scroll-progress-fill {
+  height: 100%;
   width: 100%;
-  max-width: 72rem;
-  margin: 0 auto;
-  /* Navbar (~4rem) clearance only — content starts under fixed nav */
-  padding: 4.5rem 1rem 1.25rem;
-  box-sizing: border-box;
-  max-height: 100dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: flex;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #34d399, #6ee7b7);
+  transition: transform 0.08s linear;
+}
+
+.landing-scroll-rail {
+  position: fixed;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: none;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  gap: 0.55rem;
+}
+@media (min-width: 1024px) {
+  .landing-scroll-rail {
+    display: flex;
+  }
+}
+.landing-scroll-rail-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgb(63 63 70);
+  border: 1px solid rgb(82 82 91);
+  transition: transform 0.25s var(--ease-out), background 0.25s var(--ease-out), box-shadow 0.25s;
+}
+.landing-scroll-rail-dot.is-active {
+  background: #34d399;
+  border-color: #6ee7b7;
+  transform: scale(1.35);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.45);
+}
+.landing-scroll-rail-pct {
+  margin-top: 0.35rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgb(113 113 122);
 }
 
-/* Hero owns its own top padding; avoid double offset */
-.landing-hero-slide.landing-snap-slide {
-  padding: 0;
+.landing-tour-bar {
+  height: 2px;
+  width: min(12rem, 40vw);
+  background: rgb(39 39 42);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.landing-tour-bar-fill {
+  height: 100%;
+  background: #34d399;
+  transition: width 0.35s var(--ease-out);
 }
 
-/* Trader desk animations — replay when slide locks in */
+.landing-tour-panel {
+  animation: landing-tour-swap 0.4s var(--ease-out);
+}
+@keyframes landing-tour-swap {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Keep animation hooks; no document-level scroll snap */
+.landing-snap-slide {
+  position: relative;
+}
+
 .landing-snap-active .trader-spark-path {
   animation: trader-spark-draw 1.35s var(--ease-out) forwards;
 }
@@ -1558,14 +1595,18 @@ body.landing-scroll-snap-body {
     scroll-snap-type: none;
     scroll-behavior: auto;
   }
+  .landing-scroll-progress,
+  .landing-scroll-rail {
+    display: none !important;
+  }
+  .landing-tour-panel {
+    animation: none !important;
+  }
   .landing-snap-slide {
-    scroll-snap-align: none;
-    scroll-snap-stop: normal;
     height: auto;
     min-height: 0;
     max-height: none;
     overflow: visible;
-    padding: 0;
   }
   .landing-snap-slide-inner {
     max-height: none;

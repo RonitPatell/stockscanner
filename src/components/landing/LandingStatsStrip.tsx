@@ -2,7 +2,6 @@
 
 import { CountUp } from "./CountUp";
 import { TraderDualTape } from "./LandingTraderViz";
-import { SnapSection } from "./SnapSlides";
 
 const STATS = [
   { label: "SEC-backed datasets", end: 6, suffix: "+" },
@@ -13,11 +12,11 @@ const STATS = [
 
 export function LandingStatsStrip() {
   return (
-    <SnapSection
-      className="landing-stats-slide bg-[var(--bg-panel)]/40"
-      testId="landing-stats-strip"
+    <section
+      className="py-10 sm:py-12 px-4 sm:px-6 border-y mk-hairline bg-[var(--bg-panel)]/40 landing-snap-active"
+      data-testid="landing-stats-strip"
     >
-      <div className="landing-snap-slide-inner max-w-6xl mx-auto px-4 sm:px-6 w-full space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <TraderDualTape />
         <dl className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
           {STATS.map((s, i) => (
@@ -34,6 +33,6 @@ export function LandingStatsStrip() {
           ))}
         </dl>
       </div>
-    </SnapSection>
+    </section>
   );
 }

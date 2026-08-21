@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { TrackLink } from "./TrackLink";
 import { TRUSTTICKER_TRIAL_CTA } from "@/lib/billing/pricing";
 import { TraderFilingRail, TraderPortfolioGrid } from "./LandingTraderViz";
-import { ScrollHint, SnapSlide, StepProgress, useSnapSlideIndex } from "./SnapSlides";
-import { usePrefersReducedMotion } from "./use-scroll-progress";
+import { Reveal } from "./Reveal";
 
 const STEPS = [
   {
@@ -55,7 +54,7 @@ function ForwardViz({ kind }: { kind: (typeof STEPS)[number]["viz"] }) {
   }
   if (kind === "daily") return <TraderFilingRail className="justify-center" />;
   return (
-    <p className="mk-stat text-5xl text-emerald-400/30 text-center py-8">7 days</p>
+    <p className="mk-stat text-4xl text-emerald-400/30 text-center py-4">7 days</p>
   );
 }
 
@@ -66,86 +65,63 @@ export function LandingForwardPath({
   primaryHref: string;
   isSubscribed: boolean;
 }) {
-  const reduced = usePrefersReducedMotion();
-  const { active, register } = useSnapSlideIndex(STEPS.length);
-  const labels = STEPS.map((s) => s.title);
+  return (
+    <section
+      id="path"
+      className="py-14 sm:py-16 px-4 sm:px-6 border-t mk-hairline"
+      data-testid="landing-forward-path"
+    >
+      <div className="max-w-6xl mx-auto">
+        <Reveal>
+          <div className="mk-section-rule mb-6">
+            <span className="mk-stat text-[13px] text-[var(--accent)]">04</span>
+            <span className="mk-tick !text-[var(--text-secondary)]">Forward path</span>
+          </div>
+          <h2 className="mk-display text-2xl sm:text-4xl max-w-xl mb-3">
+            From signup to daily habit in four steps.
+          </h2>
+          <p className="text-sm text-[var(--text-secondary)] max-w-lg mb-10 leading-relaxed">
+            Real SEC data behind every number in the desk.
+          </p>
+        </Reveal>
 
-  if (reduced) {
-    return (
-      <section className="py-16 px-4 sm:px-6" data-testid="landing-forward-path">
-        <div className="max-w-6xl mx-auto grid sm:grid-cols-2 gap-8">
-          {STEPS.map((s) => (
-            <div key={s.n}>
-              <h3 className="font-semibold mb-2">{s.title}</h3>
-              <p className="text-sm text-[var(--text-secondary)]">{s.body}</p>
-            </div>
+        <div className="grid sm:grid-cols-2 gap-5 lg:gap-6">
+          {STEPS.map((s, i) => (
+            <Reveal key={s.n} delay={i * 60}>
+              <article className="mk-panel mk-corners rounded-lg p-5 h-full landing-snap-active">
+                <div className="flex items-start gap-4">
+                  <span className="mk-stat text-2xl text-emerald-400/40 shrink-0">{s.n}</span>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">{s.title}</h3>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{s.body}</p>
+                    <div className="pt-1">
+                      <ForwardViz kind={s.viz} />
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </Reveal>
           ))}
         </div>
-      </section>
-    );
-  }
 
-  return (
-    <section className="landing-forward-sequence" data-testid="landing-forward-path">
-      {STEPS.map((s, i) => (
-        <SnapSlide
-          key={s.n}
-          index={i}
-          register={register}
-          className="landing-forward-slide bg-[var(--bg-graphite)]/30"
-        >
-          <div className="landing-snap-slide-inner max-w-6xl mx-auto px-4 sm:px-6 w-full">
-            <div className="grid lg:grid-cols-2 gap-10 items-center">
-              <div className="space-y-5">
-                {i === 0 ? (
-                  <>
-                    <p className="mk-tick text-emerald-400/90">Forward path</p>
-                    <h2 id="forward-heading" className="mk-display text-2xl sm:text-4xl max-w-md">
-                      From signup to daily habit in four steps.
-                    </h2>
-                    <p className="text-sm text-[var(--text-secondary)] max-w-md leading-relaxed">
-                      Each stop is one step. Real SEC data behind every number in the desk.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <span className="mk-stat text-4xl text-emerald-400/35 block">{s.n}</span>
-                    <h3 className="text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">
-                      {s.title}
-                    </h3>
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-md">
-                      {s.body}
-                    </p>
-                  </>
-                )}
-                <StepProgress total={STEPS.length} active={active} labels={labels} />
-                <ScrollHint
-                  label={i < STEPS.length - 1 ? "Scroll to next step" : "Scroll to evidence"}
-                />
-                {i === STEPS.length - 1 && !isSubscribed && (
-                  <TrackLink event="landing_cta_trial" props={{ placement: "forward" }} href={primaryHref}>
-                    <Button size="lg" className="cta-glow mt-4">
-                      {TRUSTTICKER_TRIAL_CTA}
-                      <ArrowRight className="w-5 h-5" aria-hidden />
-                    </Button>
-                  </TrackLink>
-                )}
-                {i === STEPS.length - 1 && isSubscribed && (
-                  <Link href="/dashboard">
-                    <Button size="lg" className="cta-glow mt-4">
-                      Open Portfolio
-                      <ArrowRight className="w-5 h-5" aria-hidden />
-                    </Button>
-                  </Link>
-                )}
-              </div>
-              <div className="mk-panel mk-corners rounded-lg p-6 sm:p-8 min-h-[200px] flex items-center justify-center">
-                <ForwardViz kind={s.viz} />
-              </div>
-            </div>
-          </div>
-        </SnapSlide>
-      ))}
+        <Reveal delay={200} className="mt-10">
+          {isSubscribed ? (
+            <Link href="/dashboard">
+              <Button size="lg" className="cta-glow">
+                Open Portfolio
+                <ArrowRight className="w-5 h-5" aria-hidden />
+              </Button>
+            </Link>
+          ) : (
+            <TrackLink event="landing_cta_trial" props={{ placement: "forward" }} href={primaryHref}>
+              <Button size="lg" className="cta-glow">
+                {TRUSTTICKER_TRIAL_CTA}
+                <ArrowRight className="w-5 h-5" aria-hidden />
+              </Button>
+            </TrackLink>
+          )}
+        </Reveal>
+      </div>
     </section>
   );
 }

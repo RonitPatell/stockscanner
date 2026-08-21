@@ -10,7 +10,7 @@ import { LandingPinnedOperations } from "./LandingPinnedOperations";
 import { LandingMarketShift } from "./LandingMarketShift";
 import { LandingForwardPath } from "./LandingForwardPath";
 import { LandingStatsStrip } from "./LandingStatsStrip";
-import { LandingScrollSnap } from "./LandingScrollSnap";
+import { LandingScrollProgress } from "./LandingScrollProgress";
 import {
   TRUSTTICKER_ANNUAL_LABEL,
   TRUSTTICKER_MONTHLY_LABEL,
@@ -120,7 +120,7 @@ export function MarketingLanding({
 
   return (
     <main className="marketing-shell min-h-screen overflow-x-hidden">
-      <LandingScrollSnap />
+      <LandingScrollProgress />
       <LandingHeroScroll
         displayName={displayName}
         isSignedIn={isSignedIn}

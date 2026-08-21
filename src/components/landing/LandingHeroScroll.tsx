@@ -3,7 +3,6 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LandingHeroDesk } from "./LandingHeroDesk";
-import { SnapSection } from "./SnapSlides";
 import { TrackLink } from "./TrackLink";
 import {
   TRUSTTICKER_ANNUAL_LABEL,
@@ -27,13 +26,14 @@ export function LandingHeroScroll({
   secondaryLabel: string;
   isSignedIn: boolean;
 }) {
-  const parallax = useParallaxScroll(0.22);
+  const parallax = useParallaxScroll(0.18);
   const reduced = usePrefersReducedMotion();
 
   return (
-    <SnapSection
-      className="landing-hero-slide relative overflow-hidden !p-0"
-      testId="landing-hero"
+    <section
+      id="hero"
+      className="landing-hero-slide relative overflow-hidden min-h-[88dvh] flex flex-col"
+      data-testid="landing-hero"
     >
       <div
         className="absolute inset-0 grid-bg pointer-events-none landing-grid-drift"
@@ -46,7 +46,7 @@ export function LandingHeroScroll({
       <div className="trader-hero-scan pointer-events-none" aria-hidden />
 
       <div
-        className="relative flex-1 flex flex-col justify-center max-w-6xl w-full mx-auto px-4 sm:px-6 pt-20 sm:pt-22 pb-6"
+        className="relative flex-1 flex flex-col justify-center max-w-6xl w-full mx-auto px-4 sm:px-6 pt-24 pb-10"
         aria-labelledby="hero-heading"
       >
         <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-8 lg:gap-12 items-center w-full">
@@ -58,7 +58,7 @@ export function LandingHeroScroll({
               </p>
             </div>
 
-            <h1 id="hero-heading" className="landing-headline mb-6 text-[var(--text-primary)]">
+            <h1 id="hero-heading" className="landing-headline mb-5 text-[var(--text-primary)]">
               <span className="landing-headline-line landing-fade-up landing-delay-1 block">
                 The research brain
               </span>
@@ -74,7 +74,7 @@ export function LandingHeroScroll({
               {isSignedIn && displayName ? ` Welcome back, ${displayName}.` : ""}
             </p>
 
-            <p className="landing-fade-up landing-delay-3 text-[13px] text-[var(--text-tertiary)] max-w-lg mb-8">
+            <p className="landing-fade-up landing-delay-3 text-[13px] text-[var(--text-tertiary)] max-w-lg mb-7">
               Built for people who want clarity without another cluttered terminal.
             </p>
 
@@ -105,7 +105,7 @@ export function LandingHeroScroll({
             </div>
 
             <p
-              className="landing-fade-up landing-delay-5 mk-tick mt-5 sm:mt-6 text-[var(--text-tertiary)] normal-case !tracking-[0.06em]"
+              className="landing-fade-up landing-delay-5 mk-tick mt-5 text-[var(--text-tertiary)] normal-case !tracking-[0.06em]"
               data-testid="landing-pricing-line"
             >
               {TRUSTTICKER_MONTHLY_LABEL}/month or {TRUSTTICKER_ANNUAL_LABEL}{" "}
@@ -115,17 +115,12 @@ export function LandingHeroScroll({
 
           <div
             className="landing-fade-up landing-delay-2 w-full max-w-lg mx-auto lg:max-w-none lg:mx-0 landing-hero-preview"
-            style={reduced ? undefined : { transform: `translate3d(0, ${-parallax * 0.35}px, 0)` }}
+            style={reduced ? undefined : { transform: `translate3d(0, ${-parallax * 0.3}px, 0)` }}
           >
             <LandingHeroDesk />
           </div>
         </div>
       </div>
-
-      <div className="landing-scroll-cue hidden sm:flex pb-6" aria-hidden>
-        <span className="mk-tick">Scroll</span>
-        <span className="landing-scroll-line" />
-      </div>
-    </SnapSection>
+    </section>
   );
 }
