@@ -24,8 +24,8 @@
   /* Text hierarchy */
   --text-primary: #f2efe9;
   --text-secondary: #a49d90;
-  --text-tertiary: #6f6a5f;
-  --text-muted: #4a463e;
+  --text-tertiary: #8a8478;
+  --text-muted: #7a7468;
 
   /* Emerald = actions / live; brand nav = purple */
   --accent: #16c784;
@@ -87,8 +87,6 @@
 
   --icon-xs: 12px;
   --icon-sm: 14px;
-  --icon-md: 16px;
-  --icon-lg: 20px;
 
   --row-pad-y: var(--space-2);
   --row-pad-x: 12px;
@@ -351,8 +349,6 @@ body {
 
 .tt-icon-xs { width: var(--icon-xs); height: var(--icon-xs); }
 .tt-icon-sm { width: var(--icon-sm); height: var(--icon-sm); }
-.tt-icon-md { width: var(--icon-md); height: var(--icon-md); }
-.tt-icon-lg { width: var(--icon-lg); height: var(--icon-lg); }
 
 .tt-stack-section { display: flex; flex-direction: column; gap: var(--section-gap); }
 .tt-stack-card { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -1140,6 +1136,382 @@ body {
     0 10px 40px rgba(22, 199, 132, 0.36);
 }
 
+/* ═══════════════════════════════════════════════════════
+   LANDING V2 — Meuze-inspired scroll narrative
+═══════════════════════════════════════════════════════ */
+.landing-headline {
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  text-wrap: balance;
+}
+
+.landing-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.landing-orb-a {
+  width: min(520px, 70vw);
+  height: min(520px, 70vw);
+  top: -8%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(22, 199, 132, 0.22), transparent 68%);
+  animation: landing-orb-drift-a 18s ease-in-out infinite alternate;
+}
+.landing-orb-b {
+  width: min(380px, 55vw);
+  height: min(380px, 55vw);
+  bottom: 10%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(94, 200, 212, 0.12), transparent 70%);
+  animation: landing-orb-drift-b 22s ease-in-out infinite alternate;
+}
+@keyframes landing-orb-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-24px, 32px, 0) scale(1.08); }
+}
+@keyframes landing-orb-drift-b {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(28px, -20px, 0); }
+}
+
+.landing-grid-drift {
+  will-change: transform;
+}
+
+.landing-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.5);
+  animation: landing-pulse 2.4s ease-out infinite;
+}
+@keyframes landing-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.45); }
+  70%  { box-shadow: 0 0 0 10px rgba(22, 199, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 199, 132, 0); }
+}
+
+.landing-live-wire {
+  margin-top: auto;
+}
+.landing-marquee-track {
+  animation: landing-marquee 38s linear infinite;
+  width: max-content;
+}
+@keyframes landing-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.landing-scroll-cue {
+  position: absolute;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.5;
+}
+.landing-scroll-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(180deg, var(--accent), transparent);
+  animation: landing-scroll-line 2s ease-in-out infinite;
+}
+@keyframes landing-scroll-line {
+  0%, 100% { transform: scaleY(0.6); opacity: 0.4; }
+  50%      { transform: scaleY(1); opacity: 1; }
+}
+
+.landing-hero-preview {
+  will-change: transform;
+}
+
+/* Scroll snap — flush viewport slides (no empty bands between sections) */
+html.landing-scroll-snap {
+  scroll-snap-type: y mandatory;
+  -webkit-scroll-snap-type: y mandatory;
+  scroll-padding-top: 0;
+  /* Instant snap feels cleaner than smooth easing between tall slides */
+  scroll-behavior: auto;
+}
+
+body.landing-scroll-snap-body {
+  overscroll-behavior-y: none;
+  margin: 0;
+}
+
+.landing-snap-slide {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.landing-snap-slide-inner {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  /* Navbar (~4rem) clearance only — content starts under fixed nav */
+  padding: 4.5rem 1rem 1.25rem;
+  box-sizing: border-box;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Hero owns its own top padding; avoid double offset */
+.landing-hero-slide.landing-snap-slide {
+  padding: 0;
+}
+
+/* Trader desk animations — replay when slide locks in */
+.landing-snap-active .trader-spark-path {
+  animation: trader-spark-draw 1.35s var(--ease-out) forwards;
+}
+.landing-snap-active .trader-spark-fill {
+  animation: trader-spark-fill-in 1.1s var(--ease-out) 0.15s forwards;
+  opacity: 0;
+}
+.landing-snap-active .trader-spark-dot {
+  animation: trader-spark-dot 0.4s var(--ease-out) 1.2s forwards;
+  opacity: 0;
+}
+@keyframes trader-spark-draw {
+  from { stroke-dashoffset: 420; }
+  to { stroke-dashoffset: 0; }
+}
+.trader-spark-path {
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+}
+@keyframes trader-spark-fill-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes trader-spark-dot {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.landing-snap-active .trader-feed-row {
+  animation: trader-row-in 0.55s var(--ease-out) both;
+  animation-delay: calc(0.08s + (var(--row-i, 0) * 0.1s));
+  opacity: 0;
+  transform: translateX(14px);
+}
+@keyframes trader-row-in {
+  to { opacity: 1; transform: none; }
+}
+
+.landing-snap-active .trader-stat-cell {
+  animation: trader-row-in 0.6s var(--ease-out) both;
+  animation-delay: calc(var(--row-i, 0) * 0.12s);
+  opacity: 0;
+}
+
+.landing-snap-active .trader-grid-cell {
+  animation: trader-cell-pop 0.45s var(--ease-out) both;
+  animation-delay: calc(var(--cell-i, 0) * 0.07s);
+  opacity: 0;
+  transform: scale(0.92);
+}
+@keyframes trader-cell-pop {
+  to { opacity: 1; transform: none; }
+}
+
+.trader-scan-beam {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(22, 199, 132, 0.07) 50%,
+    transparent 60%
+  );
+  transform: translateX(-100%);
+}
+.landing-snap-active .trader-scan-beam {
+  animation: trader-scan 2.2s var(--ease-out) 0.3s;
+}
+@keyframes trader-scan {
+  to { transform: translateX(100%); }
+}
+
+.trader-hero-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(22, 199, 132, 0.04) 50%,
+    transparent
+  );
+  opacity: 0.6;
+  animation: trader-hero-scan 6s ease-in-out infinite;
+}
+@keyframes trader-hero-scan {
+  0%, 100% { transform: translateY(-20%); opacity: 0.3; }
+  50% { transform: translateY(20%); opacity: 0.7; }
+}
+
+.trader-tape-a {
+  animation: trader-tape 28s linear infinite;
+}
+.trader-tape-b {
+  animation: trader-tape 22s linear infinite reverse;
+}
+@keyframes trader-tape {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.trader-live-blink {
+  animation: landing-pulse 2s ease-out infinite;
+}
+
+.trader-desk-glow {
+  animation: trader-desk-glow 4s ease-in-out infinite alternate;
+}
+@keyframes trader-desk-glow {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+.trader-feed-ping {
+  animation: trader-ping 1.8s ease-out infinite;
+}
+@keyframes trader-ping {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.35); }
+}
+
+.landing-hero-slide {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(22, 199, 132, 0.06), transparent),
+    var(--bg-ink);
+}
+
+.landing-product-slide {
+  background: var(--bg-ink);
+}
+
+.landing-stats-slide {
+  background: var(--bg-panel);
+}
+
+.landing-ops-sequence,
+.landing-shift-sequence,
+.landing-forward-sequence,
+.landing-product-sequence {
+  position: relative;
+}
+
+.landing-ops-slide {
+  background:
+    linear-gradient(180deg, rgba(22, 199, 132, 0.03), transparent 40%),
+    var(--bg-graphite);
+  background-color: rgba(16, 17, 18, 0.35);
+}
+
+.landing-shift-slide {
+  background:
+    linear-gradient(180deg, transparent, rgba(16, 17, 18, 0.45) 50%, transparent),
+    var(--bg-ink);
+}
+
+.landing-ops-card {
+  transition: box-shadow 0.5s var(--ease-out), border-color 0.5s ease;
+}
+
+@keyframes landing-slide-in-keyframes {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-snap-slide .landing-slide-in {
+  animation: landing-slide-in-keyframes 0.65s var(--ease-out) both;
+}
+
+.landing-snap-slide .landing-slide-in:nth-child(2) { animation-delay: 0.08s; }
+.landing-snap-slide .landing-slide-in:nth-child(3) { animation-delay: 0.16s; }
+.landing-snap-slide .landing-slide-in:nth-child(4) { animation-delay: 0.24s; }
+
+/* Legacy pinned styles removed — snap slides above */
+.landing-shift-scene-busy {
+  box-shadow: 0 0 60px rgba(232, 184, 74, 0.08);
+  border-color: rgba(232, 184, 74, 0.2);
+}
+.landing-shift-glow {
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(22, 199, 132, 0.08), transparent);
+  transition: opacity 0.7s ease;
+}
+.landing-shift-scene-busy + .landing-shift-glow {
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232, 184, 74, 0.1), transparent);
+}
+
+.landing-forward-card {
+  transition: transform 0.4s var(--ease-out), border-color 0.4s ease;
+}
+.landing-forward-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-strong);
+}
+
+/* Stagger reveal variants */
+.reveal-stagger-root .reveal-stagger-item {
+  opacity: 0;
+  transition:
+    opacity 0.7s var(--ease-out),
+    transform 0.7s var(--ease-out),
+    filter 0.7s var(--ease-out);
+  transition-delay: calc(var(--stagger, 70ms) * var(--i, 0));
+}
+.reveal-stagger-root .reveal-stagger-item:nth-child(1) { --i: 0; }
+.reveal-stagger-root .reveal-stagger-item:nth-child(2) { --i: 1; }
+.reveal-stagger-root .reveal-stagger-item:nth-child(3) { --i: 2; }
+.reveal-stagger-root .reveal-stagger-item:nth-child(4) { --i: 3; }
+.reveal-stagger-root .reveal-stagger-item:nth-child(5) { --i: 4; }
+.reveal-stagger-root .reveal-stagger-item:nth-child(6) { --i: 5; }
+
+.reveal-variant-up .reveal-stagger-item { transform: translateY(28px); }
+.reveal-variant-left .reveal-stagger-item { transform: translateX(-32px); }
+.reveal-variant-right .reveal-stagger-item { transform: translateX(32px); }
+.reveal-variant-scale .reveal-stagger-item { transform: scale(0.94); }
+.reveal-variant-blur .reveal-stagger-item { transform: translateY(20px); filter: blur(8px); }
+
+.reveal-stagger-root.reveal-stagger-in .reveal-stagger-item {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
 @keyframes price-rise {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1160,6 +1532,48 @@ body {
   .animate-marquee,.new-row,.animate-in { animation: none !important; }
   .reveal-base { opacity: 1; transform: none; }
   .mk-lift, .mk-lift:hover { transform: none; }
+  .reveal-stagger-root .reveal-stagger-item,
+  .reveal-stagger-root.reveal-stagger-in .reveal-stagger-item {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .landing-grid-drift,
+  .landing-marquee-track,
+  .landing-pulse-dot,
+  .landing-scroll-line,
+  .landing-orb,
+  .landing-snap-active .trader-feed-row,
+  .landing-snap-active .trader-stat-cell,
+  .landing-snap-active .trader-grid-cell,
+  .landing-snap-active .trader-spark-path,
+  .landing-snap-active .trader-scan-beam,
+  .trader-tape-a,
+  .trader-tape-b,
+  .trader-hero-scan,
+  .trader-desk-glow,
+  .trader-feed-ping { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .trader-spark-path { stroke-dashoffset: 0; }
+  html.landing-scroll-snap {
+    scroll-snap-type: none;
+    scroll-behavior: auto;
+  }
+  .landing-snap-slide {
+    scroll-snap-align: none;
+    scroll-snap-stop: normal;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+  }
+  .landing-snap-slide-inner {
+    max-height: none;
+    overflow: visible;
+    justify-content: flex-start;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
   * { scroll-behavior: auto !important; }
 }
 
